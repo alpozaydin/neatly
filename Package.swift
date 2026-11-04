@@ -11,6 +11,7 @@ let package = Package(
     targets: [
         .target(name: "NamerCore"),
         .executableTarget(name: "namer", dependencies: ["NamerCore"]),
+        .executableTarget(name: "namer-eval", dependencies: ["NamerCore"]),
         // Plain executable instead of a test target: swift-testing/XCTest need full Xcode.
         .executableTarget(name: "checks", dependencies: ["NamerCore"], path: "Tests/NamerCoreTests"),
     ]
