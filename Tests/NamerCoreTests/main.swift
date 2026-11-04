@@ -81,6 +81,25 @@ func period() {
     expect(Style.academicItem(in: "Homework 2: Hash Tables") == "hw2")
 }
 
-for t in [styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+func destinations() {
+    let home = FileManager.default.temporaryDirectory.appending(path: "namer-home-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: home) }
+    for d in ["courses-fall26/cs315", "Work/Companies/Nimbus AI", "Work/Companies/Brightline", "Documents/official"] {
+        try? FileManager.default.createDirectory(at: home.appending(path: d), withIntermediateDirectories: true)
+    }
+    let folders = Destination.index(home: home)
+    var e = Evidence(url: URL(fileURLWithPath: "/tmp/x.pdf"))
+    expect(Destination.suggest(name: "cs315-syllabus", evidence: e, folders: folders, history: [])?.lastPathComponent == "cs315")
+    e.headline = "Nimbus AI - Board Update"; e.bodySnippet = "Nimbus revenue grew. Nimbus hired."
+    expect(Destination.suggest(name: "board-update", evidence: e, folders: folders, history: [])?.lastPathComponent == "Nimbus AI")
+    e = Evidence(url: URL(fileURLWithPath: "/tmp/y.pdf")); e.bodySnippet = "Harvard Medical School"
+    expect(Destination.suggest(name: "research", evidence: e, folders: folders, history: []) == nil)   // no guessing
+    // You moved a transcript to Documents/official once → next transcript goes there too.
+    let past = Correction(original: "a.pdf", suggested: "transcript-fall26", chosen: "transcript-fall26", via: "rules",
+                          source: nil, title: nil, chosenFolder: home.appending(path: "Documents/official").path)
+    expect(Destination.suggest(name: "transcript-spring27", evidence: e, folders: folders, history: [past])?.lastPathComponent == "official")
+}
+
+for t in [destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
