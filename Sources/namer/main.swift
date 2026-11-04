@@ -13,10 +13,46 @@ usage: namer [options] <file or folder>...
   --no-model   don't use the on-device model
   undo <file>  restore a file's original name
   keep <file>  mark a name as yours: never suggest for it again
+  learn <folder>...  learn your naming style from names you already chose (reads names only)
+  style        show the saved style  (style --reset to delete it)
 """
 
 var args = Array(CommandLine.arguments.dropFirst())
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
+
+if args.first == "learn" {
+    let roots = args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+    guard !roots.isEmpty else { print("usage: namer learn <folder>..."); exit(1) }
+    let (overall, agreement, folders) = StyleProfile.learn(roots: roots)
+    func describe(_ p: StyleProfile) -> String {
+        let sep = p.separator == " " ? "spaces" : "'\(p.separator)'"
+        return "\(sep), \(p.lowercase ? "lowercase" : "Title Case")" + (p.suffix.map { ", ends with \($0)" } ?? "")
+            + "  → e.g. \(p.render("transcript-fall26"))"
+    }
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    for f in folders {
+        print("\(f.folder.replacingOccurrences(of: home, with: "~"))  (\(f.profile.learnedFrom) names)")
+        print("    \(describe(f.profile))")
+    }
+    let saved = overall   // separator + case only: a suffix like your initials belongs to one folder, not all
+    print("\nmost folders (\(Int(agreement * 100))% of \(folders.count)): \(describe(saved))")
+    if args.contains("--dry-run") { exit(0) }
+    if agreement < 0.6 {
+        print("\nYour folders use different styles, so nothing was saved.")
+        print("Run it on the folders whose style you want for downloads, e.g.: namer learn ~/courses-fall26")
+        exit(0)
+    }
+    try saved.save()
+    print("saved to \(StyleProfile.fileURL.path.replacingOccurrences(of: home, with: "~"))")
+    exit(0)
+}
+
+if args.first == "style" {
+    if args.contains("--reset") { try? FileManager.default.removeItem(at: StyleProfile.fileURL); print("style reset"); exit(0) }
+    if let p = StyleProfile.load() { print(String(data: try JSONEncoder().encode(p), encoding: .utf8)!) }
+    else { print("no saved style — using: lowercase, '-' (run: namer learn <folder>)") }
+    exit(0)
+}
 
 if args.first == "keep" {
     for p in args.dropFirst() { Decision.markKeep(URL(fileURLWithPath: p)); print("keeping: \(p)") }
@@ -40,6 +76,7 @@ if args.first == "undo" {
 }
 let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch")
 var namer = Namer()
+namer.profile = StyleProfile.load() ?? .standard
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
 

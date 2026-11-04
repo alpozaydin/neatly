@@ -63,6 +63,24 @@ func transcriptRule() {
     expect(Namer().ruleName(e) == "transcript-fall26")
 }
 
-for t in [terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+func styleLearning() {
+    let work = StyleProfile.learn(names: ["CivCore AI Model - MAO", "Slush 2026 Side Events - MAO", "Market Map - MAO"])
+    expect(work.separator == " " && !work.lowercase && work.suffix == "MAO")
+    expect(work.render("invoice-turkcell-nov26") == "Invoice Turkcell Nov26 - MAO")
+    let school = StyleProfile.learn(names: ["hw1-bomblab", "courses-fall26", "CENG315-W123", "lec1"])
+    expect(school.separator == "-" && school.lowercase && school.suffix == nil)
+    expect(StyleProfile.standard.render("ceng213-hw2") == "ceng213-hw2")
+}
+
+func period() {
+    let c = Calendar.current
+    expect(Style.period(in: "Fatura Dönemi: Ekim 2026").map { c.component(.month, from: $0) } == 10)
+    expect(Style.period(in: "Tarih: 03.11.2026").map { c.component(.month, from: $0) } == 11)
+    expect(Style.courseCode(in: "CENG 334 Operating Systems", academicSource: false) == "ceng334")
+    expect(Style.courseCode(in: "Lufthansa LH1357", academicSource: false) == nil)
+    expect(Style.academicItem(in: "Homework 2: Hash Tables") == "hw2")
+}
+
+for t in [styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
