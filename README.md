@@ -19,6 +19,18 @@ No confident name → no suggestion. A guess is worse than a junk name.
 lowercase-kebab, most distinctive word first, qualifier last, as short as possible:
 `transcript-fall26`, `unidepth-2024`, `invoice-turkcell-nov26`.
 
+## Live mode
+
+```sh
+namer --watch ~/Downloads --ask   # a small dialog for each new download
+namer service install             # same, in the background, starting at login
+namer service uninstall           # stop it
+```
+
+The dialog shows the suggested name. **Rename** accepts it, editing the text uses your name instead,
+**Keep name** leaves the file alone for good. Your edits are saved in
+`~/Library/Application Support/namer/corrections.jsonl` so namer can learn from them.
+
 ## Your style
 
 namer can copy how you already name files. It reads only file **names**, never contents:

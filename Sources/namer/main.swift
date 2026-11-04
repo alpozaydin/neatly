@@ -9,6 +9,8 @@ usage: namer [options] <file or folder>...
   --force      suggest even for names that already look fine (never overrides a name you chose)
   --why        show the evidence, and why files were skipped
   --watch      wait for new files in the folder and suggest names as they arrive
+  --ask        with --watch: show a dialog for each file (Rename / edit the name / Keep name)
+  service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
   undo <file>  restore a file's original name
@@ -54,6 +56,45 @@ if args.first == "style" {
     exit(0)
 }
 
+if args.first == "service" {
+    let label = "dev.namer.watch"
+    let plist = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/\(label).plist")
+    let uid = getuid()
+    func launchctl(_ a: [String]) {
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl"); p.arguments = a
+        p.standardError = FileHandle.nullDevice; try? p.run(); p.waitUntilExit()
+    }
+    switch args.dropFirst().first {
+    case "install":
+        let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path
+        let log = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/namer.log").path
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict>
+          <key>Label</key><string>\(label)</string>
+          <key>ProgramArguments</key><array><string>\(exe)</string><string>--watch</string>
+            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string></array>
+          <key>RunAtLoad</key><true/>
+          <key>KeepAlive</key><true/>
+          <key>StandardOutPath</key><string>\(log)</string>
+          <key>StandardErrorPath</key><string>/dev/null</string>
+        </dict></plist>
+        """
+        try xml.write(to: plist, atomically: true, encoding: .utf8)
+        launchctl(["bootout", "gui/\(uid)/\(label)"])
+        launchctl(["bootstrap", "gui/\(uid)", plist.path])
+        print("namer now watches ~/Downloads and asks before renaming. Log: ~/Library/Logs/namer.log")
+        print("Stop it any time: namer service uninstall")
+    case "uninstall":
+        launchctl(["bootout", "gui/\(uid)/\(label)"])
+        try? FileManager.default.removeItem(at: plist)
+        print("stopped and removed")
+    default: print("usage: namer service install|uninstall")
+    }
+    exit(0)
+}
+
 if args.first == "keep" {
     for p in args.dropFirst() { Decision.markKeep(URL(fileURLWithPath: p)); print("keeping: \(p)") }
     exit(0)
@@ -74,11 +115,35 @@ if args.first == "undo" {
     guard let i = args.firstIndex(of: f) else { return false }
     args.remove(at: i); return true
 }
-let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch")
+let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask")
 var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
+
+enum Answer { case rename(String), keep, noAnswer }
+
+/// A plain macOS dialog with the suggestion pre-filled. Editing the text = your own name.
+func askUser(file: String, suggestion: String) -> Answer {
+    func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+    let script = """
+    display dialog "New download:\\n\(q(file))\\n\\nRename to:" default answer "\(q(suggestion))" ¬
+      with title "namer" buttons {"Keep name", "Rename"} default button "Rename" cancel button "Keep name" giving up after 300
+    """
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    p.arguments = ["-e", script]
+    let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return .noAnswer }
+    p.waitUntilExit()
+    if p.terminationStatus != 0 { return .keep }                       // "Keep name" = cancel button
+    let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    if text.contains("gave up:true") { return .noAnswer }
+    guard let r = text.range(of: "text returned:") else { return .noAnswer }
+    var chosen = String(text[r.upperBound...]).components(separatedBy: ", gave up:").first ?? ""
+    chosen = chosen.trimmingCharacters(in: .whitespacesAndNewlines)
+    return chosen.isEmpty ? .noAnswer : .rename(chosen)
+}
 
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
 if watch {
@@ -107,7 +172,25 @@ if watch {
                 case .suggested(let s):
                     let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
                     print("\(name)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
-                    if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
+                    if ask {
+                        let answer = askUser(file: name, suggestion: s.name)
+                        let ev = s.evidence
+                        let log = { (chosen: String) in
+                            Correction(original: name, suggested: s.name, chosen: chosen, via: s.via,
+                                       source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline).save()
+                        }
+                        switch answer {
+                        case .rename(let chosen):
+                            let done = try? Rename.apply(url, to: chosen)
+                            if let done { seen.insert(done.lastPathComponent) }
+                            if chosen != s.name { log(chosen); if let done { Decision.markKeep(done) } }
+                            print("   renamed to \(chosen)\(chosen != s.name ? " (your edit, saved)" : "")")
+                        case .keep:
+                            Decision.markKeep(url); log("")
+                            print("   kept original name")
+                        case .noAnswer: print("   no answer, left as is")
+                        }
+                    } else if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
                 case .kept(let r): print("\(name)  keep (\(r))")
                 case .unsure(let r): print("\(name)  ? (\(r))")
                 }
