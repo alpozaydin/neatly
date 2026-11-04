@@ -68,7 +68,17 @@ if args.first == "service" {
     }
     switch args.dropFirst().first {
     case "install":
-        let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path
+        // Run a stable copy, not the build output: macOS asks for folder access again whenever the
+        // program file changes, so developer rebuilds must not touch the one the service runs.
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let installed = home.appending(path: ".local/bin/namer")
+        let built = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        if built.path != installed.path {
+            try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: installed)
+            try FileManager.default.copyItem(at: built, to: installed)
+        }
+        let exe = installed.path
         let log = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/namer.log").path
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -87,6 +97,7 @@ if args.first == "service" {
         launchctl(["bootout", "gui/\(uid)/\(label)"])
         launchctl(["bootstrap", "gui/\(uid)", plist.path])
         print("namer now watches ~/Downloads and asks before renaming. Log: ~/Library/Logs/namer.log")
+        print("Installed at ~/.local/bin/namer. After updating namer, run 'namer service install' again.")
         print("Stop it any time: namer service uninstall")
     case "uninstall":
         launchctl(["bootout", "gui/\(uid)/\(label)"])
