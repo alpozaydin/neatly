@@ -136,21 +136,4 @@ enum Extract {
         if t.allSatisfy({ $0.isNumber || $0.isPunctuation || $0.isWhitespace }) { return true }
         return false
     }
-
-    /// Is the current filename already meaningful? Then we leave the file alone.
-    static func isJunkName(_ stem: String) -> Bool {
-        let letters = stem.filter(\.isLetter).count
-        let digits = stem.filter(\.isNumber).count
-        if letters == 0 { return true }
-        if digits >= letters { return true }                       // 1234567_2026-11-04_124701
-        let l = stem.lowercased()
-        let junk = ["download", "document", "file", "untitled", "scan", "img_", "img-", "image", "screenshot",
-                    "screen shot", "export", "print", "attachment", "unnamed", "unknown", "view", "get", "fatura",
-                    "invoice", "whatsapp image", "whatsapp video", "photo", "pxl_", "dsc", "dcim", "anfrage"]
-        if junk.contains(where: { l.hasPrefix($0) }) { return true }
-        // Long random-looking tokens (hashes, uuids)
-        if stem.count >= 16, !stem.contains(" "),
-           stem.filter({ "aeiou".contains($0.lowercased()) }).count * 6 < letters { return true }
-        return false
-    }
 }
