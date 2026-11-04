@@ -16,7 +16,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public func render(_ kebab: String) -> String {
         var parts = kebab.split(separator: "-").map(String.init)
         if !lowercase {
-            parts = parts.map { $0.allSatisfy(\.isLetter) ? $0.prefix(1).uppercased() + $0.dropFirst() : $0 }
+            parts = parts.map { $0.first?.isLetter == true ? $0.prefix(1).uppercased() + $0.dropFirst() : $0 }
         }
         var out = parts.joined(separator: separator)
         if let suffix { out += (separator == " " ? " - " : separator) + suffix }
