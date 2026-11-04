@@ -223,7 +223,27 @@ if watch {
                         case .noAnswer: print("   no answer, left as is")
                         }
                     } else if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
-                case .kept(let r): print("\(name)  keep (\(r))")
+                case .kept(let r):
+                    print("\(name)  keep (\(r))")
+                    // Good name, but it may still belong somewhere. Ask only if there's a clear folder.
+                    if ask, r == "name already meaningful",
+                       let target = Destination.suggest(forKept: url, folders: Destination.index()) {
+                        let stem = url.deletingPathExtension().lastPathComponent
+                        print("   folder suggestion: \(Destination.pretty(target))")
+                        switch askUser(file: name, suggestion: stem, folder: target) {
+                        case .save(let chosen, let folder):
+                            let done = try? Rename.apply(url, to: chosen, in: folder)
+                            if folder?.path != target.path || chosen != stem {
+                                Correction(original: name, suggested: Style.join(Style.tokens(stem)), chosen: chosen,
+                                           via: "move", source: nil, title: nil,
+                                           suggestedFolder: target.path, chosenFolder: folder?.path).save()
+                            }
+                            if let done { Decision.markKeep(done); if done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) } }
+                            print("   saved as \(folder.map(Destination.pretty) ?? "Downloads")/\(done?.lastPathComponent ?? chosen)")
+                        case .keep: Decision.markKeep(url); print("   kept as is")
+                        case .noAnswer: print("   no answer, left as is")
+                        }
+                    }
                 case .unsure(let r): print("\(name)  ? (\(r))")
                 }
             } else { pending[name] = size }
@@ -262,7 +282,10 @@ for url in files {
     switch await namer.suggest(for: url, explicit: force) {
     case .kept(let r):
         kept += 1
-        if why { print("\(shown)     keep   (\(r))") }
+        if why || whereTo { print("\(shown)     keep   (\(r))") }
+        if whereTo, let f = Destination.suggest(forKept: url, folders: folderIndex) {
+            print("      folder:  \(Destination.pretty(f))")
+        }
     case .unsure(let r):
         unsure += 1
         if why { print("\(shown)     ?      (\(r))") }
