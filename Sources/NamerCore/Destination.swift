@@ -71,6 +71,17 @@ public enum Destination {
         return nil
     }
 
+    /// For a file whose name is already good: is there a clear folder for it? Uses the name and download link only.
+    public static func suggest(forKept url: URL, folders: [Folder]) -> URL? {
+        var e = Evidence(url: url)
+        e.sourceURLs = Extract.sourceURLs(url)
+        if url.pathExtension.lowercased() == "pdf", let t = Extract.pdf(url)?.title, !Extract.isJunkTitle(t, stem: e.stem) {
+            e.metadataTitle = t
+        }
+        let kebab = Style.join(Style.tokens(e.stem))   // "CENG331-05-machinebasics…" → "ceng331-05-…"
+        return suggest(name: kebab, evidence: e, folders: folders)
+    }
+
     /// "~/courses-fall26/ceng315" for display.
     public static func pretty(_ url: URL) -> String {
         url.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")
