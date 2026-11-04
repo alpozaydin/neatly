@@ -38,12 +38,21 @@ func papers() {
     expect(Style.paperName(title: "Attention Is All You Need", year: 2017) == "attention-is-all-2017")
 }
 
+func isJunk(_ s: String) -> Bool { Decision.junkReason(s) != nil }
+
 func junkNames() {
-    expect(Extract.isJunkName("1234567_2026-11-04_124701"))
-    expect(Extract.isJunkName("1909.00871v3"))
-    expect(Extract.isJunkName("download (3)"))
-    expect(!Extract.isJunkName("transcript-fall26"))
-    expect(!Extract.isJunkName("27oct2026sila_hoca_meet"))
+    expect(isJunk("WhatsApp Image 2026-10-30 at 13.45.29"))
+    expect(isJunk("IMG_4009"))
+    expect(isJunk("Anfrage-26F04668426"))
+    expect(isJunk("7f3a9c2be81d4f0a9b6c"))
+    expect(!isJunk("CivCore deck - Oct 2026"))
+    expect(!isJunk("imagenet-results"))
+    expect(!isJunk("invoice-turkcell-nov26"))
+    expect(isJunk("1234567_2026-11-04_124701"))
+    expect(isJunk("1909.00871v3"))
+    expect(isJunk("download (3)"))
+    expect(!isJunk("transcript-fall26"))
+    expect(!isJunk("27oct2026sila_hoca_meet"))
 }
 
 func transcriptRule() {
