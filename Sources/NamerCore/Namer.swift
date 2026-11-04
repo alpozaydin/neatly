@@ -36,7 +36,7 @@ public struct Namer: Sendable {
         }
 
         func done(_ stem: String?, _ via: String) -> Outcome {
-            guard let stem, stem.count >= 3, stem != e.stem.lowercased() else {
+            guard let stem, stem.count >= 2, stem != e.stem.lowercased() else {
                 return .unsure(why: "no better name found")
             }
             let c = (clock.now - start).components
@@ -89,6 +89,9 @@ public struct Namer: Sendable {
             let look = isImage && Model.canSeeImages
             if look { e.steps.append("vision") }
             if let w = await withTimeout(remaining, { await Model.name(for: snapshot, lookAtImage: look) }) ?? nil {
+                if let course = courseCode(e) {
+                    return done(Style.join([course] + w.filter { $0 != course }), "model[\(trail)]")
+                }
                 return done(Style.join(w + [qualifierFor(e)].compactMap { $0 }), "model[\(trail)]")
             }
         }
@@ -100,20 +103,63 @@ public struct Namer: Sendable {
         return .unsure(why: "not enough evidence")
     }
 
-    /// Rules: if the strongest evidence names a known document kind, build the name directly.
+    /// Rules: known document kinds and course files are named directly — fast and predictable.
     func ruleName(_ e: Evidence) -> String? {
         let strong = [e.metadataTitle, e.headline].compactMap { $0 }.joined(separator: " ")
-        let weak = String((e.bodySnippet ?? "").prefix(300))
-        guard let kind = Style.kind(in: strong) ?? Style.kind(in: weak) else { return nil }
+        let weak = String((e.bodySnippet ?? "").prefix(400))
+        let kind = Style.kind(in: strong) ?? Style.kind(in: weak)
+
+        // Course files: course code first, then what it is. ceng213-hw2, ceng499-lecture5, ceng334-syllabus.
+        let personal: Set<String> = ["transcript", "enrollment", "cv"]   // full of course codes, but not about one
+        if !(kind.map { personal.contains($0.word) } ?? false), let course = courseCode(e) {
+            // A syllabus mentions "midterms"; a midterm never mentions "syllabus" — so the document kind wins.
+            let kindItem = kind.flatMap { ["syllabus", "schedule"].contains($0.word) ? $0.word : nil }
+            if let item = kindItem ?? Style.academicItem(in: strong) ?? Style.academicItem(in: weak) {
+                return Style.join([course, item])
+            }
+        }
+
+        // "LuMon: Lunar Monocular Depth Estimation Benchmark" → lumon. Papers and projects name themselves.
+        if kind == nil, let t = e.metadataTitle ?? e.headline, let colon = t.firstIndex(of: ":"),
+           t.distance(from: colon, to: t.endIndex) > 15 {
+            let head = Style.words(String(t[..<colon]))
+            if (1...2).contains(head.count), head.joined().count >= 3 { return Style.join(head) }
+        }
+
+        guard let kind else { return nil }
+        if kind.word == "cv" { return cvName(e) }
         let issuer = kind.keepIssuer ? Style.issuer(host: e.sourceHost) : nil
-        return Style.join([kind.word, issuer, Style.qualifier(kind.qualifier, e.date)].compactMap { $0 })
+        // Bills and payslips: the month they are FOR, not the day they arrived.
+        let date = kind.qualifier == .month ? (Style.period(in: strong + " " + weak) ?? e.date) : e.date
+        return Style.join([kind.word, issuer, Style.qualifier(kind.qualifier, date)].compactMap { $0 })
+    }
+
+    /// Someone else's CV: cv-john-smith. Your own: just cv.
+    func cvName(_ e: Evidence) -> String {
+        let candidates = [e.headline, e.metadataTitle].compactMap { $0 }
+        let person = candidates.lazy.map { Style.words($0).filter { !["cv", "resume", "curriculum", "vitae"].contains($0) } }
+            .first { (2...3).contains($0.count) && $0.allSatisfy { $0.allSatisfy(\.isLetter) } }
+        guard let person else { return "cv" }
+        let me = Set(Style.words(NSFullUserName()))
+        return Set(person).isSubset(of: me) ? "cv" : Style.join(["cv"] + person)
+    }
+
+    func courseCode(_ e: Evidence) -> String? {
+        let text = [e.metadataTitle, e.headline, e.bodySnippet.map { String($0.prefix(400)) }].compactMap { $0 }
+            .joined(separator: "\n")
+        return Style.courseCode(in: text, academicSource: isAcademic(e))
+    }
+
+    func isAcademic(_ e: Evidence) -> Bool {
+        guard let host = e.sourceHost else { return false }
+        let lms = ["odtuclass", "moodle", "canvas", "blackboard", "classroom.google", "edu"]
+        return lms.contains { host.contains($0) }
     }
 
     /// Qualifier for model-named files: academic sources get a term, others nothing (keep it short).
     func qualifierFor(_ e: Evidence) -> String? {
-        guard let host = e.sourceHost, let date = e.date else { return nil }
-        let academic = host.contains(".edu") || host.hasSuffix("odtuclass.metu.edu.tr")
-        return academic ? Style.term(date) : nil
+        guard isAcademic(e), let date = e.date else { return nil }
+        return Style.term(date)
     }
 }
 

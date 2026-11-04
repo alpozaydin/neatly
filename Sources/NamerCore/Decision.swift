@@ -29,6 +29,14 @@ public enum Decision: Sendable, Equatable {
         return .keep(why: "name already meaningful")
     }
 
+    /// Words that say nothing about a file on their own.
+    static let fillerWords: Set<String> = [
+        "main", "paper", "final", "draft", "new", "old", "copy", "version", "rev", "edit", "edited", "output", "out",
+        "temp", "tmp", "test", "doc", "docs", "pdf", "file", "files", "untitled", "document", "download", "downloads",
+        "image", "images", "img", "photo", "pic", "screenshot", "screen", "shot", "at", "am", "pm", "scan", "export",
+        "print", "unknown", "unnamed", "attachment", "view", "get", "the", "of", "and", "my", "kopya", "yeni", "son",
+    ]
+
     /// Why a filename is meaningless, or nil if it looks like a real name.
     static func junkReason(_ stem: String) -> String? {
         let l = stem.lowercased()
@@ -49,6 +57,12 @@ public enum Decision: Sendable, Equatable {
         }
 
         if digits >= letters { return "mostly numbers / ids" }
+
+        // Every word is filler: main.pdf, paper_final_v3 (1), Screen Shot … at 1.00.00 PM
+        let words = l.split { !$0.isLetter }.map(String.init)
+        if !words.isEmpty, words.allSatisfy({ fillerWords.contains($0) || $0.count == 1 }) {
+            return "only generic words"
+        }
 
         // Long tokens with almost no vowels: hashes, uuids, tracking ids.
         let tokens = l.split { !$0.isLetter && !$0.isNumber }

@@ -120,4 +120,85 @@ public enum Style {
         }
         return join(Array(words(title).prefix(3)) + [y].compactMap { $0 })
     }
+
+    // MARK: Courses (students' most common files)
+
+    /// Department prefixes that appear in course codes. Other prefixes only count on a university website.
+    static let departments: Set<String> = [
+        "ceng", "cs", "cse", "cmpe", "comp", "ece", "ee", "eee", "math", "phys", "chem", "bio", "biol", "stat",
+        "econ", "ie", "me", "ae", "am", "mse", "chbe", "ce", "psy", "psyc", "phil", "hist", "eng", "engl", "is",
+        "sts", "tur", "arch", "ba", "bus", "fin", "acc", "mgmt", "ling", "info", "inf", "ds", "ai", "ml",
+    ]
+
+    /// "CENG 334", "MATH119", "cs-101" → "ceng334". Nil if none.
+    public static func courseCode(in text: String, academicSource: Bool) -> String? {
+        let re = try! Regex(#"\b([A-Za-z]{2,5})[ \-]?(\d{3,4})\b"#)
+        for m in text.matches(of: re) {
+            guard let d = m.output[1].substring, let n = m.output[2].substring else { continue }
+            let dept = d.lowercased()
+            let looksLikeCode = d == d.uppercased() || departments.contains(dept)
+            if departments.contains(dept) || (academicSource && looksLikeCode && d.count >= 2) {
+                return dept + n
+            }
+        }
+        return nil
+    }
+
+    /// "Homework 2" → hw2, "Lecture 5" → lecture5, "Lab 3" → lab3, "Midterm" → midterm, "Syllabus" → syllabus.
+    public static func academicItem(in text: String) -> String? {
+        let t = words(text).joined(separator: " ")
+        let patterns: [(String, String)] = [
+            (#"\b(?:homework|hw|odev|assignment|ass)\s?(\d{1,2})\b"#, "hw"),
+            (#"\b(?:lecture|lec)\s?(\d{1,2})\b"#, "lecture"),
+            (#"\b(?:lab|laboratory)\s?(\d{1,2})\b"#, "lab"),
+            (#"\b(?:recitation|rec)\s?(\d{1,2})\b"#, "rec"),
+            (#"\b(?:quiz)\s?(\d{1,2})\b"#, "quiz"),
+            (#"\b(?:week|hafta)\s?(\d{1,2})\b"#, "week"),
+            (#"\b(?:project|proje)\s?(\d{1,2})\b"#, "project"),
+            (#"\b(?:midterm|vize)\s?(\d?)"#, "midterm"),
+        ]
+        for (p, word) in patterns {
+            if let m = t.firstMatch(of: try! Regex(p)) {
+                let n = m.output[1].substring.map(String.init) ?? ""
+                return word + n
+            }
+        }
+        for plain in ["syllabus", "final exam", "cheat sheet", "cheatsheet"] where t.contains(plain) {
+            return plain.replacingOccurrences(of: " ", with: "")
+        }
+        return nil
+    }
+
+    // MARK: Period ("Ekim 2026", "October 2026", "03.11.2026")
+
+    static let months: [String: Int] = {
+        let names = [
+            ["january", "jan", "ocak", "januar"], ["february", "feb", "subat", "februar"],
+            ["march", "mar", "mart", "marz", "maerz"], ["april", "apr", "nisan"], ["may", "mayis", "mai"],
+            ["june", "jun", "haziran", "juni"], ["july", "jul", "temmuz", "juli"], ["august", "aug", "agustos"],
+            ["september", "sep", "sept", "eylul"], ["october", "oct", "ekim", "oktober", "okt"],
+            ["november", "nov", "kasim"], ["december", "dec", "aralik", "dezember", "dez"],
+        ]
+        var out: [String: Int] = [:]
+        for (i, list) in names.enumerated() { for n in list { out[n] = i + 1 } }
+        return out
+    }()
+
+    /// The period a document is about, if its text says so. Month name + year wins over a full date.
+    public static func period(in text: String) -> Date? {
+        let w = words(text)
+        for (i, word) in w.enumerated() {
+            guard let m = months[word] else { continue }
+            for j in [i + 1, i - 1] where w.indices.contains(j) {
+                if let y = Int(w[j]), (2000...2100).contains(y) {
+                    return Calendar.current.date(from: DateComponents(year: y, month: m, day: 1))
+                }
+            }
+        }
+        let re = try! Regex(#"\b(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](20\d{2})\b"#)
+        if let m = text.firstMatch(of: re), let mo = Int(m.output[2].substring ?? ""), let y = Int(m.output[3].substring ?? "") {
+            return Calendar.current.date(from: DateComponents(year: y, month: mo, day: 1))
+        }
+        return nil
+    }
 }
