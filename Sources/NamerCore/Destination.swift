@@ -76,10 +76,26 @@ public enum Destination {
     public static func suggest(forKept url: URL, folders: [Folder]) -> URL? {
         var e = Evidence(url: url)
         e.sourceURLs = Extract.sourceURLs(url)
-        if url.pathExtension.lowercased() == "pdf", let t = Extract.pdf(url)?.title, !Extract.isJunkTitle(t, stem: e.stem) {
-            e.metadataTitle = t
+        // First page / paragraph only — enough to find "CENG 491" in a well-named file.
+        let info: Extract.PDFInfo? = switch url.pathExtension.lowercased() {
+            case "pdf": Extract.pdf(url)
+            case "docx": Extract.docx(url)
+            case "pptx": Extract.pptx(url)
+            case "ipynb": Extract.notebook(url)
+            default: nil
         }
-        let kebab = Style.join(Style.tokens(e.stem))   // "CENG331-05-machinebasics…" → "ceng331-05-…"
+        if let info {
+            if !Extract.isJunkTitle(info.title, stem: e.stem) { e.metadataTitle = info.title }
+            e.headline = info.headline
+            e.bodySnippet = info.snippet
+        }
+        var kebab = Style.join(Style.tokens(e.stem))   // "CENG331-05-machinebasics…" → "ceng331-05-…"
+        // Course code in the content but not in the name → still the course's folder.
+        let academic = e.sourceHost.map { h in ["odtuclass", "moodle", "canvas", "edu"].contains { h.contains($0) } } ?? false
+        let text = [e.metadataTitle, e.headline, e.bodySnippet.map { String($0.prefix(400)) }].compactMap { $0 }.joined(separator: "\n")
+        if let course = Style.courseCode(in: text, academicSource: academic), !kebab.hasPrefix(course) {
+            kebab = course + "-" + kebab
+        }
         return suggest(name: kebab, evidence: e, folders: folders)
     }
 
