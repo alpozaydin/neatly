@@ -19,6 +19,7 @@ usage: namer [options] <file or folder>...
   style        show the saved style  (style --reset to delete it)
 """
 
+setvbuf(stdout, nil, _IOLBF, 0)   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst())
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 
