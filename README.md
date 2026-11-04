@@ -27,19 +27,21 @@ namer service install             # same, in the background, starting at login
 namer service uninstall           # stop it
 ```
 
-The dialog shows the suggested name and folder:
+Every new download gets a dialog with a suggested folder and name:
 
 ```
-Folder: ceng315
-Rename to: [ceng315-syllabus]      [Keep name]  [Folder…]  [Rename]
+Suggested folder:  courses-fall26 › ceng315
+Suggested name:    [ceng315-syllabus]          [Leave as is]  [Select place…]  [Save]
 ```
 
-**Rename** saves it with that name in that folder. Edit the name to choose your own.
-**Folder…** picks another folder. **Keep name** leaves the file alone for good.
+**Save** puts it in that folder with that name. Edit the name to choose your own.
+**Select place…** picks another folder. **Leave as is** changes nothing and won't ask again.
+Installers (.dmg, .pkg) are skipped.
 
 Folders are suggested only if they already exist: a course code goes to that course's folder,
 a file goes where you put the same kind of file last time, or to a folder whose name it mentions.
-Otherwise it stays in Downloads. Your edits are saved in
+If none of these fit, the on-device model picks from your folders — but only a folder that shares
+a word with the file. Otherwise the suggestion is Downloads. Your edits are saved in
 `~/Library/Application Support/namer/corrections.jsonl` so namer can learn from them.
 
 ## Your style

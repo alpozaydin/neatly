@@ -72,8 +72,14 @@ public enum Destination {
         return nil
     }
 
-    /// For a file whose name is already good: is there a clear folder for it? Uses the name and download link only.
+    /// For a file whose name is already good: is there a clear folder for it?
     public static func suggest(forKept url: URL, folders: [Folder]) -> URL? {
+        let (e, kebab) = keptEvidence(url)
+        return suggest(name: kebab, evidence: e, folders: folders)
+    }
+
+    /// Cheap evidence for a file we are not renaming: link, title, first page. Plus its name in kebab form.
+    public static func keptEvidence(_ url: URL) -> (Evidence, String) {
         var e = Evidence(url: url)
         e.sourceURLs = Extract.sourceURLs(url)
         // First page / paragraph only — enough to find "CENG 491" in a well-named file.
@@ -96,7 +102,34 @@ public enum Destination {
         if let course = Style.courseCode(in: text, academicSource: academic), !kebab.hasPrefix(course) {
             kebab = course + "-" + kebab
         }
-        return suggest(name: kebab, evidence: e, folders: folders)
+        return (e, kebab)
+    }
+
+    /// Rules first; if they have no clear answer, the on-device model picks from your folders. nil = Downloads.
+    public static func best(name: String, evidence e: Evidence, folders: [Folder], useModel: Bool = true) async -> URL? {
+        if let f = suggest(name: name, evidence: e, folders: folders) { return f }
+        guard useModel else { return nil }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path + "/"
+        // Recently used folders first; at most 80 so the list fits the model's context.
+        let options = folders.sorted { $0.modified > $1.modified }.prefix(80)
+            .map { $0.url.path.replacingOccurrences(of: home, with: "") }
+        guard let pick = await Model.pickFolder(for: e, name: name, options: Array(options)) else { return nil }
+        // Safety: the file must share a real word with the folder path. A refund letter has nothing to do
+        // with a startup's folder, however "travel-ish" both look to a small model.
+        var words = Set(Style.tokens([e.stem, name, e.metadataTitle, e.headline, e.sourceHost,
+                                      e.bodySnippet.map { String($0.prefix(800)) }].compactMap { $0 }.joined(separator: " ")))
+        let list = Style.tokens(e.stem)
+        for i in list.indices.dropLast() { words.insert(list[i] + list[i + 1]) }   // "data room" → "dataroom"
+        let folderWords = Style.tokens(pick).filter { $0.count >= 4 && !Style.filler.contains($0) }
+        guard folderWords.contains(where: { words.contains($0) }) else { return nil }
+        return URL(fileURLWithPath: home + pick)
+    }
+
+    /// "courses-fall26 › ceng491" — short, but enough to tell same-named folders apart.
+    public static func short(_ url: URL?) -> String {
+        guard let url else { return "Downloads" }
+        let parts = url.pathComponents
+        return parts.suffix(2).joined(separator: " › ")
     }
 
     /// "~/courses-fall26/ceng315" for display.
