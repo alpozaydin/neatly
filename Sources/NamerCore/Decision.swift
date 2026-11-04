@@ -35,6 +35,7 @@ public enum Decision: Sendable, Equatable {
         "temp", "tmp", "test", "doc", "docs", "pdf", "file", "files", "untitled", "document", "download", "downloads",
         "image", "images", "img", "photo", "pic", "screenshot", "screen", "shot", "at", "am", "pm", "scan", "export",
         "print", "unknown", "unnamed", "attachment", "view", "get", "the", "of", "and", "my", "kopya", "yeni", "son",
+        "archive", "slides", "notes", "recording", "gmt", "zoom", "untitled", "presentation", "spreadsheet", "belge",
     ]
 
     /// Why a filename is meaningless, or nil if it looks like a real name.

@@ -72,13 +72,16 @@ public enum Style {
     public static let kinds: [Kind] = [
         .init(word: "transcript", qualifier: .term, keepIssuer: false, triggers: ["transcript", "transkript", "not dokumu"]),
         .init(word: "syllabus", qualifier: .term, keepIssuer: false, triggers: ["syllabus", "course outline", "ders plani"]),
+        .init(word: "exam-schedule", qualifier: .term, keepIssuer: false, triggers: ["exam schedule", "final exam schedule", "sinav programi", "sinav takvimi"]),
         .init(word: "schedule", qualifier: .term, keepIssuer: false, triggers: ["course schedule", "ders programi", "weekly schedule"]),
+        .init(word: "tuition", qualifier: .term, keepIssuer: false, triggers: ["tuition fee", "harc", "ogrenim ucreti", "katki payi"]),
         .init(word: "enrollment", qualifier: .term, keepIssuer: false, triggers: ["ogrenci belgesi", "enrollment certificate", "certificate of enrollment"]),
         .init(word: "invoice", qualifier: .month, keepIssuer: true, triggers: ["invoice", "fatura", "e arsiv fatura"]),
         .init(word: "receipt", qualifier: .month, keepIssuer: true, triggers: ["receipt", "dekont", "makbuz"]),
         .init(word: "statement", qualifier: .month, keepIssuer: true, triggers: ["account statement", "hesap ozeti", "ekstre"]),
         .init(word: "payslip", qualifier: .month, keepIssuer: true, triggers: ["payslip", "bordro", "pay stub"]),
         .init(word: "ticket", qualifier: .month, keepIssuer: true, triggers: ["boarding pass", "e ticket", "bilet"]),
+        .init(word: "learning-agreement", qualifier: .none, keepIssuer: false, triggers: ["learning agreement"]),
         .init(word: "contract", qualifier: .year, keepIssuer: true, triggers: ["contract", "agreement", "sozlesme"]),
         .init(word: "cv", qualifier: .none, keepIssuer: false, triggers: ["curriculum vitae", "resume", "ozgecmis"]),
     ]

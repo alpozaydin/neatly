@@ -56,6 +56,7 @@ enum Model {
         var prompt = ""
         if Decision.junkReason(e.stem) == nil { prompt += "Current filename: \(e.stem)\n" }
         if let s = e.sourceDescription { prompt += "Downloaded from: \(s)\n" }
+        if let h = e.linkHint { prompt += "The download link mentions: \(h)\n" }
         if let t = e.metadataTitle { prompt += "Embedded title: \(t)\n" }
         if let h = e.headline { prompt += "Largest heading: \(h)\n" }
         if !e.labels.isEmpty { prompt += "Photo labels: \(e.labels.joined(separator: ", "))\n" }
