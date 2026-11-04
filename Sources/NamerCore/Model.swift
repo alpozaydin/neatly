@@ -29,6 +29,7 @@ enum Model {
     Rules:
     - Say WHAT the document is, and WHO it is from if that is a company or institution.
     - The most distinctive word first. Always write the name in English, even if the content is not.
+    - Name the TOPIC, never the form. Never answer "handwriting", "notes", "text", "screenshot" alone.
     - Drop generic words: document, file, image, photo, picture, student, official, final, copy.
     - Never include personal names of the owner, ids, order numbers, dates, or file types.
     Examples:
@@ -38,13 +39,16 @@ enum Model {
     - letter from Lufthansa Kundenservice about a lost suitcase -> lufthansa baggage claim
     - photo labels: whiteboard; text: "Midterm topics: graphs, DP" -> midterm topics
     - photo labels: food, pizza; no text -> pizza
+    - handwritten notes: "integration by parts, u = x, dv = e^x dx" -> integration by parts
+    - whiteboard: "sprint 4 retro: what went well / blockers" -> sprint4 retro
     Answer with 1 to 3 lowercase words separated by spaces and nothing else.
     """
 
     /// Words the model must never hand back: they describe the container, not the content.
     static let banned: Set<String> = ["img", "image", "images", "photo", "picture", "pic", "heic", "jpg", "jpeg",
                                        "png", "svg", "pdf", "gif", "webp", "file", "document", "tbn", "download",
-                                       "unknown", "untitled", "name", "none", "scan"]
+                                       "unknown", "untitled", "name", "none", "scan", "handwriting", "handwritten",
+                                       "writing", "text", "screenshot"]
 
     static func name(for e: Evidence, lookAtImage: Bool = false) async -> [String]? {
         guard isAvailable else { return nil }
@@ -58,7 +62,12 @@ enum Model {
         // Nothing to go on: a guess would be worse than leaving the name alone.
         guard lookAtImage || e.metadataTitle != nil || e.headline != nil || !e.labels.isEmpty || e.bodySnippet != nil
         else { return nil }
-        prompt += lookAtImage ? "The image is attached. Name it by what it shows.\nName:" : "Name:"
+        if lookAtImage {
+            prompt += (e.bodySnippet?.count ?? 0) > 80
+                ? "The image is attached. Name it by what its text is about.\n"
+                : "The image is attached. Name it by what it shows.\n"
+        }
+        prompt += "Name:"
 
         let session = LanguageModelSession(instructions: instructions)
         let options = GenerationOptions(temperature: 0)
@@ -73,6 +82,9 @@ enum Model {
         } else {
             guard let out = try? await session.respond(to: prompt, options: options) else { return nil }
             text = out.content
+        }
+        if ProcessInfo.processInfo.environment["NAMER_DEBUG"] != nil {
+            FileHandle.standardError.write(Data("--- prompt\n\(prompt)\n--- answer\n\(text)\n---\n".utf8))
         }
         // First line only; models sometimes add an explanation after it.
         let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""

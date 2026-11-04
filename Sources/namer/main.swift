@@ -8,6 +8,7 @@ usage: namer [options] <file or folder>...
   --apply      rename the files
   --force      suggest even for names that already look fine (never overrides a name you chose)
   --why        show the evidence, and why files were skipped
+  --watch      wait for new files in the folder and suggest names as they arrive
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
   undo <file>  restore a file's original name
@@ -37,10 +38,48 @@ if args.first == "undo" {
     guard let i = args.firstIndex(of: f) else { return false }
     args.remove(at: i); return true
 }
-let apply = flag("--apply"), force = flag("--force"), why = flag("--why")
+let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch")
 var namer = Namer()
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
+
+// Watch mode: poll once a second; a file is "done" when its size stops changing.
+if watch {
+    let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
+    let skip: Set<String> = ["crdownload", "download", "part", "partial"]
+    func listing() -> [String: Int] {
+        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey],
+                                                                   options: [.skipsHiddenFiles])) ?? []
+        var out: [String: Int] = [:]
+        for u in items where !skip.contains(u.pathExtension.lowercased()) {
+            out[u.lastPathComponent] = (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+        }
+        return out
+    }
+    var seen = Set(listing().keys)
+    var pending: [String: Int] = [:]
+    print("watching \(dir.path) — download something (Ctrl-C to stop)")
+    while true {
+        try? await Task.sleep(for: .seconds(1))
+        let now = listing()
+        for (name, size) in now where !seen.contains(name) {
+            if pending[name] == size {           // same size two checks in a row: finished
+                seen.insert(name); pending[name] = nil
+                let url = dir.appending(path: name)
+                switch await namer.suggest(for: url, explicit: force) {
+                case .suggested(let s):
+                    let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
+                    print("\(name)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
+                    if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
+                case .kept(let r): print("\(name)  keep (\(r))")
+                case .unsure(let r): print("\(name)  ? (\(r))")
+                }
+            } else { pending[name] = size }
+        }
+        seen.formIntersection(now.keys)          // forget deleted files
+        if apply { seen.formUnion(listing().keys) }
+    }
+}
 
 // Expand folders one level (Downloads, Desktop) — skip hidden and in-progress downloads.
 let partial: Set<String> = ["crdownload", "download", "part", "partial"]
