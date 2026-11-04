@@ -177,4 +177,21 @@ enum Model {
                                              options: GenerationOptions(temperature: 0))
         return out?.content.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("no") ?? false
     }
+
+    /// Pick one folder from the person's own folders, or nil. The answer must be one of the listed paths.
+    static func pickFolder(for e: Evidence, name: String, options: [String]) async -> String? {
+        guard isAvailable, !options.isEmpty else { return nil }
+        var facts = "File: \(name).\(e.ext)\n"
+        if let s = e.sourceDescription { facts += "Downloaded from: \(s)\n" }
+        if let t = e.metadataTitle ?? e.headline { facts += "Title: \(t)\n" }
+        if let b = e.bodySnippet { facts += "Beginning:\n\(withoutLetterhead(b).prefix(400))\n" }
+        let session = LanguageModelSession(instructions: """
+        You file documents into folders. Pick the single best folder for the file from the list.
+        Answer with the folder path exactly as written in the list, or "none" if no folder clearly fits.
+        """)
+        let prompt = facts + "\nFolders:\n" + options.map { "- \($0)" }.joined(separator: "\n") + "\n\nBest folder:"
+        guard let out = try? await session.respond(to: prompt, options: GenerationOptions(temperature: 0)) else { return nil }
+        let answer = out.content.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "-`\"'")))
+        return options.first { $0.caseInsensitiveCompare(answer) == .orderedSame }   // must be a real folder
+    }
 }

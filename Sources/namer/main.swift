@@ -146,18 +146,15 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     return (p.terminationStatus == 0, String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
 }
 
-/// The dialog: the name in the field (edit it to name the file yourself), the folder as one short word above.
-/// Rename = this name, in this folder. Folder… = pick another folder. Keep name = leave the file alone.
+/// The dialog. Save = suggested folder + the name in the field. Select place… = pick a folder. Leave as is = no change.
 func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
     func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-    let original = (file as NSString).deletingPathExtension
-    let action = suggestion == original ? "Move" : "Rename"
     let r = osascript("""
-    display dialog "New download:\\n\(q(file))\\n\\nFolder: \(q(folder?.lastPathComponent ?? "Downloads"))\\n\(action == "Move" ? "Name:" : "Rename to:")" ¬
-      default answer "\(q(suggestion))" with title "namer" buttons {"Keep name", "Folder…", "\(action)"} ¬
-      default button "\(action)" cancel button "Keep name" giving up after 300
+    display dialog "\(q(file))\\n\\nSuggested folder:  \(q(Destination.short(folder)))\\n\\nSuggested name:" ¬
+      default answer "\(q(suggestion))" with title "namer" buttons {"Leave as is", "Select place…", "Save"} ¬
+      default button "Save" cancel button "Leave as is" giving up after 300
     """)
-    if !r.ok { return .keep }                                        // "Keep name" = cancel button
+    if !r.ok { return .keep }                                        // "Leave as is" = cancel button
     if r.out.contains("gave up:true") { return .noAnswer }
     guard let t = r.out.range(of: "text returned:") else { return .noAnswer }
     let typed = (String(r.out[t.upperBound...]).components(separatedBy: ", gave up:").first ?? "")
@@ -169,8 +166,8 @@ func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
     let name = (expanded as NSString).lastPathComponent
     var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : folder
 
-    if r.out.contains("button returned:Folder") {
-        let start = chosenFolder ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
+    if r.out.contains("button returned:Select place") {
+        let start = chosenFolder ?? FileManager.default.homeDirectoryForCurrentUser
         let pick = osascript("""
         POSIX path of (choose folder with prompt "Save “\(q(name))” in:" default location (POSIX file "\(q(start.path))"))
         """)
@@ -189,6 +186,7 @@ func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
 if watch {
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
     let skip: Set<String> = ["crdownload", "download", "part", "partial"]
+    let installers: Set<String> = ["dmg", "pkg", "app", "iso"]   // nothing to file
     func listing() -> [String: Int] {
         let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
                                                                    options: [.skipsHiddenFiles])) ?? []
@@ -209,57 +207,46 @@ if watch {
             if pending[name] == size {           // same size two checks in a row: finished
                 seen.insert(name); pending[name] = nil
                 let url = dir.appending(path: name)
+                let original = url.deletingPathExtension().lastPathComponent
+                // Every new download gets a name and a folder — except installers and files already handled.
+                var nameIdea = original, via = "kept", evidence: Evidence
                 switch await namer.suggest(for: url, explicit: force) {
                 case .suggested(let s):
-                    let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
-                    print("\(name)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
-                    if ask {
-                        let folders = Destination.index()
-                        let target = Destination.suggest(name: s.name, evidence: s.evidence, folders: folders)
-                        let answer = askUser(file: name, suggestion: s.name, folder: target)
-                        let ev = s.evidence
-                        let log = { (chosen: String, folder: URL?) in
-                            Correction(original: name, suggested: s.name, chosen: chosen, via: s.via,
-                                       source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline,
-                                       suggestedFolder: target?.path, chosenFolder: folder?.path).save()
-                        }
-                        switch answer {
-                        case .save(let chosen, let folder):
-                            let done = try? Rename.apply(url, to: chosen, in: folder)
-                            if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
-                            let edited = chosen != s.name || folder?.path != target?.path
-                            if edited || folder != nil { log(chosen, folder) }   // moves teach where things go
-                            if edited, let done { Decision.markKeep(done) }
-                            let place = folder.map { Destination.pretty($0) } ?? "Downloads"
-                            print("   saved as \(place)/\(done?.lastPathComponent ?? chosen)\(edited ? " (your edit, saved)" : "")")
-                        case .keep:
-                            Decision.markKeep(url); log("", nil)
-                            print("   kept as is")
-                        case .noAnswer: print("   no answer, left as is")
-                        }
-                    } else if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
-                case .kept(let r):
-                    print("\(name)  keep (\(r))")
-                    // Good name, but it may still belong somewhere. Ask only if there's a clear folder.
-                    if ask, r == "name already meaningful",
-                       let target = Destination.suggest(forKept: url, folders: Destination.index()) {
-                        let stem = url.deletingPathExtension().lastPathComponent
-                        print("   folder suggestion: \(Destination.pretty(target))")
-                        switch askUser(file: name, suggestion: stem, folder: target) {
-                        case .save(let chosen, let folder):
-                            let done = try? Rename.apply(url, to: chosen, in: folder)
-                            if folder?.path != target.path || chosen != stem {
-                                Correction(original: name, suggested: Style.join(Style.tokens(stem)), chosen: chosen,
-                                           via: "move", source: nil, title: nil,
-                                           suggestedFolder: target.path, chosenFolder: folder?.path).save()
-                            }
-                            if let done { Decision.markKeep(done); if done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) } }
-                            print("   saved as \(folder.map(Destination.pretty) ?? "Downloads")/\(done?.lastPathComponent ?? chosen)")
-                        case .keep: Decision.markKeep(url); print("   kept as is")
-                        case .noAnswer: print("   no answer, left as is")
-                        }
-                    }
-                case .unsure(let r): print("\(name)  ? (\(r))")
+                    nameIdea = s.name; via = s.via; evidence = s.evidence
+                    print("\(name)  →  \(s.name)   [\(s.via), \(Int(s.millis.rounded())) ms]")
+                case .kept(let r) where r != "name already meaningful":
+                    print("\(name)  skip (\(r))"); continue
+                case .kept, .unsure:
+                    evidence = Destination.keptEvidence(url).0
+                    print("\(name)  name ok")
+                }
+                guard ask else {
+                    if apply, nameIdea != original { _ = try? Rename.apply(url, to: nameIdea) }
+                    continue
+                }
+                if installers.contains(url.pathExtension.lowercased()) { continue }
+                let kebab = nameIdea == original ? Destination.keptEvidence(url).1 : nameIdea
+                let target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.index(),
+                                                    useModel: namer.useModel)
+                print("   folder: \(Destination.short(target))")
+                let ev = evidence, suggestedName = nameIdea, how = via
+                let log = { (chosen: String, folder: URL?) in
+                    Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,
+                               source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline,
+                               suggestedFolder: target?.path, chosenFolder: folder?.path).save()
+                }
+                switch askUser(file: name, suggestion: nameIdea, folder: target) {
+                case .save(let chosen, let folder):
+                    let done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
+                    if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
+                    let edited = chosen != nameIdea || folder?.path != target?.path
+                    log(chosen, folder)                       // every answer teaches names and folders
+                    if let done { Decision.markKeep(done) }   // handled: never ask again
+                    print("   saved as \(Destination.short(folder))/\(done?.lastPathComponent ?? chosen)\(edited ? " (your edit)" : "")")
+                case .keep:
+                    Decision.markKeep(url); log("", nil)
+                    print("   left as is")
+                case .noAnswer: print("   no answer, left as is")
                 }
             } else { pending[name] = size }
         }
@@ -298,8 +285,10 @@ for url in files {
     case .kept(let r):
         kept += 1
         if why || whereTo { print("\(shown)     keep   (\(r))") }
-        if whereTo, let f = Destination.suggest(forKept: url, folders: folderIndex) {
-            print("      folder:  \(Destination.pretty(f))")
+        if whereTo {
+            let (ev, kebab) = Destination.keptEvidence(url)
+            let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: namer.useModel)
+            print("      folder:  \(Destination.short(f))")
         }
     case .unsure(let r):
         unsure += 1
@@ -309,8 +298,8 @@ for url in files {
         let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
         print("\(shown)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
         if whereTo {
-            let f = Destination.suggest(name: s.name, evidence: s.evidence, folders: folderIndex)
-            print("      folder:  \(f.map(Destination.pretty) ?? "(stay in Downloads)")")
+            let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: namer.useModel)
+            print("      folder:  \(Destination.short(f))")
         }
         if why {
             let e = s.evidence
