@@ -11,6 +11,7 @@ public struct Evidence: Sendable {
     public var metadataTitle: String?     // title stored inside the file
     public var headline: String?          // largest text on page 1
     public var bodySnippet: String?       // capped prefix of page 1 text / OCR
+    public var linkHint: String?          // meaningful words in the download link
     public var labels: [String] = []      // what a photo shows (on-device classifier)
     public var paper: Paper?              // arXiv/DOI lookup result
     public var steps: [String] = []       // which stages contributed, for debugging

@@ -61,7 +61,27 @@ public struct Namer: Sendable {
         }
 
         let isImage = Self.imageLike.contains(e.ext)
-        if Self.pdfLike.contains(e.ext), let info = Extract.pdf(url) {
+        e.linkHint = Extract.linkHint(e.sourceURLs)
+        let office: Extract.PDFInfo? = switch e.ext {
+            case "docx": Extract.docx(url)
+            case "pptx": Extract.pptx(url)
+            case "ipynb": Extract.notebook(url)
+            default: nil
+        }
+        if let info = office {
+            if !Extract.isJunkTitle(info.title, stem: e.stem) { e.metadataTitle = info.title; e.steps.append("meta") }
+            e.headline = info.headline
+            e.bodySnippet = info.snippet
+            if info.hasText { e.steps.append("text") }
+        } else if e.ext == "zip" {
+            let names = Extract.zipListing(url)
+            let tops = Set(names.compactMap { $0.split(separator: "/").first.map(String.init) })
+            if tops.count == 1, let top = tops.first, names.count > 1, Decision.junkReason(top) == nil {
+                e.steps.append("zip")
+                return done(Style.join(Style.words(top)), "rules[zip-folder]")
+            }
+            if !names.isEmpty { e.bodySnippet = "Archive contains: " + names.joined(separator: ", "); e.steps.append("zip") }
+        } else if Self.pdfLike.contains(e.ext), let info = Extract.pdf(url) {
             // 3. Embedded title. If it already names a known kind, stop before reading the page.
             if !Extract.isJunkTitle(info.title, stem: e.stem) { e.metadataTitle = info.title; e.steps.append("meta") }
             if e.metadataTitle != nil, let n = ruleName(e) { return done(n, "rules[\(trail)]") }
@@ -109,7 +129,9 @@ public struct Namer: Sendable {
     func ruleName(_ e: Evidence) -> String? {
         let strong = [e.metadataTitle, e.headline].compactMap { $0 }.joined(separator: " ")
         let weak = String((e.bodySnippet ?? "").prefix(400))
-        let kind = Style.kind(in: strong) ?? Style.kind(in: weak)
+        // Look at heading + start of text together; the kind list is ordered specific → generic,
+        // so "DEKONT … Öğrenim Ücreti" is tuition, not just a receipt.
+        let kind = Style.kind(in: strong + " " + String(weak.prefix(300))) ?? Style.kind(in: weak)
 
         // Course files: course code first, then what it is. ceng213-hw2, ceng499-lecture5, ceng334-syllabus.
         let personal: Set<String> = ["transcript", "enrollment", "cv"]   // full of course codes, but not about one
@@ -122,11 +144,21 @@ public struct Namer: Sendable {
         }
 
         // "LuMon: Lunar Monocular Depth Estimation Benchmark" → lumon. Papers and projects name themselves.
+        // "Project Proposal: Campus Food Waste Tracker" → the part before the colon is generic → use the topic.
         if kind == nil, let t = e.metadataTitle ?? e.headline, let colon = t.firstIndex(of: ":"),
            t.distance(from: colon, to: t.endIndex) > 15 {
             let head = Style.words(String(t[..<colon]))
+            let generic: Set<String> = ["project", "proposal", "report", "homework", "assignment", "chapter", "part",
+                                        "summary", "abstract", "introduction", "re", "fwd", "subject", "draft", "notes"]
+            if (1...2).contains(head.count), head.allSatisfy({ generic.contains($0) }) {
+                let topic = Style.words(String(t[t.index(after: colon)...])).prefix(3)
+                return Style.join(Array(topic) + [head.last!])
+            }
             if (1...2).contains(head.count), head.joined().count >= 3 { return Style.join(head) }
         }
+
+        // Archives from Kaggle, GitHub etc.: the link names the dataset or repo.
+        if kind == nil, e.ext == "zip", let hint = e.linkHint { return Style.join(Style.words(hint)) }
 
         guard let kind else { return nil }
         if kind.word == "cv" { return cvName(e) }

@@ -140,3 +140,96 @@ enum Extract {
         return false
     }
 }
+
+// MARK: Office files, notebooks, archives, links — same rule: titles and the first page only.
+
+extension Extract {
+    /// Read one entry of a zip (docx/pptx are zips) without unpacking the rest. Capped at `max` bytes.
+    static func zipEntry(_ url: URL, _ path: String, max: Int = 200_000) -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        p.arguments = ["-p", url.path, path]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let data = out.fileHandleForReading.readData(ofLength: max)
+        p.terminate()
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Text inside XML tags like <a:t>…</a:t> (PowerPoint) or <w:t>…</w:t> (Word).
+    static func xmlText(_ xml: String, tag: String) -> [String] {
+        let re = try! Regex("<\(tag)(?: [^>]*)?>([^<]*)</\(tag)>")
+        return xml.matches(of: re).compactMap { $0.output[1].substring.map(String.init) }.filter { !$0.isEmpty }
+    }
+
+    static func officeTitle(_ url: URL) -> String? {
+        guard let core = zipEntry(url, "docProps/core.xml") else { return nil }
+        return xmlText(core, tag: "dc:title").first
+    }
+
+    /// Word: title field + first ~1,200 characters. The first paragraph is usually the heading.
+    static func docx(_ url: URL) -> PDFInfo? {
+        guard let xml = zipEntry(url, "word/document.xml") else { return nil }
+        let paragraphs = xml.components(separatedBy: "</w:p>").map { xmlText($0, tag: "w:t").joined() }.filter { !$0.isEmpty }
+        let text = String(paragraphs.joined(separator: "\n").prefix(snippetBudget))
+        return PDFInfo(title: officeTitle(url), headline: paragraphs.first.map { String($0.prefix(headlineMax)) },
+                       snippet: text.isEmpty ? nil : text, hasText: !text.isEmpty)
+    }
+
+    /// PowerPoint: title field + slide 1 (title slide) + slide 2.
+    static func pptx(_ url: URL) -> PDFInfo? {
+        let s1 = zipEntry(url, "ppt/slides/slide1.xml").map { xmlText($0, tag: "a:t") } ?? []
+        let s2 = zipEntry(url, "ppt/slides/slide2.xml").map { xmlText($0, tag: "a:t") } ?? []
+        let text = String((s1 + s2).joined(separator: "\n").prefix(snippetBudget))
+        guard !text.isEmpty || officeTitle(url) != nil else { return nil }
+        return PDFInfo(title: officeTitle(url), headline: s1.first, snippet: text, hasText: !text.isEmpty)
+    }
+
+    /// Jupyter / Colab: the first markdown heading, else the first cells.
+    static func notebook(_ url: URL) -> PDFInfo? {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let cells = json["cells"] as? [[String: Any]] else { return nil }
+        func source(_ c: [String: Any]) -> String {
+            (c["source"] as? [String])?.joined() ?? (c["source"] as? String) ?? ""
+        }
+        let first = cells.prefix(5).map(source).joined(separator: "\n")
+        let heading = cells.lazy.filter { $0["cell_type"] as? String == "markdown" }.map(source)
+            .compactMap { $0.split(separator: "\n").first { $0.hasPrefix("#") } }.first
+            .map { $0.drop(while: { $0 == "#" || $0 == " " }) }.map(String.init)
+        return PDFInfo(title: nil, headline: heading, snippet: String(first.prefix(snippetBudget)), hasText: !first.isEmpty)
+    }
+
+    /// Archives: list the names inside (never unpack). One top folder → that is the name.
+    static func zipListing(_ url: URL) -> [String] {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/zipinfo")
+        p.arguments = ["-1", url.path]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return [] }
+        let data = out.fileHandleForReading.readData(ofLength: 20_000)
+        p.terminate()
+        return (String(data: data, encoding: .utf8) ?? "").split(separator: "\n").map(String.init)
+            .filter { !$0.hasPrefix("__MACOSX") && !$0.hasSuffix(".DS_Store") }
+            .prefix(40).map { $0 }
+    }
+
+    /// Meaningful words in the download link: kaggle.com/datasets/user/titanic → "titanic".
+    static func linkHint(_ sources: [String]) -> String? {
+        let skip: Set<String> = ["download", "downloads", "api", "v1", "files", "file", "datasets", "dataset", "view",
+                                 "attachment", "pluginfile.php", "mod", "resource", "content", "u", "0", "raw", "zip",
+                                 "refs", "heads", "main", "master", "archive", "proxy", "get.php", "main.php", "index.php"]
+        for s in sources {
+            guard let u = URL(string: s), let host = u.host() else { continue }
+            if host.contains("googleusercontent") || host.contains("mail.") { continue }
+            let parts = u.pathComponents.filter { $0 != "/" }
+                .filter { !skip.contains($0.lowercased()) && Decision.junkReason($0) == nil && $0.count >= 3 }
+            if let last = parts.last { return last.removingPercentEncoding ?? last }
+        }
+        return nil
+    }
+}

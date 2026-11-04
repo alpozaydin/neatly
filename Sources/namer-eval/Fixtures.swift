@@ -14,6 +14,7 @@ struct NamingCase: Decodable {
     var lines: [[Line]]? = nil      // [[text, fontSize]]
     var scanned: Bool? = nil
     var network: Bool? = nil
+    var zipFiles: [String]? = nil   // for .zip cases: names inside the archive
     let expect: [String]
 
     enum Line: Decodable {
@@ -39,6 +40,22 @@ enum Fixtures {
         let ext = url.pathExtension.lowercased()
         if ext == "pdf" {
             if c.scanned == true { try scannedPDF(c, url) } else { try pdf(c, url) }
+        } else if ext == "docx" {
+            let body = c.textLines.map { "<w:p><w:r><w:t>\(xmlEscape($0.0))</w:t></w:r></w:p>" }.joined()
+            try zip(url, ["word/document.xml": "<w:document><w:body>\(body)</w:body></w:document>",
+                          "docProps/core.xml": coreXML(c.title)])
+        } else if ext == "pptx" {
+            let lines = c.textLines.map { "<a:p><a:r><a:t>\(xmlEscape($0.0))</a:t></a:r></a:p>" }
+            try zip(url, ["ppt/slides/slide1.xml": "<p:sld>\(lines.prefix(2).joined())</p:sld>",
+                          "ppt/slides/slide2.xml": "<p:sld>\(lines.dropFirst(2).joined())</p:sld>",
+                          "docProps/core.xml": coreXML(c.title)])
+        } else if ext == "ipynb" {
+            let t = c.textLines.map(\.0)
+            let cells: [[String: Any]] = [["cell_type": "markdown", "source": ["# " + (t.first ?? "")]]]
+                + t.dropFirst().map { ["cell_type": "code", "source": [$0]] }
+            try JSONSerialization.data(withJSONObject: ["cells": cells, "nbformat": 4]).write(to: url)
+        } else if ext == "zip" {
+            try zip(url, Dictionary(uniqueKeysWithValues: (c.zipFiles ?? []).map { ($0, "x") }))
         } else {
             try image(c, url, size: CGSize(width: 1600, height: 1200))
         }
@@ -46,6 +63,32 @@ enum Fixtures {
         let date = day(c.created ?? "2026-11-04")
         try (url as NSURL).setResourceValues([.creationDateKey: date, .contentModificationDateKey: date])
         return url
+    }
+
+    static func xmlEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    static func coreXML(_ title: String?) -> String {
+        "<cp:coreProperties>" + (title.map { "<dc:title>\(xmlEscape($0))</dc:title>" } ?? "") + "</cp:coreProperties>"
+    }
+
+    /// Build a zip from {path inside zip: content} using the system zip tool.
+    static func zip(_ url: URL, _ files: [String: String]) throws {
+        let tmp = FileManager.default.temporaryDirectory.appending(path: "namer-zip-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        for (path, content) in files {
+            let f = tmp.appending(path: path)
+            try FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try content.write(to: f, atomically: true, encoding: .utf8)
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        p.arguments = ["-qr", url.path, "."]
+        p.currentDirectoryURL = tmp
+        try p.run(); p.waitUntilExit()
+        guard p.terminationStatus == 0 else { throw Err("zip") }
     }
 
     static func day(_ s: String) -> Date {
