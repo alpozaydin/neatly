@@ -135,38 +135,42 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     return (p.terminationStatus == 0, String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
 }
 
-/// The dialog: one field with "folder/name". Edit any part, or pick a folder with the macOS picker.
-/// No folder in the field = stays in Downloads.
+/// The dialog: the name in the field (edit it to name the file yourself), the folder as one short word above.
+/// Rename = this name, in this folder. Folder… = pick another folder. Keep name = leave the file alone.
 func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
     func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-    let prefill = folder.map { Destination.pretty($0) + "/" + suggestion } ?? suggestion
+    let original = (file as NSString).deletingPathExtension
+    let action = suggestion == original ? "Move" : "Rename"
     let r = osascript("""
-    display dialog "New download:\\n\(q(file))\\n\\nSave as:" default answer "\(q(prefill))" ¬
-      with title "namer" buttons {"Keep as is", "Choose folder…", "Save"} default button "Save" ¬
-      cancel button "Keep as is" giving up after 300
+    display dialog "New download:\\n\(q(file))\\n\\nFolder: \(q(folder?.lastPathComponent ?? "Downloads"))\\n\(action == "Move" ? "Name:" : "Rename to:")" ¬
+      default answer "\(q(suggestion))" with title "namer" buttons {"Keep name", "Folder…", "\(action)"} ¬
+      default button "\(action)" cancel button "Keep name" giving up after 300
     """)
-    if !r.ok { return .keep }                                        // "Keep as is" = cancel button
+    if !r.ok { return .keep }                                        // "Keep name" = cancel button
     if r.out.contains("gave up:true") { return .noAnswer }
     guard let t = r.out.range(of: "text returned:") else { return .noAnswer }
     let typed = (String(r.out[t.upperBound...]).components(separatedBy: ", gave up:").first ?? "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
     guard !typed.isEmpty else { return .noAnswer }
 
-    // Split "~/a/b/name" into folder + name. A bare name means: stay where it is.
+    // Power users can still type a path: "~/somewhere/name".
     let expanded = (typed as NSString).expandingTildeInPath
     let name = (expanded as NSString).lastPathComponent
-    var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : nil
+    var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : folder
 
-    if r.out.contains("button returned:Choose folder") {
-        let start = chosenFolder ?? folder ?? FileManager.default.homeDirectoryForCurrentUser
+    if r.out.contains("button returned:Folder") {
+        let start = chosenFolder ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads")
         let pick = osascript("""
         POSIX path of (choose folder with prompt "Save “\(q(name))” in:" default location (POSIX file "\(q(start.path))"))
         """)
         guard pick.ok else { return .noAnswer }
         chosenFolder = URL(fileURLWithPath: pick.out.trimmingCharacters(in: .whitespacesAndNewlines))
     }
-    // Only inside your home folder.
-    if let f = chosenFolder, !f.path.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.path) { chosenFolder = nil }
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    if let f = chosenFolder, !f.path.hasPrefix(home.path) { chosenFolder = nil }          // only inside your home
+    if let f = chosenFolder, f.standardizedFileURL == home.appending(path: "Downloads").standardizedFileURL {
+        chosenFolder = nil                                                                 // picked Downloads = stay
+    }
     return .save(name: name, folder: chosenFolder)
 }
 

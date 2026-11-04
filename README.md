@@ -27,9 +27,15 @@ namer service install             # same, in the background, starting at login
 namer service uninstall           # stop it
 ```
 
-The dialog shows where to save the file and under what name, e.g. `~/courses-fall26/ceng315/ceng315-syllabus`.
-**Save** accepts it. Edit the text to change the folder or the name (just a name = stay in Downloads).
-**Choose folder…** opens the normal folder picker. **Keep as is** leaves the file alone for good.
+The dialog shows the suggested name and folder:
+
+```
+Folder: ceng315
+Rename to: [ceng315-syllabus]      [Keep name]  [Folder…]  [Rename]
+```
+
+**Rename** saves it with that name in that folder. Edit the name to choose your own.
+**Folder…** picks another folder. **Keep name** leaves the file alone for good.
 
 Folders are suggested only if they already exist: a course code goes to that course's folder,
 a file goes where you put the same kind of file last time, or to a folder whose name it mentions.
