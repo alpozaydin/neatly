@@ -37,6 +37,7 @@ defer { try? FileManager.default.removeItem(at: dir) }
 var namer = Namer()
 namer.useNetwork = !offline
 namer.useModel = !args.contains("--no-model")
+namer.verifyRules = args.contains("--verify")
 print("\nNAMING    model: \(namer.useModel ? Namer.modelStatus : "off")\n")
 
 var exact = 0, head = 0, none = 0, run = 0
@@ -52,7 +53,9 @@ for c in cases.naming {
     var via = ""
     // Naming is tested on its own: the decision step was scored above.
     switch await namer.suggest(for: url, explicit: true) {
-    case .suggested(let s): got = s.name; via = s.via; times.append(s.millis)
+    case .suggested(let s):
+        got = s.name; via = s.via; times.append(s.millis)
+        if let r = s.evidence.steps.first(where: { $0.hasPrefix("rule-rejected:") }) { via += "  ← model rejected \(r.dropFirst(14))" }
     default: got = nil
     }
 

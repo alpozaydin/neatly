@@ -584,9 +584,9 @@
         ]
       ],
       "expect": [
+        "math119-midterm1-fall24",
         "math119-midterm1",
-        "math119-midterm1-solutions",
-        "math119-midterm1-2024"
+        "math119-midterm1-solutions-fall24"
       ]
     },
     {
@@ -825,6 +825,80 @@
         "bilim-4100b-application",
         "bilim-4100b",
         "bilim-4100b-form"
+      ]
+    },
+    {
+      "id": "syllabus-no-word",
+      "file": "315-Fall 2026 (1).pdf",
+      "source": [
+        "https://learn.northfield.edu/pluginfile.php/1/mod_resource/content/1/315-Fall%202026.pdf"
+      ],
+      "title": "NORTHFIELD UNIVERSITY",
+      "lines": [
+        [
+          "NORTHFIELD UNIVERSITY",
+          14
+        ],
+        [
+          "CS 315 – Algorithms",
+          18
+        ],
+        [
+          "Fall 2026-2027",
+          12
+        ],
+        [
+          "Instructors: Prof. Dr. A. Yilmaz",
+          10
+        ],
+        [
+          "Teaching Assistants: B. Kaya, C. Demir",
+          10
+        ],
+        [
+          "Lecture Hours: Mon 9:15-10:30",
+          10
+        ],
+        [
+          "Grading: Midterm 30%, Final 40%, Homeworks 30%",
+          10
+        ]
+      ],
+      "expect": [
+        "cs315-syllabus",
+        "cs315-syllabus-fall26"
+      ]
+    },
+    {
+      "id": "old-final",
+      "file": "final_a.pdf",
+      "source": [
+        "https://learn.northfield.edu/pluginfile.php/2/mod_resource/content/1/final_a.pdf"
+      ],
+      "lines": [
+        [
+          "Northfield University",
+          11
+        ],
+        [
+          "Department of Computer Engineering CS 331",
+          11
+        ],
+        [
+          "Fall '2022-2023",
+          11
+        ],
+        [
+          "FINAL",
+          16
+        ],
+        [
+          "Exam: This is a closed book, closed notes exam.",
+          10
+        ]
+      ],
+      "expect": [
+        "cs331-final-fall22"
       ]
     }
   ]

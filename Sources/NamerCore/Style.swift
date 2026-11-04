@@ -16,6 +16,11 @@ public enum Style {
 
     /// Turn any phrase into slug words: ASCII (Turkish-safe), lowercase, filler removed.
     public static func words(_ phrase: String) -> [String] {
+        tokens(phrase).filter { !filler.contains($0) }
+    }
+
+    /// Like `words`, but keeps filler — for pattern matching where "final" or "of" matter.
+    public static func tokens(_ phrase: String) -> [String] {
         let latin = phrase
             .replacingOccurrences(of: "ı", with: "i").replacingOccurrences(of: "İ", with: "I")
             .applyingTransform(.toLatin, reverse: false)?
@@ -23,7 +28,7 @@ public enum Style {
         return latin.lowercased()
             .split { !($0.isLetter || $0.isNumber) }
             .map(String.init)
-            .filter { !filler.contains($0) && !$0.isEmpty }
+            .filter { !$0.isEmpty }
     }
 
     public static func join(_ parts: [String]) -> String {
@@ -149,7 +154,11 @@ public enum Style {
 
     /// "Homework 2" → hw2, "Lecture 5" → lecture5, "Lab 3" → lab3, "Midterm" → midterm, "Syllabus" → syllabus.
     public static func academicItem(in text: String) -> String? {
-        let t = words(text).joined(separator: " ")
+        let t = " " + tokens(text).joined(separator: " ") + " "
+        // A syllabus is recognizable by its sections even when it never says "syllabus".
+        let sections = ["instructor", "teaching assistant", "lecture hours", "office hours", "grading", "textbook",
+                        "prerequisite", "course objectives", "attendance", "course description", "learning outcomes"]
+        if sections.filter({ t.contains($0) }).count >= 3 { return "syllabus" }
         let patterns: [(String, String)] = [
             (#"\b(?:homework|hw|odev|assignment|ass)\s?(\d{1,2})\b"#, "hw"),
             (#"\b(?:lecture|lec)\s?(\d{1,2})\b"#, "lecture"),
@@ -159,6 +168,7 @@ public enum Style {
             (#"\b(?:week|hafta)\s?(\d{1,2})\b"#, "week"),
             (#"\b(?:project|proje)\s?(\d{1,2})\b"#, "project"),
             (#"\b(?:midterm|vize)\s?(\d?)"#, "midterm"),
+            (#"\b(?:final exam|final examination|final sinavi)\b()"#, "final"),
         ]
         for (p, word) in patterns {
             if let m = t.firstMatch(of: try! Regex(p)) {
@@ -166,7 +176,9 @@ public enum Style {
                 return word + n
             }
         }
-        for plain in ["syllabus", "final exam", "cheat sheet", "cheatsheet"] where t.contains(plain) {
+        // An exam paper that just says "FINAL" on top.
+        if t.contains(" final ") && t.contains("exam") { return "final" }
+        for plain in ["syllabus", "cheat sheet", "cheatsheet"] where t.contains(plain) {
             return plain.replacingOccurrences(of: " ", with: "")
         }
         return nil
@@ -201,6 +213,22 @@ public enum Style {
         let re = try! Regex(#"\b(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](20\d{2})\b"#)
         if let m = text.firstMatch(of: re), let mo = Int(m.output[2].substring ?? ""), let y = Int(m.output[3].substring ?? "") {
             return Calendar.current.date(from: DateComponents(year: y, month: mo, day: 1))
+        }
+        return nil
+    }
+
+    /// The term a document itself states: "Fall '2022-2023" → fall22, "2024 Fall" → fall24, "Bahar 2025" → spring25.
+    /// In an academic year "2022-2023", fall is the first year and spring/summer the second.
+    public static func termIn(_ text: String) -> String? {
+        let w = tokens(text)
+        let seasons = ["fall": "fall", "autumn": "fall", "guz": "fall", "spring": "spring", "bahar": "spring",
+                       "summer": "summer", "yaz": "summer"]
+        for (i, word) in w.enumerated() {
+            guard let season = seasons[word] else { continue }
+            let near = (max(0, i - 2)...min(w.count - 1, i + 3)).compactMap { Int(w[$0]) }.filter { (2000...2100).contains($0) }
+            guard let first = near.min() else { continue }
+            let year = (near.count >= 2 && season != "fall") ? near.max()! : first
+            return season + String(year % 100)
         }
         return nil
     }
