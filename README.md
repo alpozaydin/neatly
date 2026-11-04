@@ -27,8 +27,13 @@ namer service install             # same, in the background, starting at login
 namer service uninstall           # stop it
 ```
 
-The dialog shows the suggested name. **Rename** accepts it, editing the text uses your name instead,
-**Keep name** leaves the file alone for good. Your edits are saved in
+The dialog shows where to save the file and under what name, e.g. `~/courses-fall26/ceng315/ceng315-syllabus`.
+**Save** accepts it. Edit the text to change the folder or the name (just a name = stay in Downloads).
+**Choose folder…** opens the normal folder picker. **Keep as is** leaves the file alone for good.
+
+Folders are suggested only if they already exist: a course code goes to that course's folder,
+a file goes where you put the same kind of file last time, or to a folder whose name it mentions.
+Otherwise it stays in Downloads. Your edits are saved in
 `~/Library/Application Support/namer/corrections.jsonl` so namer can learn from them.
 
 ## Your style

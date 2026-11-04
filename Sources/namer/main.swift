@@ -9,6 +9,7 @@ usage: namer [options] <file or folder>...
   --force      suggest even for names that already look fine (never overrides a name you chose)
   --why        show the evidence, and why files were skipped
   --watch      wait for new files in the folder and suggest names as they arrive
+  --where      also suggest a folder to move each file to
   --ask        with --watch: show a dialog for each file (Rename / edit the name / Keep name)
   service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
   --offline    no network lookups (arXiv)
@@ -116,34 +117,57 @@ if args.first == "undo" {
     guard let i = args.firstIndex(of: f) else { return false }
     args.remove(at: i); return true
 }
-let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask")
+let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask"), whereTo = flag("--where")
 var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
 
-enum Answer { case rename(String), keep, noAnswer }
+enum Answer { case save(name: String, folder: URL?), keep, noAnswer }
 
-/// A plain macOS dialog with the suggestion pre-filled. Editing the text = your own name.
-func askUser(file: String, suggestion: String) -> Answer {
-    func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-    let script = """
-    display dialog "New download:\\n\(q(file))\\n\\nRename to:" default answer "\(q(suggestion))" ¬
-      with title "namer" buttons {"Keep name", "Rename"} default button "Rename" cancel button "Keep name" giving up after 300
-    """
+func osascript(_ script: String) -> (ok: Bool, out: String) {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
     p.arguments = ["-e", script]
     let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return .noAnswer }
+    guard (try? p.run()) != nil else { return (false, "") }
     p.waitUntilExit()
-    if p.terminationStatus != 0 { return .keep }                       // "Keep name" = cancel button
-    let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-    if text.contains("gave up:true") { return .noAnswer }
-    guard let r = text.range(of: "text returned:") else { return .noAnswer }
-    var chosen = String(text[r.upperBound...]).components(separatedBy: ", gave up:").first ?? ""
-    chosen = chosen.trimmingCharacters(in: .whitespacesAndNewlines)
-    return chosen.isEmpty ? .noAnswer : .rename(chosen)
+    return (p.terminationStatus == 0, String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
+}
+
+/// The dialog: one field with "folder/name". Edit any part, or pick a folder with the macOS picker.
+/// No folder in the field = stays in Downloads.
+func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
+    func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+    let prefill = folder.map { Destination.pretty($0) + "/" + suggestion } ?? suggestion
+    let r = osascript("""
+    display dialog "New download:\\n\(q(file))\\n\\nSave as:" default answer "\(q(prefill))" ¬
+      with title "namer" buttons {"Keep as is", "Choose folder…", "Save"} default button "Save" ¬
+      cancel button "Keep as is" giving up after 300
+    """)
+    if !r.ok { return .keep }                                        // "Keep as is" = cancel button
+    if r.out.contains("gave up:true") { return .noAnswer }
+    guard let t = r.out.range(of: "text returned:") else { return .noAnswer }
+    let typed = (String(r.out[t.upperBound...]).components(separatedBy: ", gave up:").first ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !typed.isEmpty else { return .noAnswer }
+
+    // Split "~/a/b/name" into folder + name. A bare name means: stay where it is.
+    let expanded = (typed as NSString).expandingTildeInPath
+    let name = (expanded as NSString).lastPathComponent
+    var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : nil
+
+    if r.out.contains("button returned:Choose folder") {
+        let start = chosenFolder ?? folder ?? FileManager.default.homeDirectoryForCurrentUser
+        let pick = osascript("""
+        POSIX path of (choose folder with prompt "Save “\(q(name))” in:" default location (POSIX file "\(q(start.path))"))
+        """)
+        guard pick.ok else { return .noAnswer }
+        chosenFolder = URL(fileURLWithPath: pick.out.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    // Only inside your home folder.
+    if let f = chosenFolder, !f.path.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.path) { chosenFolder = nil }
+    return .save(name: name, folder: chosenFolder)
 }
 
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
@@ -175,21 +199,27 @@ if watch {
                     let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
                     print("\(name)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
                     if ask {
-                        let answer = askUser(file: name, suggestion: s.name)
+                        let folders = Destination.index()
+                        let target = Destination.suggest(name: s.name, evidence: s.evidence, folders: folders)
+                        let answer = askUser(file: name, suggestion: s.name, folder: target)
                         let ev = s.evidence
-                        let log = { (chosen: String) in
+                        let log = { (chosen: String, folder: URL?) in
                             Correction(original: name, suggested: s.name, chosen: chosen, via: s.via,
-                                       source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline).save()
+                                       source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline,
+                                       suggestedFolder: target?.path, chosenFolder: folder?.path).save()
                         }
                         switch answer {
-                        case .rename(let chosen):
-                            let done = try? Rename.apply(url, to: chosen)
-                            if let done { seen.insert(done.lastPathComponent) }
-                            if chosen != s.name { log(chosen); if let done { Decision.markKeep(done) } }
-                            print("   renamed to \(chosen)\(chosen != s.name ? " (your edit, saved)" : "")")
+                        case .save(let chosen, let folder):
+                            let done = try? Rename.apply(url, to: chosen, in: folder)
+                            if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
+                            let edited = chosen != s.name || folder?.path != target?.path
+                            if edited || folder != nil { log(chosen, folder) }   // moves teach where things go
+                            if edited, let done { Decision.markKeep(done) }
+                            let place = folder.map { Destination.pretty($0) } ?? "Downloads"
+                            print("   saved as \(place)/\(done?.lastPathComponent ?? chosen)\(edited ? " (your edit, saved)" : "")")
                         case .keep:
-                            Decision.markKeep(url); log("")
-                            print("   kept original name")
+                            Decision.markKeep(url); log("", nil)
+                            print("   kept as is")
                         case .noAnswer: print("   no answer, left as is")
                         }
                     } else if apply { _ = try? Rename.apply(url, to: s.name); seen.insert(new) }
@@ -224,6 +254,7 @@ files.removeAll { partial.contains($0.pathExtension.lowercased()) }
 if namer.useModel { print("model: \(Namer.modelStatus)\n") }
 
 let pad = min(48, files.map(\.lastPathComponent.count).max() ?? 0)
+let folderIndex = whereTo ? Destination.index() : []
 var renamed = 0, suggested = 0, kept = 0, unsure = 0
 for url in files {
     let old = url.lastPathComponent
@@ -239,6 +270,10 @@ for url in files {
         suggested += 1
         let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
         print("\(shown)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
+        if whereTo {
+            let f = Destination.suggest(name: s.name, evidence: s.evidence, folders: folderIndex)
+            print("      folder:  \(f.map(Destination.pretty) ?? "(stay in Downloads)")")
+        }
         if why {
             let e = s.evidence
             if let h = e.sourceDescription { print("      source:  \(h)") }

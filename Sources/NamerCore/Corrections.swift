@@ -10,11 +10,17 @@ public struct Correction: Codable, Sendable {
     public var via: String
     public var source: String?
     public var title: String?
+    public var suggestedFolder: String?   // where namer proposed to put it (nil = Downloads)
+    public var chosenFolder: String?      // where you actually put it
 
-    public init(original: String, suggested: String, chosen: String, via: String, source: String?, title: String?) {
+    public init(original: String, suggested: String, chosen: String, via: String, source: String?, title: String?,
+                suggestedFolder: String? = nil, chosenFolder: String? = nil) {
         self.original = original; self.suggested = suggested; self.chosen = chosen
         self.via = via; self.source = source; self.title = title
+        self.suggestedFolder = suggestedFolder; self.chosenFolder = chosenFolder
     }
+
+    var suggestedFirstWord: String { suggested.split(separator: "-").first.map(String.init) ?? suggested }
 
     public static var fileURL: URL {
         StyleProfile.fileURL.deletingLastPathComponent().appending(path: "corrections.jsonl")
