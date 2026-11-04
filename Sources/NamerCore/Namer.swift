@@ -147,11 +147,17 @@ public struct Namer: Sendable {
             // A syllabus mentions "midterms"; a midterm never mentions "syllabus" — so the document kind wins.
             let kindItem = kind.flatMap { ["syllabus", "schedule"].contains($0.word) ? $0.word : nil }
             let full = e.bodySnippet ?? ""
-            if let item = kindItem ?? Style.academicItem(in: strong) ?? Style.academicItem(in: full) {
+            // Title says "midterm", page says "Midterm I" → take the one with the number.
+            let fromTitle = Style.academicItem(in: strong), fromPage = Style.academicItem(in: full)
+            let numbered = fromPage.flatMap { p in
+                fromTitle.map { p.hasPrefix($0) && p != $0 } ?? false ? p : nil }
+            if let item = kindItem ?? numbered ?? fromTitle ?? fromPage {
                 // Exams are often old papers: name them by the term written on them. ceng331-final-fall22
                 let isExam = ["midterm", "final", "quiz"].contains { item.hasPrefix($0) }
                 let term = isExam ? Style.termIn(strong + "\n" + String(full.prefix(500))) : nil
-                return Style.join([course, item, term].compactMap { $0 })
+                // "midterm KEY" / "Solutions" → …-solutions. Title, heading and filename only (exam text says "key" rarely).
+                let sol = isExam && Style.isSolutions([e.metadataTitle, e.headline, e.stem].compactMap { $0 }.joined(separator: " "))
+                return Style.join([course, item, term, sol ? "solutions" : nil].compactMap { $0 })
             }
         }
 

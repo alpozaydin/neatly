@@ -167,13 +167,13 @@ public enum Style {
             (#"\b(?:quiz)\s?(\d{1,2})\b"#, "quiz"),
             (#"\b(?:week|hafta)\s?(\d{1,2})\b"#, "week"),
             (#"\b(?:project|proje)\s?(\d{1,2})\b"#, "project"),
-            (#"\b(?:midterm|vize)\s?(\d?)"#, "midterm"),
+            (#"\b(?:midterm|vize|mt)\s?(\d|iii|ii|i)?\b"#, "midterm"),
             (#"\b(?:final exam|final examination|final sinavi)\b()"#, "final"),
         ]
         for (p, word) in patterns {
             if let m = t.firstMatch(of: try! Regex(p)) {
                 let n = m.output[1].substring.map(String.init) ?? ""
-                return word + n
+                return word + (["i": "1", "ii": "2", "iii": "3"][n] ?? n)   // "Midterm I" → midterm1
             }
         }
         // An exam paper that just says "FINAL" on top.
@@ -231,5 +231,12 @@ public enum Style {
             return season + String(year % 100)
         }
         return nil
+    }
+
+    /// Answer keys and solutions are worth saying in the name: they are the files you look for before an exam.
+    public static func isSolutions(_ text: String) -> Bool {
+        let t = " " + tokens(text).joined(separator: " ") + " "
+        return [" key ", " answer key ", " solution ", " solutions ", " cozum ", " cozumler ", " cevap anahtari "]
+            .contains { t.contains($0) }
     }
 }

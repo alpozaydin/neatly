@@ -218,7 +218,15 @@ if watch {
                     print("\(name)  skip (\(r))"); continue
                 case .kept, .unsure:
                     evidence = Destination.keptEvidence(url).0
-                    print("\(name)  name ok")
+                    // The name looks fine, but rules may know a more specific one (Sample-MT → ceng331-midterm1-fall19-solutions).
+                    // Only rules: a model guess shouldn't replace a name a person may have chosen.
+                    var rulesOnly = namer; rulesOnly.useModel = false
+                    if case .suggested(let s) = await rulesOnly.suggest(for: url, explicit: true), s.via.hasPrefix("rules") {
+                        nameIdea = s.name; via = s.via; evidence = s.evidence
+                        print("\(name)  name ok, but rules suggest \(s.name)")
+                    } else {
+                        print("\(name)  name ok")
+                    }
                 }
                 guard ask else {
                     if apply, nameIdea != original { _ = try? Rename.apply(url, to: nameIdea) }
@@ -229,6 +237,18 @@ if watch {
                 let target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.index(),
                                                     useModel: namer.useModel)
                 print("   folder: \(Destination.short(target))")
+                // Downloaded the same file twice? Say so instead of making a "-2" copy.
+                if let twin = Destination.duplicate(of: url, in: target) {
+                    let r = osascript("""
+                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(target)) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))" ¬
+                      with title "namer" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after 300
+                    """)
+                    if r.ok, r.out.contains("Move to Trash") {
+                        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                        print("   duplicate of \(twin.lastPathComponent) — moved to Trash")
+                        continue
+                    }
+                }
                 let ev = evidence, suggestedName = nameIdea, how = via
                 let log = { (chosen: String, folder: URL?) in
                     Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,

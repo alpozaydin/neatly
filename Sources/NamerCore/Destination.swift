@@ -125,6 +125,18 @@ public enum Destination {
         return URL(fileURLWithPath: home + pick)
     }
 
+    /// A file with the same bytes already in `folder`? (Downloaded twice.) Compares size first, then content.
+    public static func duplicate(of url: URL, in folder: URL?) -> URL? {
+        guard let folder, let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+              let items = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])
+        else { return nil }
+        for other in items where other.pathExtension.lowercased() == url.pathExtension.lowercased() {
+            guard (try? other.resourceValues(forKeys: [.fileSizeKey]))?.fileSize == size else { continue }
+            if FileManager.default.contentsEqual(atPath: url.path, andPath: other.path) { return other }
+        }
+        return nil
+    }
+
     /// "courses-fall26 › ceng491" — short, but enough to tell same-named folders apart.
     public static func short(_ url: URL?) -> String {
         guard let url else { return "Downloads" }

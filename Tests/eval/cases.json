@@ -584,9 +584,9 @@
         ]
       ],
       "expect": [
+        "math119-midterm1-fall24-solutions",
         "math119-midterm1-fall24",
-        "math119-midterm1",
-        "math119-midterm1-solutions-fall24"
+        "math119-midterm1"
       ]
     },
     {
@@ -899,6 +899,40 @@
       ],
       "expect": [
         "ceng331-final-fall22"
+      ]
+    },
+    {
+      "id": "midterm-key",
+      "file": "Sample-MT.pdf",
+      "title": "midterm KEY",
+      "source": [
+        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/3/mod_resource/content/1/Sample-MT.pdf"
+      ],
+      "lines": [
+        [
+          "Middle East Technical University",
+          11
+        ],
+        [
+          "Department of Computer Engineering CENG 331",
+          11
+        ],
+        [
+          "Fall '2019-2020",
+          11
+        ],
+        [
+          "Midterm I",
+          16
+        ],
+        [
+          "Duration: 100 minutes. This is a closed book exam.",
+          10
+        ]
+      ],
+      "expect": [
+        "ceng331-midterm1-fall19-solutions",
+        "ceng331-midterm1-fall19-key"
       ]
     }
   ]
