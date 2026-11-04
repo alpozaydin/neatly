@@ -82,10 +82,12 @@ enum Extract {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1600,   // downsample: faster, still readable
+            kCGImageSourceCreateThumbnailWithTransform: true,   // respect phone rotation
+            kCGImageSourceThumbnailMaxPixelSize: 2400,          // handwriting needs more pixels than print
         ]
         guard let img = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
-        return ocr(img)
+        // Photos get the slow, accurate recognizer: it can read handwriting; .fast cannot.
+        return ocr(img, accurate: true)
     }
 
     static func ocr(pdfFirstPage url: URL) -> String? {
@@ -106,17 +108,18 @@ enum Extract {
         try? VNImageRequestHandler(cgImage: img).perform([req])
         // Very broad labels say nothing a filename needs.
         let generic: Set<String> = ["structure", "indoor", "outdoor", "material", "people", "adult", "document",
-                                    "screenshot", "text", "art", "illustrations", "graphic", "shape"]
+                                    "screenshot", "text", "art", "illustrations", "graphic", "shape",
+                                    "handwriting", "paper", "printed_page", "diagram"]
         return (req.results ?? [])
             .filter { $0.confidence > 0.3 && !generic.contains($0.identifier) }
             .prefix(3)
             .map { $0.identifier.replacingOccurrences(of: "_", with: " ") }
     }
 
-    private static func ocr(_ img: CGImage) -> String? {
+    private static func ocr(_ img: CGImage, accurate: Bool = false) -> String? {
         let req = VNRecognizeTextRequest()
-        req.recognitionLevel = .fast
-        req.usesLanguageCorrection = false
+        req.recognitionLevel = accurate ? .accurate : .fast
+        req.usesLanguageCorrection = accurate
         try? VNImageRequestHandler(cgImage: img).perform([req])
         let lines = (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }
         let text = lines.joined(separator: "\n")
