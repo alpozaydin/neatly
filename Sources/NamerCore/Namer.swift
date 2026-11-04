@@ -9,6 +9,8 @@ public enum Outcome: Sendable {
 public struct Namer: Sendable {
     public var useNetwork = true
     public var useModel = true
+    /// The person's naming style. Names are built as lowercase-kebab, then rendered in this style.
+    public var profile = StyleProfile.standard
     /// Wall-clock budgets. Past these we give up rather than make the user wait.
     /// Images get more: looking at a picture is the expensive, high-value step.
     public var documentBudget: Duration = .seconds(3)
@@ -41,7 +43,7 @@ public struct Namer: Sendable {
             }
             let c = (clock.now - start).components
             let ms = Double(c.seconds) * 1000 + Double(c.attoseconds) / 1e15
-            return .suggested(Suggestion(name: stem, via: via, millis: ms, evidence: e))
+            return .suggested(Suggestion(name: profile.render(stem), via: via, millis: ms, evidence: e))
         }
         var trail: String { e.steps.joined(separator: "+") }
 

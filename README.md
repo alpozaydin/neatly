@@ -19,6 +19,19 @@ No confident name → no suggestion. A guess is worse than a junk name.
 lowercase-kebab, most distinctive word first, qualifier last, as short as possible:
 `transcript-fall26`, `unidepth-2024`, `invoice-turkcell-nov26`.
 
+## Your style
+
+namer can copy how you already name files. It reads only file **names**, never contents:
+
+```sh
+namer learn ~/courses-fall26     # learns e.g. "lowercase, '-'"  → transcript-fall26
+namer style                       # show what it learned
+namer style --reset               # forget it
+```
+
+It learns per folder and skips code repos. If your folders disagree, it saves nothing and tells you.
+The style is one small file: `~/Library/Application Support/namer/style.json`.
+
 ## Usage
 
 ```sh
