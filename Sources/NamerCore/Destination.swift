@@ -10,7 +10,8 @@ public enum Destination {
 
     /// Folders a person organises files in: home folders except system ones, 3 levels deep, no code repos.
     public static func index(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [Folder] {
-        let skipTop: Set<String> = ["Library", "Applications", "Downloads", "Movies", "Music", "Pictures", "Public",
+        // Desktop and Documents are privacy-protected: scanning them from the background would pop macOS prompts.
+        let skipTop: Set<String> = ["Library", "Applications", "Downloads", "Movies", "Music", "Pictures", "Public", "Desktop", "Documents",
                                     "src", "miniconda3", "anaconda3", "venvs", "node_modules", "go", "opt"]
         var out: [Folder] = []
         func walk(_ dir: URL, _ depth: Int) {
