@@ -11,6 +11,8 @@ public struct Namer: Sendable {
     public var useModel = true
     /// The person's naming style. Names are built as lowercase-kebab, then rendered in this style.
     public var profile = StyleProfile.standard
+    /// Experimental: ask the model to double-check names made by rules. Measured in namer-eval --verify.
+    public var verifyRules = false
     /// Wall-clock budgets. Past these we give up rather than make the user wait.
     /// Images get more: looking at a picture is the expensive, high-value step.
     public var documentBudget: Duration = .seconds(3)
@@ -101,7 +103,13 @@ public struct Namer: Sendable {
         }
 
         // Known document kinds are decided by rules: fast and predictable.
-        if let n = ruleName(e) { return done(n, "rules[\(trail)]") }
+        if let n = ruleName(e) {
+            if verifyRules, useModel, await Model.rejects(name: n, for: e) {
+                e.steps.append("rule-rejected:\(n)")
+            } else {
+                return done(n, "rules[\(trail)]")
+            }
+        }
 
         // 6. On-device model. For images it looks at the picture itself (when the OS supports it).
         let budget = isImage ? imageBudget : documentBudget
@@ -134,12 +142,16 @@ public struct Namer: Sendable {
         let kind = Style.kind(in: strong + " " + String(weak.prefix(300))) ?? Style.kind(in: weak)
 
         // Course files: course code first, then what it is. ceng213-hw2, ceng499-lecture5, ceng334-syllabus.
-        let personal: Set<String> = ["transcript", "enrollment", "cv"]   // full of course codes, but not about one
+        let personal: Set<String> = ["transcript", "enrollment", "cv", "exam-schedule", "tuition", "learning-agreement"]   // mention courses, but are not about one
         if !(kind.map { personal.contains($0.word) } ?? false), let course = courseCode(e) {
             // A syllabus mentions "midterms"; a midterm never mentions "syllabus" — so the document kind wins.
             let kindItem = kind.flatMap { ["syllabus", "schedule"].contains($0.word) ? $0.word : nil }
-            if let item = kindItem ?? Style.academicItem(in: strong) ?? Style.academicItem(in: weak) {
-                return Style.join([course, item])
+            let full = e.bodySnippet ?? ""
+            if let item = kindItem ?? Style.academicItem(in: strong) ?? Style.academicItem(in: full) {
+                // Exams are often old papers: name them by the term written on them. ceng331-final-fall22
+                let isExam = ["midterm", "final", "quiz"].contains { item.hasPrefix($0) }
+                let term = isExam ? Style.termIn(strong + "\n" + String(full.prefix(500))) : nil
+                return Style.join([course, item, term].compactMap { $0 })
             }
         }
 

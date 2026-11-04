@@ -151,10 +151,11 @@ if watch {
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
     let skip: Set<String> = ["crdownload", "download", "part", "partial"]
     func listing() -> [String: Int] {
-        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey],
+        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
                                                                    options: [.skipsHiddenFiles])) ?? []
         var out: [String: Int] = [:]
-        for u in items where !skip.contains(u.pathExtension.lowercased()) {
+        for u in items where !skip.contains(u.pathExtension.lowercased())
+            && (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {   // files only
             out[u.lastPathComponent] = (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
         }
         return out

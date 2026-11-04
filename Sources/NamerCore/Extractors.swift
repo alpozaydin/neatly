@@ -136,6 +136,10 @@ enum Extract {
         if junkPrefixes.contains(where: { l.hasPrefix($0) }) { return true }
         if [".doc", ".docx", ".pdf", ".ppt", ".pptx", ".tex", ".dvi"].contains(where: { l.hasSuffix($0) }) { return true }
         if l == stem.lowercased() { return true }
+        // An institution's name is a letterhead, not a title. "MIDDLE EAST TECHNICAL UNIVERSITY"
+        let w = l.split(separator: " ")
+        if w.count <= 6, ["university", "universitesi", "üniversitesi", "department of", "faculty of"]
+            .contains(where: { l.contains($0) }) { return true }
         if t.allSatisfy({ $0.isNumber || $0.isPunctuation || $0.isWhitespace }) { return true }
         return false
     }

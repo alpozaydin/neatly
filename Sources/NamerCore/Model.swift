@@ -160,4 +160,21 @@ enum Model {
         // Fall back to the original if we removed almost everything.
         return kept.count >= 2 ? kept.joined(separator: "\n") : text
     }
+
+    /// Second opinion on a rule-made name. True only on a clear "no".
+    static func rejects(name: String, for e: Evidence) async -> Bool {
+        guard isAvailable else { return false }
+        var facts = ""
+        if let s = e.sourceDescription { facts += "Downloaded from: \(s)\n" }
+        if let t = e.metadataTitle { facts += "Embedded title: \(t)\n" }
+        if let h = e.headline { facts += "Largest heading: \(h)\n" }
+        if let b = e.bodySnippet { facts += "Beginning of content:\n\(withoutLetterhead(b).prefix(600))\n" }
+        let session = LanguageModelSession(instructions: """
+        You check file names. A good name is short and says what the file is. Words like fall26 or nov26 are dates; \
+        ceng213 is a course code; hw2 means homework 2. Answer only "yes" if the name fits the file, or "no" if it is wrong.
+        """)
+        let out = try? await session.respond(to: facts + "Proposed name: \(name)\nDoes it fit?",
+                                             options: GenerationOptions(temperature: 0))
+        return out?.content.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("no") ?? false
+    }
 }

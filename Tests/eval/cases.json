@@ -584,9 +584,9 @@
         ]
       ],
       "expect": [
+        "math119-midterm1-fall24",
         "math119-midterm1",
-        "math119-midterm1-solutions",
-        "math119-midterm1-2024"
+        "math119-midterm1-solutions-fall24"
       ]
     },
     {
@@ -825,6 +825,80 @@
         "tubitak-2209a-application",
         "tubitak-2209a",
         "tubitak-2209a-form"
+      ]
+    },
+    {
+      "id": "syllabus-no-word",
+      "file": "315-Fall 2026 (1).pdf",
+      "source": [
+        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/1/mod_resource/content/1/315-Fall%202026.pdf"
+      ],
+      "title": "MIDDLE EAST TECHNICAL UNIVERSITY",
+      "lines": [
+        [
+          "MIDDLE EAST TECHNICAL UNIVERSITY",
+          14
+        ],
+        [
+          "CEng 315 – Algorithms",
+          18
+        ],
+        [
+          "Fall 2026-2027",
+          12
+        ],
+        [
+          "Instructors: Prof. Dr. A. Yilmaz",
+          10
+        ],
+        [
+          "Teaching Assistants: B. Kaya, C. Demir",
+          10
+        ],
+        [
+          "Lecture Hours: Mon 9:15-10:30",
+          10
+        ],
+        [
+          "Grading: Midterm 30%, Final 40%, Homeworks 30%",
+          10
+        ]
+      ],
+      "expect": [
+        "ceng315-syllabus",
+        "ceng315-syllabus-fall26"
+      ]
+    },
+    {
+      "id": "old-final",
+      "file": "final_a.pdf",
+      "source": [
+        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/2/mod_resource/content/1/final_a.pdf"
+      ],
+      "lines": [
+        [
+          "Middle East Technical University",
+          11
+        ],
+        [
+          "Department of Computer Engineering CENG 331",
+          11
+        ],
+        [
+          "Fall '2022-2023",
+          11
+        ],
+        [
+          "FINAL",
+          16
+        ],
+        [
+          "Exam: This is a closed book, closed notes exam.",
+          10
+        ]
+      ],
+      "expect": [
+        "ceng331-final-fall22"
       ]
     }
   ]
