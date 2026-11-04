@@ -27,6 +27,15 @@ swift build -c release --product namer
 .build/release/namer --apply ~/Downloads    # rename
 .build/release/namer undo transcript-fall26.pdf
 swift run checks                            # self-checks
+swift run -c release namer-eval             # accuracy + speed score
 ```
+
+## Testing accuracy
+
+`Tests/eval/cases.json` lists test files and the names we want for them.
+`namer-eval` creates those files (PDFs, scans, photos), runs namer on them, and prints a score.
+All test data is made up — no real personal files.
+
+To add a case: copy one block in `cases.json`, change the text and the wanted names, run `namer-eval`.
 
 Requires macOS 26+ (Apple Intelligence enabled for the model step; everything else works without it).

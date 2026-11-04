@@ -1,0 +1,188 @@
+{
+  "decision": {
+    "rename": [
+      "IMG_4009.HEIC",
+      "PXL_20261012_101010.jpg",
+      "DSC00123.JPG",
+      "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
+      "Screenshot 2026-11-03 at 14.22.10.png",
+      "Screen Shot 2020-01-01 at 1.00.00 PM.png",
+      "download.pdf",
+      "download (3).pdf",
+      "document(1).pdf",
+      "Unknown.png",
+      "untitled.pdf",
+      "images.png",
+      "image (2).png",
+      "scan0001.pdf",
+      "1234567_2026-11-04_124701.pdf",
+      "Anfrage-26F04668426.pdf",
+      "7f3a9c2b-e81d-4f0a-9b6c-1a2b3c4d5e6f.pdf",
+      "EAF2026000123456.pdf",
+      "1730987654321.pdf",
+      "main.pdf",
+      "paper_final_v3 (1).pdf"
+    ],
+    "keep": [
+      "CV_janedoe.pdf",
+      "CivCore deck - Oct 2026.pdf",
+      "transcript-fall26.pdf",
+      "invoice-turkcell-nov26.pdf",
+      "Team Hatching from a Golden Egg.png",
+      "ceng213-hw2.pdf",
+      "lec05-decision-trees.pdf",
+      "imagenet-results.png",
+      "LuMon_CVPR2026_camera_ready.pdf",
+      "27oct2026sila_hoca_meet.txt",
+      "Thesis Draft v2.docx",
+      "budget_2027.xlsx",
+      "IMG-ideas-for-app.png",
+      "Screenshot of login bug.png"
+    ]
+  },
+
+  "naming": [
+    {
+      "id": "metu-transcript",
+      "file": "1234567_2026-11-04_124701.pdf",
+      "source": ["https://student.metu.edu.tr/proxy/Student_Information/main.php"],
+      "title": "Student Transcript",
+      "lines": [["Middle East Technical University", 12], ["Student Copy", 22], ["Name: Jane Doe   Student No: 1234567", 10]],
+      "expect": ["transcript-fall26"]
+    },
+    {
+      "id": "ceng-syllabus",
+      "file": "8812_4471.pdf",
+      "source": ["https://odtuclass.metu.edu.tr/pluginfile.php/8812/mod_resource/content/1/8812_4471.pdf"],
+      "created": "2027-02-20",
+      "lines": [["CENG 334 Operating Systems", 22], ["Course Syllabus - Spring 2027", 16], ["Instructor: Dr. A. Yilmaz. Grading: 2 midterms, 1 final, 4 homeworks.", 10]],
+      "expect": ["ceng334-syllabus", "ceng334-syllabus-spring27", "syllabus-ceng334-spring27"]
+    },
+    {
+      "id": "turkcell-invoice",
+      "file": "EAF2026000123456.pdf",
+      "source": ["https://www.turkcell.com.tr/hesabim/faturalarim"],
+      "created": "2026-11-05",
+      "lines": [["e-Arşiv Fatura", 20], ["Turkcell İletişim Hizmetleri A.Ş.", 12], ["Fatura Dönemi: Ekim 2026   Toplam: 349,90 TL", 10]],
+      "expect": ["invoice-turkcell-nov26", "invoice-turkcell-oct26"]
+    },
+    {
+      "id": "garanti-receipt",
+      "file": "Dekont_20261103_778812.pdf",
+      "source": ["https://sube.garantibbva.com.tr/isube/login"],
+      "lines": [["DEKONT", 20], ["Garanti BBVA - Para Transferi (EFT)", 12], ["Tutar: 1.500,00 TL   Tarih: 03.11.2026", 10]],
+      "expect": ["receipt-garantibbva-nov26", "receipt-garanti-nov26", "eft-receipt-garanti"]
+    },
+    {
+      "id": "db-refund-letter",
+      "file": "Anfrage-26F04668426.pdf",
+      "source": ["https://mail-attachment.googleusercontent.com/attachment/u/0/?view=att"],
+      "lines": [["DB Fernverkehr AG - Servicecenter Fahrgastrechte", 10], ["Ihr Anliegen vom 02.10.2026 | Fall-ID 26F04668426", 10], ["Hallo Jane Doe, vielen Dank für Ihren Antrag auf Fahrpreisentschädigung wegen Verspätung. Wir erstatten Ihnen 25% des Fahrpreises.", 10]],
+      "expect": ["db-refund-claim", "db-refund", "db-delay-refund", "db-compensation"]
+    },
+    {
+      "id": "boarding-pass",
+      "file": "2026110812345.pdf",
+      "source": ["https://www.lufthansa.com/de/en/online-check-in"],
+      "created": "2026-11-08",
+      "lines": [["Boarding Pass", 24], ["Lufthansa LH1357  Ankara ESB - Frankfurt FRA", 12], ["Passenger: DOE/JANE  Seat 14C  Gate B12", 10]],
+      "expect": ["ticket-lufthansa-nov26", "boarding-pass-lufthansa", "lufthansa-boarding-pass"]
+    },
+    {
+      "id": "rent-contract",
+      "file": "scan0001.pdf",
+      "created": "2026-09-01",
+      "lines": [["KİRA SÖZLEŞMESİ", 22], ["Kiraya veren: A. Kaya   Kiracı: J. Doe", 11], ["Adres: Çankaya, Ankara   Aylık kira: 25.000 TL   Süre: 1 yıl", 10]],
+      "expect": ["rent-contract", "rent-contract-2026", "lease-contract", "contract-rent-2026"]
+    },
+    {
+      "id": "payslip",
+      "file": "document(3).pdf",
+      "created": "2026-11-01",
+      "lines": [["BORDRO", 22], ["Acme Teknoloji A.Ş. - Ekim 2026", 12], ["Brüt: 60.000 TL   Net: 45.120 TL", 10]],
+      "expect": ["payslip-oct26", "payslip-acme-oct26"]
+    },
+    {
+      "id": "paper-no-arxiv",
+      "file": "main.pdf",
+      "title": "LuMon: Lunar Monocular Depth Estimation Benchmark",
+      "lines": [["LuMon: Lunar Monocular Depth Estimation Benchmark", 18], ["Anonymous CVPR submission", 11], ["Abstract. Monocular depth estimation for lunar rovers is hard because of harsh lighting...", 10]],
+      "expect": ["lumon", "lumon-2026", "lumon-benchmark"]
+    },
+    {
+      "id": "lecture-slides",
+      "file": "1730987654321.pdf",
+      "source": ["https://odtuclass.metu.edu.tr/pluginfile.php/1/mod_resource/content/2/1730987654321.pdf"],
+      "created": "2026-10-28",
+      "lines": [["CENG 499 Introduction to Machine Learning", 14], ["Lecture 5: Decision Trees", 24], ["Entropy, information gain, pruning", 12]],
+      "expect": ["ceng499-lecture5", "ceng499-decision-trees", "decision-trees-ceng499", "lecture5-decision-trees"]
+    },
+    {
+      "id": "homework",
+      "file": "4f9a2c7e-81d4-4f0a-9b6c-1a2b3c4d5e6f.pdf",
+      "source": ["https://odtuclass.metu.edu.tr/mod/assign/view.php?id=4411"],
+      "created": "2026-10-15",
+      "lines": [["CENG 213 Data Structures", 14], ["Homework 2: Hash Tables", 22], ["Due: 30 October 2026, 23:59", 10]],
+      "expect": ["ceng213-hw2", "hw2-ceng213", "ceng213-hw2-hash-tables", "hw2-hash-tables"]
+    },
+    {
+      "id": "scanned-medical",
+      "file": "SCAN_0042.pdf",
+      "scanned": true,
+      "lines": [["ANKARA CITY HOSPITAL", 22], ["Medical Report", 20], ["Patient: Jane Doe. Diagnosis: sprained ankle. Rest for 5 days.", 12]],
+      "expect": ["medical-report", "medical-report-ankara", "hospital-report"]
+    },
+    {
+      "id": "someone-elses-cv",
+      "file": "download.pdf",
+      "title": "Curriculum Vitae - John Smith",
+      "lines": [["John Smith", 24], ["Curriculum Vitae", 14], ["Software Engineer - 6 years Swift, iOS, macOS", 10]],
+      "expect": ["cv-john-smith", "john-smith-cv"]
+    },
+    {
+      "id": "coursera-certificate",
+      "file": "f8d2a1c9b7e64c2a.pdf",
+      "source": ["https://www.coursera.org/account/accomplishments"],
+      "lines": [["Certificate of Completion", 22], ["Deep Learning Specialization", 16], ["Coursera - awarded to Jane Doe", 10]],
+      "expect": ["certificate-deep-learning", "deep-learning-certificate", "coursera-deep-learning", "deep-learning-coursera"]
+    },
+    {
+      "id": "arxiv-attention",
+      "file": "1706.03762v7.pdf",
+      "network": true,
+      "lines": [["placeholder", 10]],
+      "expect": ["attention-2017", "transformer-2017", "attention-is-all-2017"]
+    },
+    {
+      "id": "arxiv-depth-anything",
+      "file": "2401.10891v2.pdf",
+      "network": true,
+      "lines": [["placeholder", 10]],
+      "expect": ["depth-anything-2024"]
+    },
+    {
+      "id": "error-screenshot",
+      "file": "Screenshot 2026-11-03 at 14.22.10.png",
+      "lines": [["Uncaught TypeError: Cannot read properties of undefined (reading 'map')", 22], ["at App.render (App.jsx:42)", 18]],
+      "expect": ["typeerror", "typeerror-undefined", "typeerror-map", "js-error"]
+    },
+    {
+      "id": "meeting-notes-photo",
+      "file": "IMG_5521.jpg",
+      "lines": [["Thesis meeting - next steps", 34], ["1. ablation study", 28], ["2. related work", 28]],
+      "expect": ["thesis-meeting", "thesis-next-steps", "thesis-meeting-notes"]
+    },
+    {
+      "id": "grocery-receipt",
+      "file": "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
+      "lines": [["MIGROS", 34], ["SUT 1L          34,90", 22], ["EKMEK           15,00", 22], ["TOPLAM         245,90 TL", 26]],
+      "expect": ["receipt-migros", "migros-receipt", "receipt-migros-oct26"]
+    },
+    {
+      "id": "event-poster",
+      "file": "images.png",
+      "lines": [["GOLDEN EGG HACKATHON", 36], ["Ankara - 15 November 2026", 22], ["Register now", 20]],
+      "expect": ["golden-egg-hackathon", "hackathon-golden-egg"]
+    }
+  ]
+}
