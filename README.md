@@ -31,12 +31,17 @@ Every new download gets a dialog with a suggested folder and name:
 
 ```
 Suggested folder:  courses-fall26 › ceng315
-Suggested name:    [ceng315-syllabus]          [Leave as is]  [Select place…]  [Save]
+Suggested name:    [ceng315-syllabus]      Saves automatically  [Leave as is]  [Select place…]  [Save (5)]
 ```
 
 **Save** puts it in that folder with that name. Edit the name to choose your own.
 **Select place…** picks another folder. **Leave as is** changes nothing and won't ask again.
 Installers (.dmg, .pkg) are skipped.
+
+**No answer in 5 seconds = Save**, so downloads made by agents or scripts never wait for a click.
+Moving the mouse over the dialog or typing stops the countdown. Change the time with
+`--timeout N` (`--timeout 0` waits for you). A second copy of a file you already have goes to the Trash
+the same way.
 
 Folders are suggested only if they already exist: a course code goes to that course's folder,
 a file goes where you put the same kind of file last time, or to a folder whose name it mentions.
