@@ -10,7 +10,8 @@ usage: namer [options] <file or folder>...
   --why        show the evidence, and why files were skipped
   --watch      wait for new files in the folder and suggest names as they arrive
   --where      also suggest a folder to move each file to
-  --ask        with --watch: show a dialog for each file (Rename / edit the name / Keep name)
+  --ask        with --watch: show a dialog for each file (Save / Select place… / Leave as is)
+  --timeout N  with --ask: save the suggestion after N seconds without an answer (default 5, 0 = wait)
   service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
@@ -23,6 +24,8 @@ usage: namer [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst())
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
+
+if args.first == "dialog" { runDialog(Array(args.dropFirst())) }   // the popup, started by the watcher
 
 if args.first == "learn" {
     let roots = args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
@@ -133,6 +136,10 @@ var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
+var timeout = 5
+if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(args[i + 1]) {
+    timeout = max(0, n); args.removeSubrange(i...(i + 1))
+}
 
 enum Answer { case save(name: String, folder: URL?), keep, noAnswer }
 
@@ -146,34 +153,26 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     return (p.terminationStatus == 0, String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
 }
 
-/// The dialog. Save = suggested folder + the name in the field. Select place… = pick a folder. Leave as is = no change.
-func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
-    func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-    let r = osascript("""
-    display dialog "\(q(file))\\n\\nSuggested folder:  \(q(Destination.short(folder)))\\n\\nSuggested name:" ¬
-      default answer "\(q(suggestion))" with title "namer" buttons {"Leave as is", "Select place…", "Save"} ¬
-      default button "Save" cancel button "Leave as is" giving up after 300
-    """)
-    if !r.ok { return .keep }                                        // "Leave as is" = cancel button
-    if r.out.contains("gave up:true") { return .noAnswer }
-    guard let t = r.out.range(of: "text returned:") else { return .noAnswer }
-    let typed = (String(r.out[t.upperBound...]).components(separatedBy: ", gave up:").first ?? "")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !typed.isEmpty else { return .noAnswer }
+/// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Select place… = pick a folder.
+/// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
+@MainActor func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    p.arguments = ["dialog", String(timeout), file, suggestion, folder?.path ?? ""]
+    let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return .noAnswer }
+    let reply = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    p.waitUntilExit()
+    let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
+    if parts.first == "keep" { return .keep }
+    guard parts.first == "save", parts.count >= 3 else { return .noAnswer }
+    let typed = parts[1].trimmingCharacters(in: .whitespaces)
+    let shown: URL? = parts[2].isEmpty ? nil : URL(fileURLWithPath: parts[2])
 
     // Power users can still type a path: "~/somewhere/name".
     let expanded = (typed as NSString).expandingTildeInPath
     let name = (expanded as NSString).lastPathComponent
-    var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : folder
-
-    if r.out.contains("button returned:Select place") {
-        let start = chosenFolder ?? FileManager.default.homeDirectoryForCurrentUser
-        let pick = osascript("""
-        POSIX path of (choose folder with prompt "Save “\(q(name))” in:" default location (POSIX file "\(q(start.path))"))
-        """)
-        guard pick.ok else { return .noAnswer }
-        chosenFolder = URL(fileURLWithPath: pick.out.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
+    var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : shown
     let home = FileManager.default.homeDirectoryForCurrentUser
     if let f = chosenFolder, !f.path.hasPrefix(home.path) { chosenFolder = nil }          // only inside your home
     if let f = chosenFolder, f.standardizedFileURL == home.appending(path: "Downloads").standardizedFileURL {
@@ -240,10 +239,11 @@ if watch {
                 // Downloaded the same file twice? Say so instead of making a "-2" copy.
                 if let twin = Destination.duplicate(of: url, in: target) {
                     let r = osascript("""
-                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(target)) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))" ¬
-                      with title "namer" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after 300
+                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(target)) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))\(timeout > 0 ? "\\n\\nMoves to Trash in \(timeout) s if you don’t answer." : "")" ¬
+                      with title "namer" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after \(timeout > 0 ? timeout : 300)
                     """)
-                    if r.ok, r.out.contains("Move to Trash") {
+                    // No answer: an exact copy already exists, so trashing this one loses nothing (and it's in the Trash).
+                    if r.ok, r.out.contains("Move to Trash") || (timeout > 0 && r.out.contains("gave up:true")) {
                         try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
                         print("   duplicate of \(twin.lastPathComponent) — moved to Trash")
                         continue
