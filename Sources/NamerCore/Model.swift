@@ -51,8 +51,20 @@ enum Model {
                                        "unknown", "untitled", "name", "none", "scan", "handwriting", "handwritten",
                                        "writing", "text", "screenshot"]
 
-    static func name(for e: Evidence, lookAtImage: Bool = false) async -> [String]? {
+    /// Load the model into memory now, so the first real request doesn't pay for it.
+    static func prewarm() {
+        guard isAvailable else { return }
+        LanguageModelSession(instructions: instructions).prewarm()
+    }
+
+    static func name(for e: Evidence, lookAtImage: Bool = false, examples: [Examples.Example] = []) async -> [String]? {
         guard isAvailable else { return nil }
+        var shots = ""
+        if !examples.isEmpty {
+            // Retrieved from this person's own past saves (see Similarity.swift): their style beats our defaults.
+            shots = "Names this person chose for similar files. Follow their style; reuse a word only if it fits this file:\n"
+                + examples.map { "- \($0.about.prefix(150)) -> \($0.name)" }.joined(separator: "\n") + "\n\n"
+        }
         var prompt = ""
         if Decision.junkReason(e.stem) == nil { prompt += "Current filename: \(e.stem)\n" }
         if let s = e.sourceDescription { prompt += "Downloaded from: \(s)\n" }
@@ -72,6 +84,8 @@ enum Model {
                 : "The image is attached. Name it by what it shows.\n"
         }
         prompt += "Name:"
+        let summaryInput = prompt
+        prompt = shots + prompt
 
         // Foreign text: summarize in English first, then name from the summary (two small steps beat one big one).
         var summary: String?
@@ -80,8 +94,8 @@ enum Model {
             Read a document written in \(lang). In one short English sentence, say what kind of document it is,
             who sent it, and what it is about. Ignore addresses, phone numbers and department names.
             """)
-            summary = try? await s.respond(to: prompt, options: GenerationOptions(temperature: 0)).content
-            if let summary { prompt = "Summary: \(summary)\n" + (e.sourceDescription.map { "Downloaded from: \($0)\n" } ?? "") + "Name:" }
+            summary = try? await s.respond(to: summaryInput, options: GenerationOptions(temperature: 0)).content
+            if let summary { prompt = shots + "Summary: \(summary)\n" + (e.sourceDescription.map { "Downloaded from: \($0)\n" } ?? "") + "Name:" }
         }
 
         let session = LanguageModelSession(instructions: instructions)
