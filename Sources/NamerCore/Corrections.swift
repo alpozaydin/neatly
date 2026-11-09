@@ -12,12 +12,21 @@ public struct Correction: Codable, Sendable {
     public var title: String?
     public var suggestedFolder: String?   // where namer proposed to put it (nil = Downloads)
     public var chosenFolder: String?      // where you actually put it
+    public var auto: Bool?                // saved by the countdown, not by you: not a signal of what you want
+    public var context: String?           // one line on what the file was about, for finding similar files later
 
     public init(original: String, suggested: String, chosen: String, via: String, source: String?, title: String?,
-                suggestedFolder: String? = nil, chosenFolder: String? = nil) {
+                suggestedFolder: String? = nil, chosenFolder: String? = nil, auto: Bool? = nil, context: String? = nil) {
         self.original = original; self.suggested = suggested; self.chosen = chosen
         self.via = via; self.source = source; self.title = title
         self.suggestedFolder = suggestedFolder; self.chosenFolder = chosenFolder
+        self.auto = auto; self.context = context
+    }
+
+    /// What the file was about. Older entries have no context: fall back to the title and namer's guess.
+    var about: String {
+        context ?? [title, suggested.replacingOccurrences(of: "-", with: " "), source.map { "from \($0)" }]
+            .compactMap { $0 }.joined(separator: ". ")
     }
 
     var suggestedFirstWord: String { suggested.split(separator: "-").first.map(String.init) ?? suggested }

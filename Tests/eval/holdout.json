@@ -1,0 +1,40 @@
+{
+  "note": "Held-out set. Expected names were written before namer ever ran on these files. Never change rules or prompts to fix a case here; add the file to cases.json instead and write a new held-out case. All names and numbers are made up.",
+  "decision": {
+    "rename": ["IMG_20261108_142201.jpg", "doc_8812734.pdf", "Untitled (4).png", "file-sample_150kB.pdf", "WhatsApp Image 2026-11-02 at 10.11.04.jpeg"],
+    "keep": ["ceng213-notes.pdf", "resume-2026.pdf", "thesis draft v3.docx", "Linear Algebra Cheatsheet.pdf", "budget_2027.xlsx"]
+  },
+  "naming": [
+    {"id": "ho-hw-hash", "file": "hw3_2026.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/9/mod_resource/content/1/hw3_2026.pdf"],
+     "lines": [["CENG 213 Data Structures", 18], ["Homework 3: Hash Tables", 16], ["Due: December 1, 2026, 23:59", 10]], "expect": ["ceng213-hw3", "ceng213-hw3-hash-tables"]},
+    {"id": "ho-quiz-sol", "file": "q2sol.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/10/mod_resource/content/1/q2sol.pdf"],
+     "lines": [["MATH 260 Basic Linear Algebra", 16], ["Quiz 2 - Solutions", 18], ["Spring 2026", 11]], "expect": ["math260-quiz2-solutions", "math260-quiz2-solutions-spring26"]},
+    {"id": "ho-electricity", "file": "fatura_102938.pdf", "source": ["https://online.enerjisa.com.tr/fatura"], "created": "2026-11-06",
+     "lines": [["Enerjisa", 20], ["Elektrik Faturası", 16], ["Fatura Dönemi: Ekim 2026   Tutar: 612,40 TL", 10]], "expect": ["invoice-enerjisa-oct26", "electricity-enerjisa-oct26", "invoice-enerjisa-nov26"]},
+    {"id": "ho-flight", "file": "ETKT_2351234567890.pdf", "source": ["https://www.turkishairlines.com/en-tr/manage-booking"],
+     "lines": [["Electronic Ticket Itinerary Receipt", 18], ["Turkish Airlines", 12], ["Istanbul (IST) - Munich (MUC)   12 Dec 2026   TK1635", 10]], "expect": ["ticket-turkishairlines-ist-muc", "ticket-turkishairlines-dec26", "ticket-istanbul-munich", "ticket-turkishairlines"]},
+    {"id": "ho-statement", "file": "hesap_ozeti_20261101.pdf", "source": ["https://www.isbank.com.tr/internet-subesi"],
+     "lines": [["Türkiye İş Bankası", 14], ["Hesap Özeti", 20], ["Dönem: 01.10.2026 - 31.10.2026", 10]], "expect": ["statement-isbank-oct26"]},
+    {"id": "ho-insurance", "file": "POL_8823411.pdf",
+     "lines": [["Allianz Sigorta", 14], ["Seyahat Sağlık Sigortası Poliçesi", 18], ["Poliçe No: 8823411   Başlangıç: 10.12.2026", 10]], "expect": ["insurance-allianz", "travel-insurance-allianz", "allianz-travel-insurance"]},
+    {"id": "ho-acceptance", "file": "notification_1182.pdf", "source": ["https://mail.google.com/mail/u/0/"],
+     "lines": [["CVPR 2027 Workshop on Medical Vision", 16], ["Notification of Acceptance", 18], ["Dear authors, we are pleased to inform you that your paper has been accepted.", 10]], "expect": ["cvpr-acceptance", "acceptance-cvpr", "cvpr-workshop-acceptance"]},
+    {"id": "ho-visa", "file": "Appointment_Confirmation.pdf", "source": ["https://visa.vfsglobal.com/tur/en/deu/"],
+     "lines": [["VFS Global", 12], ["Germany Visa Application - Appointment Confirmation", 16], ["Date: 15 January 2027, 10:30, Ankara", 10]], "expect": ["visa-appointment-germany", "visa-appointment", "germany-visa-appointment"]},
+    {"id": "ho-backprop-photo", "file": "IMG_4821.jpg",
+     "lines": [["Backpropagation", 40], ["dL/dW = dL/dy * x", 30], ["chain rule through each layer", 26]], "expect": ["backpropagation", "backprop", "backpropagation-chain-rule"]},
+    {"id": "ho-zoom-shot", "file": "Screenshot 2026-11-08 at 14.22.01.png",
+     "lines": [["CENG 491 Senior Project - Weekly Meeting", 28], ["Zoom Meeting ID: 812 3344 5566", 22], ["Passcode: 4411", 22]], "expect": ["ceng491-meeting", "ceng491-zoom", "ceng491-weekly-meeting"]},
+    {"id": "ho-cover-letter", "file": "Document1.docx",
+     "lines": [["Cover Letter", 16], ["Dear Hiring Manager, I am applying for the Machine Learning Intern position at Aselsan.", 11]], "expect": ["cover-letter-aselsan", "aselsan-cover-letter"]},
+    {"id": "ho-group-pres", "file": "Presentation1.pptx",
+     "lines": [["Smart Parking System", 28], ["CENG 356 - Group 4 Final Presentation", 16], ["Problem, design, demo", 12]], "expect": ["ceng356-smart-parking", "ceng356-presentation", "ceng356-smart-parking-presentation"]},
+    {"id": "ho-notebook", "file": "Untitled3.ipynb",
+     "lines": [["Homework 2: CNN on CIFAR-10", 0], ["import torch", 0], ["model = ResNet18()", 0]], "expect": ["hw2-cifar10", "cifar10-cnn", "hw2-cnn-cifar10"]},
+    {"id": "ho-zip-hw", "file": "archive (2).zip", "zipFiles": ["hw4/main.c", "hw4/Makefile", "hw4/report.pdf"], "expect": ["hw4"]},
+    {"id": "ho-chapter", "file": "ch05.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/11/mod_resource/content/1/ch05.pdf"],
+     "lines": [["CENG 334 Operating Systems", 12], ["Chapter 5: CPU Scheduling", 22], ["Basic concepts, scheduling criteria, algorithms", 11]], "expect": ["ceng334-cpu-scheduling", "ceng334-ch5-cpu-scheduling", "ceng334-chapter5"]},
+    {"id": "ho-order", "file": "order_details.pdf", "source": ["https://www.trendyol.com/hesabim/siparislerim"],
+     "lines": [["Sipariş Detayı", 18], ["Logitech MX Master 3S Kablosuz Mouse   1 adet   3.299,00 TL", 10]], "expect": ["receipt-trendyol-mouse", "receipt-trendyol", "receipt-trendyol-nov26"]}
+  ]
+}

@@ -19,6 +19,7 @@ usage: namer [options] <file or folder>...
   keep <file>  mark a name as yours: never suggest for it again
   learn <folder>...  learn your naming style from names you already chose (reads names only)
   style        show the saved style  (style --reset to delete it)
+  stats        how often you saved the suggestion unchanged, and your recent edits
 """
 
 setvbuf(stdout, nil, _IOLBF, 0)   // write log lines immediately, even when not in a terminal
@@ -111,6 +112,40 @@ if args.first == "service" {
     exit(0)
 }
 
+// How often are the suggestions right? The honest metric: popups you saved without changing anything.
+if args.first == "stats" {
+    let all = Correction.all()
+    let answered = all.filter { $0.auto != true }
+    guard !all.isEmpty else { print("no popups answered yet"); exit(0) }
+    func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "-" : "\(Int((Double(a) / Double(b) * 100).rounded()))%" }
+    let left = answered.filter { $0.chosen.isEmpty }
+    let saved = answered.filter { !$0.chosen.isEmpty }
+    let nameOK = saved.filter { $0.chosen == $0.suggested }
+    let withFolder = saved.filter { $0.suggestedFolder != nil || $0.chosenFolder != nil }
+    let folderOK = withFolder.filter { $0.chosenFolder == $0.suggestedFolder }
+    let both = saved.filter { $0.chosen == $0.suggested && $0.chosenFolder == $0.suggestedFolder }
+    let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
+    print("\(all.count) popups since \(f.string(from: all.map(\.date).min()!))  (\(all.count - answered.count) auto-saved, not counted)\n")
+    print("ACCEPTED  \(pct(both.count, answered.count))  saved without any change: \(both.count) of \(answered.count) answered")
+    print("  name    \(pct(nameOK.count, saved.count))  kept the suggested name (\(nameOK.count)/\(saved.count) saves)")
+    print("  folder  \(pct(folderOK.count, withFolder.count))  kept the suggested folder (\(folderOK.count)/\(withFolder.count))")
+    print("  left as is: \(left.count)\n")
+    print("BY PATH   saves  name kept")
+    func bucket(_ v: String) -> String { v.hasPrefix("rules") ? "rules" : v.hasPrefix("model") ? "model" : v == "kept" ? "name ok" : "other" }
+    for b in ["rules", "model", "name ok", "other"] {
+        let g = saved.filter { bucket($0.via) == b }
+        guard !g.isEmpty else { continue }
+        let ok = g.filter { $0.chosen == $0.suggested }.count
+        print("  \(b.padding(toLength: 8, withPad: " ", startingAt: 0))  \(String(g.count).padding(toLength: 5, withPad: " ", startingAt: 0))  \(pct(ok, g.count))")
+    }
+    let edits = saved.filter { $0.chosen != $0.suggested }.suffix(8)
+    if !edits.isEmpty {
+        print("\nRECENT EDITS (what to fix next)")
+        for c in edits { print("  \(c.suggested)  →  \(c.chosen)   [\(bucket(c.via))]") }
+    }
+    exit(0)
+}
+
 if args.first == "keep" {
     for p in args.dropFirst() { Decision.markKeep(URL(fileURLWithPath: p)); print("keeping: \(p)") }
     exit(0)
@@ -141,7 +176,7 @@ if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(arg
     timeout = max(0, n); args.removeSubrange(i...(i + 1))
 }
 
-enum Answer { case save(name: String, folder: URL?), keep, noAnswer }
+enum Answer { case save(name: String, folder: URL?, auto: Bool), keep, noAnswer }
 
 func osascript(_ script: String) -> (ok: Bool, out: String) {
     let p = Process()
@@ -178,7 +213,7 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     if let f = chosenFolder, f.standardizedFileURL == home.appending(path: "Downloads").standardizedFileURL {
         chosenFolder = nil                                                                 // picked Downloads = stay
     }
-    return .save(name: name, folder: chosenFolder)
+    return .save(name: name, folder: chosenFolder, auto: parts.count > 3 && parts[3] == "auto")
 }
 
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
@@ -198,9 +233,17 @@ if watch {
     }
     var seen = Set(listing().keys)
     var pending: [String: Int] = [:]
+    var warmed = Date.distantPast
+    if namer.useModel { Task.detached { Namer.prewarm() } }
     print("watching \(dir.path) — download something (Ctrl-C to stop)")
     while true {
         try? await Task.sleep(for: .seconds(1))
+        // A download in progress: load the model now, so it's ready when the file lands.
+        if namer.useModel, Date().timeIntervalSince(warmed) > 120,
+           ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).contains(where: {
+               skip.contains(($0 as NSString).pathExtension.lowercased()) }) {
+            warmed = Date(); Task.detached { Namer.prewarm() }
+        }
         let now = listing()
         for (name, size) in now where !seen.contains(name) {
             if pending[name] == size {           // same size two checks in a row: finished
@@ -232,10 +275,16 @@ if watch {
                     continue
                 }
                 if installers.contains(url.pathExtension.lowercased()) { continue }
-                let kebab = nameIdea == original ? Destination.keptEvidence(url).1 : nameIdea
-                let target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.index(),
+                let kebab = nameIdea == original ? Destination.keptEvidence(url).1
+                    : nameIdea.lowercased().split(whereSeparator: { "-_ ".contains($0) }).joined(separator: "-")
+                let target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.cachedIndex(),
                                                     useModel: namer.useModel)
                 print("   folder: \(Destination.short(target))")
+                // Match the neighbours: in a folder of "Lab Report - MAO" files, a new one is styled the same way.
+                if nameIdea != original, let local = Destination.style(of: target) {
+                    let styled = local.render(kebab)
+                    if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
+                }
                 // Downloaded the same file twice? Say so instead of making a "-2" copy.
                 if let twin = Destination.duplicate(of: url, in: target) {
                     let r = osascript("""
@@ -250,21 +299,22 @@ if watch {
                     }
                 }
                 let ev = evidence, suggestedName = nameIdea, how = via
-                let log = { (chosen: String, folder: URL?) in
+                let log = { (chosen: String, folder: URL?, auto: Bool) in
                     Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,
                                source: ev.sourceHost, title: ev.metadataTitle ?? ev.headline,
-                               suggestedFolder: target?.path, chosenFolder: folder?.path).save()
+                               suggestedFolder: target?.path, chosenFolder: folder?.path,
+                               auto: auto ? true : nil, context: String(gist(ev).prefix(300))).save()
                 }
                 switch askUser(file: name, suggestion: nameIdea, folder: target) {
-                case .save(let chosen, let folder):
+                case .save(let chosen, let folder, let auto):
                     let done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
                     if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
                     let edited = chosen != nameIdea || folder?.path != target?.path
-                    log(chosen, folder)                       // every answer teaches names and folders
+                    log(chosen, folder, auto)                 // every answer teaches names and folders (auto ones don't)
                     if let done { Decision.markKeep(done) }   // handled: never ask again
-                    print("   saved as \(Destination.short(folder))/\(done?.lastPathComponent ?? chosen)\(edited ? " (your edit)" : "")")
+                    print("   saved as \(Destination.short(folder))/\(done?.lastPathComponent ?? chosen)\(auto ? " (no answer, auto-saved)" : edited ? " (your edit)" : "")")
                 case .keep:
-                    Decision.markKeep(url); log("", nil)
+                    Decision.markKeep(url); log("", nil, false)
                     print("   left as is")
                 case .noAnswer: print("   no answer, left as is")
                 }
@@ -296,7 +346,14 @@ files.removeAll { partial.contains($0.pathExtension.lowercased()) }
 if namer.useModel { print("model: \(Namer.modelStatus)\n") }
 
 let pad = min(48, files.map(\.lastPathComponent.count).max() ?? 0)
-let folderIndex = whereTo ? Destination.index() : []
+let folderIndex = whereTo ? Destination.cachedIndex() : []
+/// --where --why: the folders the model chose from, closest first.
+func showShortlist(_ name: String, _ e: Evidence) {
+    guard why else { return }
+    let t0 = Date()
+    let list = Destination.shortlist(name: name, evidence: e, folders: folderIndex, k: 5)
+    print("      closest: \(list.map { Destination.short($0.url) }.joined(separator: " | "))  (\(Int(Date().timeIntervalSince(t0) * 1000)) ms)")
+}
 var renamed = 0, suggested = 0, kept = 0, unsure = 0
 for url in files {
     let old = url.lastPathComponent
@@ -309,6 +366,7 @@ for url in files {
             let (ev, kebab) = Destination.keptEvidence(url)
             let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: namer.useModel)
             print("      folder:  \(Destination.short(f))")
+            showShortlist(kebab, ev)
         }
     case .unsure(let r):
         unsure += 1
@@ -320,6 +378,7 @@ for url in files {
         if whereTo {
             let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: namer.useModel)
             print("      folder:  \(Destination.short(f))")
+            showShortlist(s.name, s.evidence)
         }
         if why {
             let e = s.evidence

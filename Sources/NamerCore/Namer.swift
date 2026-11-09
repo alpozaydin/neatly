@@ -17,8 +17,17 @@ public struct Namer: Sendable {
     /// Images get more: looking at a picture is the expensive, high-value step.
     public var documentBudget: Duration = .seconds(3)
     public var imageBudget: Duration = .seconds(8)
+    /// Few-shot learning: show the model names you chose for similar files. nil = read corrections.jsonl.
+    public var learnFromCorrections = true
+    public var history: [Correction]? = nil
 
     public init() {}
+
+    /// Load the model and the embedder ahead of time (e.g. while a download is still running): the first call is the slow one.
+    public static func prewarm() {
+        Model.prewarm()
+        Embedder.shared.warm()
+    }
 
     public static var modelStatus: String { Model.status }
 
@@ -118,7 +127,9 @@ public struct Namer: Sendable {
             let snapshot = e
             let look = isImage && Model.canSeeImages
             if look { e.steps.append("vision") }
-            if let w = await withTimeout(remaining, { await Model.name(for: snapshot, lookAtImage: look) }) ?? nil {
+            let examples = learnFromCorrections ? Examples.similar(to: snapshot, history: history ?? Correction.all()) : []
+            if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
+            if let w = await withTimeout(remaining, { await Model.name(for: snapshot, lookAtImage: look, examples: examples) }) ?? nil {
                 if let course = courseCode(e) {
                     return done(Style.join([course] + w.filter { $0 != course }), "model[\(trail)]")
                 }

@@ -100,6 +100,29 @@ func destinations() {
     expect(Destination.suggest(name: "transcript-spring27", evidence: e, folders: folders, history: [past])?.lastPathComponent == "official")
 }
 
-for t in [destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+/// Few-shot retrieval: a new photo of people from LinkedIn should recall the names you gave similar photos,
+/// not your invoices. Auto-saves and "Leave as is" never count as examples.
+func examples() {
+    func c(_ about: String, _ chosen: String, auto: Bool? = nil) -> Correction {
+        Correction(original: "x.jpg", suggested: "x", chosen: chosen, via: "model", source: nil, title: nil,
+                   auto: auto, context: about)
+    }
+    let history = [
+        c("Photo labels: people, suit, clothing. from media.licdn.com", "egg-001 suit"),
+        c("Photo labels: crowd, people, jeans. from media.licdn.com", "egg-001 toplu foto"),
+        c("Invoice Hetzner Online GmbH, server rental October 2026", "invoice-hetzner-oct26"),
+        c("Photo labels: people, stage, clothing. from media.licdn.com", "never-shown", auto: true),
+        c("Photo labels: people, suit. from media.licdn.com", ""),
+    ]
+    var e = Evidence(url: URL(fileURLWithPath: "/tmp/1794216482652.jpeg"))
+    e.labels = ["people", "clothing", "suit"]
+    e.sourceURLs = ["https://media.licdn.com/dms/image/abc"]
+    let got = Examples.similar(to: e, history: history).map(\.name)
+    expect(got.first?.hasPrefix("egg-001") == true)
+    expect(!got.contains("never-shown") && !got.contains(""))
+    expect(!got.contains("invoice-hetzner-oct26"))
+}
+
+for t in [examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

@@ -110,10 +110,9 @@ public enum Destination {
         if let f = suggest(name: name, evidence: e, folders: folders) { return f }
         guard useModel else { return nil }
         let home = FileManager.default.homeDirectoryForCurrentUser.path + "/"
-        // Recently used folders first; at most 80 so the list fits the model's context.
-        let options = folders.sorted { $0.modified > $1.modified }.prefix(80)
+        let options = shortlist(name: name, evidence: e, folders: folders)
             .map { $0.url.path.replacingOccurrences(of: home, with: "") }
-        guard let pick = await Model.pickFolder(for: e, name: name, options: Array(options)) else { return nil }
+        guard let pick = await Model.pickFolder(for: e, name: name, options: options) else { return nil }
         // Safety: the file must share a real word with the folder path. A refund letter has nothing to do
         // with a startup's folder, however "travel-ish" both look to a small model.
         var words = Set(Style.tokens([e.stem, name, e.metadataTitle, e.headline, e.sourceHost,
@@ -123,6 +122,41 @@ public enum Destination {
         let folderWords = Style.tokens(pick).filter { $0.count >= 4 && !Style.filler.contains($0) }
         guard folderWords.contains(where: { words.contains($0) }) else { return nil }
         return URL(fileURLWithPath: home + pick)
+    }
+
+    /// The folders the model gets to choose from: the closest by meaning (folder path + the names of the files
+    /// inside it, compared with what this file is about). A small model picks far better from 12 relevant
+    /// options than from 80 recent ones. Falls back to the most recently used folders.
+    public static func shortlist(name: String, evidence e: Evidence, folders: [Folder], k: Int = 12) -> [Folder] {
+        let recent = Array(folders.sorted { $0.modified > $1.modified }.prefix(80))
+        let query = name.replacingOccurrences(of: "-", with: " ") + ". " + gist(e)
+        let ranked = Embedder.shared.rank(query, folders.map(describe))
+        guard !ranked.isEmpty else { return recent }
+        return ranked.prefix(k).map { folders[$0.index] }
+    }
+
+    /// "courses-fall26 ceng331: ceng331-midterm1-fall19-solutions, CENG331-02-03-bits-ints, …" — what a folder holds.
+    static func describe(_ f: Folder) -> String {
+        let key = "\(f.url.path)|\(f.modified.timeIntervalSince1970)"
+        return FolderText.shared.get(key) {
+            let path = f.url.pathComponents.suffix(2).joined(separator: " ")
+            let names = ((try? FileManager.default.contentsOfDirectory(atPath: f.url.path)) ?? [])
+                .filter { !$0.hasPrefix(".") }.sorted().prefix(15)
+                .map { ($0 as NSString).deletingPathExtension }
+            return path + (names.isEmpty ? "" : ": " + names.joined(separator: ", "))
+        }
+    }
+
+    /// Folder list, rebuilt at most every few minutes: scanning ~/ for every download is wasted work.
+    public static func cachedIndex(maxAge: TimeInterval = 600) -> [Folder] { IndexCache.shared.get(maxAge: maxAge) }
+
+    /// The naming style of the files already in `folder` (separator, case, suffix), if at least 3 of them
+    /// look hand-named. New files then match their neighbours instead of a global default.
+    public static func style(of folder: URL?) -> StyleProfile? {
+        guard let folder, let items = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil,
+                                                                                    options: [.skipsHiddenFiles]) else { return nil }
+        let names = items.compactMap(StyleProfile.chosenName)
+        return names.count >= 3 ? StyleProfile.learn(names: names) : nil
     }
 
     /// A file with the same bytes already in `folder`? (Downloaded twice.) Compares size first, then content.
@@ -147,5 +181,28 @@ public enum Destination {
     /// "~/courses-fall26/ceng315" for display.
     public static func pretty(_ url: URL) -> String {
         url.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")
+    }
+}
+
+final class FolderText: @unchecked Sendable {
+    static let shared = FolderText()
+    private let lock = NSLock()
+    private var memo: [String: String] = [:]
+    func get(_ key: String, _ make: () -> String) -> String {
+        lock.lock(); defer { lock.unlock() }
+        if let v = memo[key] { return v }
+        let v = make(); memo[key] = v; return v
+    }
+}
+
+final class IndexCache: @unchecked Sendable {
+    static let shared = IndexCache()
+    private let lock = NSLock()
+    private var folders: [Destination.Folder] = []
+    private var built = Date.distantPast
+    func get(maxAge: TimeInterval) -> [Destination.Folder] {
+        lock.lock(); defer { lock.unlock() }
+        if Date().timeIntervalSince(built) > maxAge { folders = Destination.index(); built = Date() }
+        return folders
     }
 }

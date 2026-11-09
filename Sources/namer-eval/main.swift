@@ -1,7 +1,8 @@
 import Foundation
 import NamerCore
 
-// Runs Tests/eval/cases.json and prints a score. Usage: swift run namer-eval [--offline] [--no-model]
+// Runs Tests/eval/cases.json and prints a score. Usage: swift run namer-eval [--offline] [--no-model] [--holdout]
+// --holdout runs Tests/eval/holdout.json instead: cases nobody tuned the rules on, for an honest score.
 
 struct Cases: Decodable {
     struct DecisionCases: Decodable { let rename: [String]; let keep: [String] }
@@ -12,7 +13,7 @@ struct Cases: Decodable {
 let args = CommandLine.arguments
 let offline = args.contains("--offline")
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-let cases = try JSONDecoder().decode(Cases.self, from: Data(contentsOf: root.appending(path: "Tests/eval/cases.json")))
+let cases = try JSONDecoder().decode(Cases.self, from: Data(contentsOf: root.appending(path: args.contains("--holdout") ? "Tests/eval/holdout.json" : "Tests/eval/cases.json")))
 
 // MARK: 1. Rename-or-keep decision (filenames only)
 
@@ -38,6 +39,7 @@ var namer = Namer()
 namer.useNetwork = !offline
 namer.useModel = !args.contains("--no-model")
 namer.verifyRules = args.contains("--verify")
+namer.history = []   // scores must not depend on whoever runs them: no personal corrections
 print("\nNAMING    model: \(namer.useModel ? Namer.modelStatus : "off")\n")
 
 var exact = 0, head = 0, none = 0, run = 0

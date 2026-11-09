@@ -48,6 +48,8 @@ a file goes where you put the same kind of file last time, or to a folder whose 
 If none of these fit, the on-device model picks from your folders — but only a folder that shares
 a word with the file. Otherwise the suggestion is Downloads. Your edits are saved in
 `~/Library/Application Support/namer/corrections.jsonl` so namer can learn from them.
+On the model path, the shortlist of folders is chosen by meaning: what the file is about vs. each
+folder's name and the names of the files inside it.
 
 ## Your style
 
@@ -61,6 +63,18 @@ namer style --reset               # forget it
 
 It learns per folder and skips code repos. If your folders disagree, it saves nothing and tells you.
 The style is one small file: `~/Library/Application Support/namer/style.json`.
+
+Two more things happen on their own:
+
+- **Names follow the folder.** A file going into a folder of `Lab Report - MAO` files gets the same
+  separator, case and suffix as its neighbours (needs 3+ hand-named files there).
+- **Your edits become examples.** When the on-device model names a file, it is shown up to 3 names you
+  saved for the most similar past files (found with Apple's on-device text embedding). No training:
+  the more you correct, the more it names files your way. Auto-saves and "Leave as is" don't count.
+
+```sh
+namer stats      # how often you saved the suggestion unchanged, and your recent edits
+```
 
 ## Usage
 
@@ -80,5 +94,9 @@ swift run -c release namer-eval             # accuracy + speed score
 All test data is made up — no real personal files.
 
 To add a case: copy one block in `cases.json`, change the text and the wanted names, run `namer-eval`.
+
+`Tests/eval/holdout.json` is a second set that the rules were **never** tuned on
+(`namer-eval --holdout`). Its score is the honest one. Don't change namer to fix a held-out case:
+move the pattern into `cases.json` and write a fresh held-out case instead.
 
 Requires macOS 26+ (Apple Intelligence enabled for the model step; everything else works without it).

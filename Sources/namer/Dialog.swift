@@ -5,7 +5,7 @@ import AppKit
 /// Typing in the name field or moving the mouse over the window stops the countdown.
 ///
 /// Runs as its own process (`namer dialog …`) so the watcher keeps its simple loop.
-/// Prints one line: "save\t<name>\t<folder path, empty = Downloads>", "keep", or "none".
+/// Prints one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user>", "keep", or "none".
 @MainActor
 final class CountdownDialog: NSObject, NSTextFieldDelegate {
     let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 10),
@@ -80,7 +80,7 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
     }
 
     func tick() {
-        if remaining <= 0 { save(); return }
+        if remaining <= 0 { saveNow(auto: true); return }
         saveButton.title = "Save (\(remaining))"
         status.stringValue = "Saves automatically"
     }
@@ -102,10 +102,13 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         exit(0)
     }
 
-    @objc func save() {
+    @objc func save() { saveNow(auto: false) }
+
+    /// auto = the countdown ran out: nobody looked, so this mustn't be read as "the person agreed".
+    func saveNow(auto: Bool) -> Never {
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { finish("none") }
-        finish("save\t\(name)\t\(folder?.path ?? "")")
+        finish("save\t\(name)\t\(folder?.path ?? "")\t\(auto ? "auto" : "user")")
     }
 
     @objc func leaveAsIs() { finish("keep") }
