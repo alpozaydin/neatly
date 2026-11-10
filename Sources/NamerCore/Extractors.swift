@@ -67,8 +67,11 @@ enum Extract {
         }
         guard let maxSize = runs.map(\.size).max() else { return nil }
         // Body-text-sized "largest" means there is no real headline.
-        let sizes = runs.map(\.size).sorted()
-        let median = sizes[sizes.count / 2]
+        // Median by characters, not runs: body text is most of the characters, however few lines it has.
+        let bySize = runs.sorted { $0.size < $1.size }
+        let total = bySize.reduce(0) { $0 + $1.text.count }
+        var seen = 0
+        let median = bySize.first { seen += $0.text.count; return seen * 2 >= total }?.size ?? maxSize
         guard maxSize >= median * 1.15 else { return nil }
 
         let text = runs.filter { $0.size >= maxSize * 0.95 }.map(\.text).joined(separator: " ")
