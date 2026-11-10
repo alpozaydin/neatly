@@ -166,10 +166,20 @@ public struct Namer: Sendable {
                 // Exams are often old papers: name them by the term written on them. ceng331-final-fall22
                 let isExam = ["midterm", "final", "quiz"].contains { item.hasPrefix($0) }
                 let term = isExam ? Style.termIn(strong + "\n" + String(full.prefix(500))) : nil
-                // "midterm KEY" / "Solutions" → …-solutions. Title, heading and filename only (exam text says "key" rarely).
-                let sol = isExam && Style.isSolutions([e.metadataTitle, e.headline, e.stem].compactMap { $0 }.joined(separator: " "))
-                return Style.join([course, item, term, sol ? "solutions" : nil].compactMap { $0 })
+                // "midterm KEY" / "Quiz 2 Solutions" / "HW1 Solutions" → …-solutions.
+                // Title, heading, filename and the page header only: exam questions can say "key" too.
+                let gradable = isExam || ["hw", "rec", "lab"].contains { item.hasPrefix($0) }
+                let top = full.split(whereSeparator: \.isNewline).prefix(3).joined(separator: " ")   // the page header
+                let sol = gradable && Style.isSolutions([e.metadataTitle, e.headline, e.stem, top].compactMap { $0 }.joined(separator: " "))
+                // Lectures and chapters: the number alone says little. ceng334-ch5-cpu-scheduling
+                let topic = ["lecture", "ch", "week"].contains { item.hasPrefix($0) } ? itemTopic(e) : []
+                return Style.join([course, item] + topic + [term, sol ? "solutions" : nil].compactMap { $0 })
             }
+        }
+
+        // No course code, but clearly coursework: "Homework 2: CNN on CIFAR-10" → hw2-cnn-cifar10.
+        if kind == nil, let item = Style.academicItem(in: strong), item != "syllabus", item.contains(where: \.isNumber) {
+            return Style.join([item] + itemTopic(e))
         }
 
         // "LuMon: Lunar Monocular Depth Estimation Benchmark" → lumon. Papers and projects name themselves.
@@ -191,10 +201,23 @@ public struct Namer: Sendable {
 
         guard let kind else { return nil }
         if kind.word == "cv" { return cvName(e) }
-        let issuer = kind.keepIssuer ? Style.issuer(host: e.sourceHost) : nil
+        // A webmail host says nothing about who wrote the document: prefer the text then.
+        let fromHost = Style.issuer(host: e.sourceHost).flatMap { ["gmail", "outlook", "webmail", "mail"].contains($0) ? nil : $0 }
+        let issuer = kind.keepIssuer
+            ? (kind.word == "acceptance" ? nil : fromHost) ?? Style.issuer(inText: strong + "\n" + weak, kind: kind.word)
+            : nil
+        if kind.issuerFirst { return issuer.map { Style.join([$0, kind.word]) } ?? kind.word }
         // Bills and payslips: the month they are FOR, not the day they arrived.
         let date = kind.qualifier == .month ? (Style.period(in: strong + " " + weak) ?? e.date) : e.date
         return Style.join([kind.word, issuer, Style.qualifier(kind.qualifier, date)].compactMap { $0 })
+    }
+
+    /// The topic of a numbered course item, from the title line that names it: "Lecture 7: Procedures" → [procedures].
+    func itemTopic(_ e: Evidence) -> [String] {
+        let lines = [e.metadataTitle, e.headline].compactMap { $0 }
+            + (e.bodySnippet ?? "").split(whereSeparator: \.isNewline).prefix(6).map(String.init)
+        guard let line = lines.first(where: { $0.contains(":") && Style.academicItem(in: $0) != nil }) else { return [] }
+        return Style.topic(after: line)
     }
 
     /// Someone else's CV: cv-john-smith. Your own: just cv.

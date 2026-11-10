@@ -1,939 +1,1551 @@
 {
-  "decision": {
-    "rename": [
-      "IMG_4009.HEIC",
-      "PXL_20261012_101010.jpg",
-      "DSC00123.JPG",
-      "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
-      "Screenshot 2026-11-03 at 14.22.10.png",
-      "Screen Shot 2020-01-01 at 1.00.00 PM.png",
-      "download.pdf",
-      "download (3).pdf",
-      "document(1).pdf",
-      "Unknown.png",
-      "untitled.pdf",
-      "images.png",
-      "image (2).png",
-      "scan0001.pdf",
-      "1234567_2026-11-04_124701.pdf",
-      "Anfrage-26F04668426.pdf",
-      "7f3a9c2b-e81d-4f0a-9b6c-1a2b3c4d5e6f.pdf",
-      "EAF2026000123456.pdf",
-      "1730987654321.pdf",
-      "main.pdf",
-      "paper_final_v3 (1).pdf",
-      "Untitled document.docx",
-      "Document (1).docx",
-      "Untitled0.ipynb",
-      "archive.zip",
-      "GMT20261104-101500_Recording_1920x1080.mp4",
-      "slides.pdf",
-      "Untitled presentation.pptx"
-    ],
-    "keep": [
-      "CV_janedoe.pdf",
-      "CivCore deck - Oct 2026.pdf",
-      "transcript-fall26.pdf",
-      "invoice-turkcell-nov26.pdf",
-      "Team Hatching from a Golden Egg.png",
-      "ceng213-hw2.pdf",
-      "lec05-decision-trees.pdf",
-      "imagenet-results.png",
-      "LuMon_CVPR2026_camera_ready.pdf",
-      "27oct2026sila_hoca_meet.txt",
-      "Thesis Draft v2.docx",
-      "budget_2027.xlsx",
-      "IMG-ideas-for-app.png",
-      "Screenshot of login bug.png",
-      "hw1.pdf",
-      "CENG315_HW2_solutions.pdf",
-      "Lecture1.pptx",
-      "Copy of Project Plan.docx",
-      "titanic-dataset.zip",
-      "linux-master.zip"
-    ]
-  },
-  "naming": [
-    {
-      "id": "metu-transcript",
-      "file": "1234567_2026-11-04_124701.pdf",
-      "source": [
-        "https://student.metu.edu.tr/proxy/Student_Information/main.php"
-      ],
-      "title": "Student Transcript",
-      "lines": [
-        [
-          "Middle East Technical University",
-          12
-        ],
-        [
-          "Student Copy",
-          22
-        ],
-        [
-          "Name: Jane Doe   Student No: 1234567",
-          10
-        ]
-      ],
-      "expect": [
-        "transcript-fall26"
-      ]
-    },
-    {
-      "id": "ceng-syllabus",
-      "file": "8812_4471.pdf",
-      "source": [
-        "https://odtuclass.metu.edu.tr/pluginfile.php/8812/mod_resource/content/1/8812_4471.pdf"
-      ],
-      "created": "2027-02-20",
-      "lines": [
-        [
-          "CENG 334 Operating Systems",
-          22
-        ],
-        [
-          "Course Syllabus - Spring 2027",
-          16
-        ],
-        [
-          "Instructor: Dr. A. Yilmaz. Grading: 2 midterms, 1 final, 4 homeworks.",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng334-syllabus",
-        "ceng334-syllabus-spring27",
-        "syllabus-ceng334-spring27"
-      ]
-    },
-    {
-      "id": "turkcell-invoice",
-      "file": "EAF2026000123456.pdf",
-      "source": [
-        "https://www.turkcell.com.tr/hesabim/faturalarim"
-      ],
-      "created": "2026-11-05",
-      "lines": [
-        [
-          "e-Arşiv Fatura",
-          20
-        ],
-        [
-          "Turkcell İletişim Hizmetleri A.Ş.",
-          12
-        ],
-        [
-          "Fatura Dönemi: Ekim 2026   Toplam: 349,90 TL",
-          10
-        ]
-      ],
-      "expect": [
-        "invoice-turkcell-nov26",
-        "invoice-turkcell-oct26"
-      ]
-    },
-    {
-      "id": "garanti-receipt",
-      "file": "Dekont_20261103_778812.pdf",
-      "source": [
-        "https://sube.garantibbva.com.tr/isube/login"
-      ],
-      "lines": [
-        [
-          "DEKONT",
-          20
-        ],
-        [
-          "Garanti BBVA - Para Transferi (EFT)",
-          12
-        ],
-        [
-          "Tutar: 1.500,00 TL   Tarih: 03.11.2026",
-          10
-        ]
-      ],
-      "expect": [
-        "receipt-garantibbva-nov26",
-        "receipt-garanti-nov26",
-        "eft-receipt-garanti"
-      ]
-    },
-    {
-      "id": "db-refund-letter",
-      "file": "Anfrage-26F04668426.pdf",
-      "source": [
-        "https://mail-attachment.googleusercontent.com/attachment/u/0/?view=att"
-      ],
-      "lines": [
-        [
-          "DB Fernverkehr AG - Servicecenter Fahrgastrechte",
-          10
-        ],
-        [
-          "Ihr Anliegen vom 02.10.2026 | Fall-ID 26F04668426",
-          10
-        ],
-        [
-          "Hallo Jane Doe, vielen Dank für Ihren Antrag auf Fahrpreisentschädigung wegen Verspätung. Wir erstatten Ihnen 25% des Fahrpreises.",
-          10
-        ]
-      ],
-      "expect": [
-        "db-refund-claim",
-        "db-refund",
-        "db-delay-refund",
-        "db-compensation"
-      ]
-    },
-    {
-      "id": "boarding-pass",
-      "file": "2026110812345.pdf",
-      "source": [
-        "https://www.lufthansa.com/de/en/online-check-in"
-      ],
-      "created": "2026-11-08",
-      "lines": [
-        [
-          "Boarding Pass",
-          24
-        ],
-        [
-          "Lufthansa LH1357  Ankara ESB - Frankfurt FRA",
-          12
-        ],
-        [
-          "Passenger: DOE/JANE  Seat 14C  Gate B12",
-          10
-        ]
-      ],
-      "expect": [
-        "ticket-lufthansa-nov26",
-        "boarding-pass-lufthansa",
-        "lufthansa-boarding-pass"
-      ]
-    },
-    {
-      "id": "rent-contract",
-      "file": "scan0001.pdf",
-      "created": "2026-09-01",
-      "lines": [
-        [
-          "KİRA SÖZLEŞMESİ",
-          22
-        ],
-        [
-          "Kiraya veren: A. Kaya   Kiracı: J. Doe",
-          11
-        ],
-        [
-          "Adres: Çankaya, Ankara   Aylık kira: 25.000 TL   Süre: 1 yıl",
-          10
-        ]
-      ],
-      "expect": [
-        "rent-contract",
-        "rent-contract-2026",
-        "lease-contract",
-        "contract-rent-2026"
-      ]
-    },
-    {
-      "id": "payslip",
-      "file": "document(3).pdf",
-      "created": "2026-11-01",
-      "lines": [
-        [
-          "BORDRO",
-          22
-        ],
-        [
-          "Acme Teknoloji A.Ş. - Ekim 2026",
-          12
-        ],
-        [
-          "Brüt: 60.000 TL   Net: 45.120 TL",
-          10
-        ]
-      ],
-      "expect": [
-        "payslip-oct26",
-        "payslip-acme-oct26"
-      ]
-    },
-    {
-      "id": "paper-no-arxiv",
-      "file": "main.pdf",
-      "title": "LuMon: Lunar Monocular Depth Estimation Benchmark",
-      "lines": [
-        [
-          "LuMon: Lunar Monocular Depth Estimation Benchmark",
-          18
-        ],
-        [
-          "Anonymous CVPR submission",
-          11
-        ],
-        [
-          "Abstract. Monocular depth estimation for lunar rovers is hard because of harsh lighting...",
-          10
-        ]
-      ],
-      "expect": [
-        "lumon",
-        "lumon-2026",
-        "lumon-benchmark"
-      ]
-    },
-    {
-      "id": "lecture-slides",
-      "file": "1730987654321.pdf",
-      "source": [
-        "https://odtuclass.metu.edu.tr/pluginfile.php/1/mod_resource/content/2/1730987654321.pdf"
-      ],
-      "created": "2026-10-28",
-      "lines": [
-        [
-          "CENG 499 Introduction to Machine Learning",
-          14
-        ],
-        [
-          "Lecture 5: Decision Trees",
-          24
-        ],
-        [
-          "Entropy, information gain, pruning",
-          12
-        ]
-      ],
-      "expect": [
-        "ceng499-lecture5",
-        "ceng499-decision-trees",
-        "decision-trees-ceng499",
-        "lecture5-decision-trees"
-      ]
-    },
-    {
-      "id": "homework",
-      "file": "4f9a2c7e-81d4-4f0a-9b6c-1a2b3c4d5e6f.pdf",
-      "source": [
-        "https://odtuclass.metu.edu.tr/mod/assign/view.php?id=4411"
-      ],
-      "created": "2026-10-15",
-      "lines": [
-        [
-          "CENG 213 Data Structures",
-          14
-        ],
-        [
-          "Homework 2: Hash Tables",
-          22
-        ],
-        [
-          "Due: 30 October 2026, 23:59",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng213-hw2",
-        "hw2-ceng213",
-        "ceng213-hw2-hash-tables",
-        "hw2-hash-tables"
-      ]
-    },
-    {
-      "id": "scanned-medical",
-      "file": "SCAN_0042.pdf",
-      "scanned": true,
-      "lines": [
-        [
-          "ANKARA CITY HOSPITAL",
-          22
-        ],
-        [
-          "Medical Report",
-          20
-        ],
-        [
-          "Patient: Jane Doe. Diagnosis: sprained ankle. Rest for 5 days.",
-          12
-        ]
-      ],
-      "expect": [
-        "medical-report",
-        "medical-report-ankara",
-        "hospital-report"
-      ]
-    },
-    {
-      "id": "someone-elses-cv",
-      "file": "download.pdf",
-      "title": "Curriculum Vitae - John Smith",
-      "lines": [
-        [
-          "John Smith",
-          24
-        ],
-        [
-          "Curriculum Vitae",
-          14
-        ],
-        [
-          "Software Engineer - 6 years Swift, iOS, macOS",
-          10
-        ]
-      ],
-      "expect": [
-        "cv-john-smith",
-        "john-smith-cv"
-      ]
-    },
-    {
-      "id": "coursera-certificate",
-      "file": "f8d2a1c9b7e64c2a.pdf",
-      "source": [
-        "https://www.coursera.org/account/accomplishments"
-      ],
-      "lines": [
-        [
-          "Certificate of Completion",
-          22
-        ],
-        [
-          "Deep Learning Specialization",
-          16
-        ],
-        [
-          "Coursera - awarded to Jane Doe",
-          10
-        ]
-      ],
-      "expect": [
-        "certificate-deep-learning",
-        "deep-learning-certificate",
-        "coursera-deep-learning",
-        "deep-learning-coursera"
-      ]
-    },
-    {
-      "id": "arxiv-attention",
-      "file": "1706.03762v7.pdf",
-      "network": true,
-      "lines": [
-        [
-          "placeholder",
-          10
-        ]
-      ],
-      "expect": [
-        "attention-2017",
-        "transformer-2017",
-        "attention-is-all-2017"
-      ]
-    },
-    {
-      "id": "arxiv-depth-anything",
-      "file": "2401.10891v2.pdf",
-      "network": true,
-      "lines": [
-        [
-          "placeholder",
-          10
-        ]
-      ],
-      "expect": [
-        "depth-anything-2024"
-      ]
-    },
-    {
-      "id": "error-screenshot",
-      "file": "Screenshot 2026-11-03 at 14.22.10.png",
-      "lines": [
-        [
-          "Uncaught TypeError: Cannot read properties of undefined (reading 'map')",
-          22
-        ],
-        [
-          "at App.render (App.jsx:42)",
-          18
-        ]
-      ],
-      "expect": [
-        "typeerror",
-        "typeerror-undefined",
-        "typeerror-map",
-        "js-error"
-      ]
-    },
-    {
-      "id": "meeting-notes-photo",
-      "file": "IMG_5521.jpg",
-      "lines": [
-        [
-          "Thesis meeting - next steps",
-          34
-        ],
-        [
-          "1. ablation study",
-          28
-        ],
-        [
-          "2. related work",
-          28
-        ]
-      ],
-      "expect": [
-        "thesis-meeting",
-        "thesis-next-steps",
-        "thesis-meeting-notes"
-      ]
-    },
-    {
-      "id": "grocery-receipt",
-      "file": "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
-      "lines": [
-        [
-          "MIGROS",
-          34
-        ],
-        [
-          "SUT 1L          34,90",
-          22
-        ],
-        [
-          "EKMEK           15,00",
-          22
-        ],
-        [
-          "TOPLAM         245,90 TL",
-          26
-        ]
-      ],
-      "expect": [
-        "receipt-migros",
-        "migros-receipt",
-        "receipt-migros-oct26"
-      ]
-    },
-    {
-      "id": "event-poster",
-      "file": "images.png",
-      "lines": [
-        [
-          "GOLDEN EGG HACKATHON",
-          36
-        ],
-        [
-          "Ankara - 15 November 2026",
-          22
-        ],
-        [
-          "Register now",
-          20
-        ]
-      ],
-      "expect": [
-        "golden-egg-hackathon",
-        "hackathon-golden-egg"
-      ]
-    },
-    {
-      "id": "slides-week3",
-      "file": "Untitled presentation.pptx",
-      "source": [
-        "https://odtuclass.metu.edu.tr/pluginfile.php/99/mod_resource/content/1/x.pptx"
-      ],
-      "created": "2026-10-10",
-      "lines": [
-        [
-          "CENG 334 - Week 3",
-          30
-        ],
-        [
-          "Processes and Threads",
-          24
-        ],
-        [
-          "fork(), exec(), context switch",
-          14
-        ]
-      ],
-      "expect": [
-        "ceng334-week3",
-        "ceng334-processes-threads",
-        "ceng334-lecture3"
-      ]
-    },
-    {
-      "id": "past-exam",
-      "file": "1700000000.pdf",
-      "source": [
-        "https://odtuclass.metu.edu.tr/pluginfile.php/7/mod_resource/content/1/1700000000.pdf"
-      ],
-      "lines": [
-        [
-          "MATH 119 Calculus with Analytic Geometry",
-          14
-        ],
-        [
-          "2024 Fall Midterm 1 - Solutions",
-          22
-        ],
-        [
-          "Q1. Evaluate the limit...",
-          10
-        ]
-      ],
-      "expect": [
-        "math119-midterm1-fall24-solutions",
-        "math119-midterm1-fall24",
-        "math119-midterm1"
-      ]
-    },
-    {
-      "id": "lab-manual",
-      "file": "download (2).pdf",
-      "source": [
-        "https://odtuclass.metu.edu.tr/mod/resource/view.php?id=5"
-      ],
-      "lines": [
-        [
-          "EE 213 Electrical Circuits Laboratory",
-          14
-        ],
-        [
-          "Lab 4: Operational Amplifiers",
-          22
-        ],
-        [
-          "Objective: build an inverting amplifier",
-          10
-        ]
-      ],
-      "expect": [
-        "ee213-lab4",
-        "ee213-lab4-op-amps"
-      ]
-    },
-    {
-      "id": "student-certificate",
-      "file": "belge_8812.pdf",
-      "source": [
-        "https://www.turkiye.gov.tr/belge-dogrulama"
-      ],
-      "lines": [
-        [
-          "T.C. ORTA DOĞU TEKNİK ÜNİVERSİTESİ",
-          12
-        ],
-        [
-          "ÖĞRENCİ BELGESİ",
-          22
-        ],
-        [
-          "Sayın Jane Doe 2026-2027 Güz döneminde kayıtlı öğrencidir.",
-          10
-        ]
-      ],
-      "expect": [
-        "enrollment-fall26",
-        "student-certificate-fall26",
-        "enrollment-certificate-fall26"
-      ]
-    },
-    {
-      "id": "exam-schedule",
-      "file": "6620_exam.pdf",
-      "source": [
-        "https://oidb.metu.edu.tr/en/final-exam-schedule"
-      ],
-      "created": "2026-12-20",
-      "lines": [
-        [
-          "Final Exam Schedule",
-          22
-        ],
-        [
-          "Fall 2026 - Middle East Technical University",
-          12
-        ],
-        [
-          "CENG 213  Jan 12  09:30  BMB-1",
-          10
-        ]
-      ],
-      "expect": [
-        "exam-schedule-fall26",
-        "final-exam-schedule-fall26",
-        "finals-fall26"
-      ]
-    },
-    {
-      "id": "tuition-receipt",
-      "file": "Dekont_20260910_5521.pdf",
-      "source": [
-        "https://www.ziraatbank.com.tr/"
-      ],
-      "created": "2026-09-10",
-      "lines": [
-        [
-          "DEKONT",
-          20
-        ],
-        [
-          "Öğrenim Ücreti / Katkı Payı Ödemesi - ODTÜ",
-          12
-        ],
-        [
-          "Tutar: 12.500,00 TL",
-          10
-        ]
-      ],
-      "expect": [
-        "tuition-fall26",
-        "tuition-receipt-fall26"
-      ]
-    },
-    {
-      "id": "internship-form",
-      "file": "Document (1).docx",
-      "lines": [
-        [
-          "Internship Evaluation Form",
-          22
-        ],
-        [
-          "To be filled by the supervisor at the end of the internship.",
-          11
-        ],
-        [
-          "Student: Jane Doe   Company: Acme",
-          10
-        ]
-      ],
-      "expect": [
-        "internship-evaluation-form",
-        "internship-evaluation",
-        "internship-form"
-      ]
-    },
-    {
-      "id": "learning-agreement",
-      "file": "LA_7731_2026.pdf",
-      "source": [
-        "https://erasmus-plus.ec.europa.eu/resources"
-      ],
-      "lines": [
-        [
-          "Learning Agreement",
-          24
-        ],
-        [
-          "Student Mobility for Studies - Erasmus+",
-          14
-        ],
-        [
-          "Sending institution: METU   Receiving: University of Helsinki",
-          10
-        ]
-      ],
-      "expect": [
-        "learning-agreement",
-        "erasmus-learning-agreement",
-        "learning-agreement-erasmus"
-      ]
-    },
-    {
-      "id": "colab-notebook",
-      "file": "Untitled0.ipynb",
-      "lines": [
-        [
-          "CENG 499 HW1 - Linear Regression",
-          20
-        ],
-        [
-          "import numpy as np",
-          10
-        ],
-        [
-          "X = np.load('train.npy')",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng499-hw1",
-        "ceng499-hw1-linear-regression"
-      ]
-    },
-    {
-      "id": "kaggle-dataset",
-      "file": "archive.zip",
-      "source": [
-        "https://www.kaggle.com/datasets/yasserh/titanic-dataset"
-      ],
-      "zipFiles": [
-        "train.csv",
-        "test.csv",
-        "gender_submission.csv"
-      ],
-      "expect": [
-        "titanic",
-        "titanic-dataset",
-        "kaggle-titanic"
-      ]
-    },
-    {
-      "id": "project-proposal",
-      "file": "Untitled document.docx",
-      "lines": [
-        [
-          "Project Proposal: Campus Food Waste Tracker",
-          20
-        ],
-        [
-          "Team: 4 students. Goal: measure and reduce cafeteria food waste with a mobile app.",
-          11
-        ]
-      ],
-      "expect": [
-        "food-waste-tracker-proposal",
-        "campus-food-waste-proposal",
-        "proposal-food-waste-tracker",
-        "food-waste-tracker"
-      ]
-    },
-    {
-      "id": "scholarship-form",
-      "file": "3341_basvuru.pdf",
-      "source": [
-        "https://www.tubitak.gov.tr/tr/burslar"
-      ],
-      "lines": [
-        [
-          "TÜBİTAK 2209-A",
-          22
-        ],
-        [
-          "Üniversite Öğrencileri Araştırma Projeleri Destekleme Programı - Başvuru Formu",
-          14
-        ],
-        [
-          "Proje başlığı: ...",
-          10
-        ]
-      ],
-      "expect": [
-        "tubitak-2209a-application",
-        "tubitak-2209a",
-        "tubitak-2209a-form"
-      ]
-    },
-    {
-      "id": "syllabus-no-word",
-      "file": "315-Fall 2026 (1).pdf",
-      "source": [
-        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/1/mod_resource/content/1/315-Fall%202026.pdf"
-      ],
-      "title": "MIDDLE EAST TECHNICAL UNIVERSITY",
-      "lines": [
-        [
-          "MIDDLE EAST TECHNICAL UNIVERSITY",
-          14
-        ],
-        [
-          "CEng 315 – Algorithms",
-          18
-        ],
-        [
-          "Fall 2026-2027",
-          12
-        ],
-        [
-          "Instructors: Prof. Dr. A. Yilmaz",
-          10
-        ],
-        [
-          "Teaching Assistants: B. Kaya, C. Demir",
-          10
-        ],
-        [
-          "Lecture Hours: Mon 9:15-10:30",
-          10
-        ],
-        [
-          "Grading: Midterm 30%, Final 40%, Homeworks 30%",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng315-syllabus",
-        "ceng315-syllabus-fall26"
-      ]
-    },
-    {
-      "id": "old-final",
-      "file": "final_a.pdf",
-      "source": [
-        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/2/mod_resource/content/1/final_a.pdf"
-      ],
-      "lines": [
-        [
-          "Middle East Technical University",
-          11
-        ],
-        [
-          "Department of Computer Engineering CENG 331",
-          11
-        ],
-        [
-          "Fall '2022-2023",
-          11
-        ],
-        [
-          "FINAL",
-          16
-        ],
-        [
-          "Exam: This is a closed book, closed notes exam.",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng331-final-fall22"
-      ]
-    },
-    {
-      "id": "midterm-key",
-      "file": "Sample-MT.pdf",
-      "title": "midterm KEY",
-      "source": [
-        "https://odtuclass2026f.metu.edu.tr/pluginfile.php/3/mod_resource/content/1/Sample-MT.pdf"
-      ],
-      "lines": [
-        [
-          "Middle East Technical University",
-          11
-        ],
-        [
-          "Department of Computer Engineering CENG 331",
-          11
-        ],
-        [
-          "Fall '2019-2020",
-          11
-        ],
-        [
-          "Midterm I",
-          16
-        ],
-        [
-          "Duration: 100 minutes. This is a closed book exam.",
-          10
-        ]
-      ],
-      "expect": [
-        "ceng331-midterm1-fall19-solutions",
-        "ceng331-midterm1-fall19-key"
-      ]
-    }
+ "decision": {
+  "rename": [
+   "IMG_4009.HEIC",
+   "PXL_20261012_101010.jpg",
+   "DSC00123.JPG",
+   "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
+   "Screenshot 2026-11-03 at 14.22.10.png",
+   "Screen Shot 2020-01-01 at 1.00.00 PM.png",
+   "download.pdf",
+   "download (3).pdf",
+   "document(1).pdf",
+   "Unknown.png",
+   "untitled.pdf",
+   "images.png",
+   "image (2).png",
+   "scan0001.pdf",
+   "1234567_2026-11-04_124701.pdf",
+   "Anfrage-26F04668426.pdf",
+   "7f3a9c2b-e81d-4f0a-9b6c-1a2b3c4d5e6f.pdf",
+   "EAF2026000123456.pdf",
+   "1730987654321.pdf",
+   "main.pdf",
+   "paper_final_v3 (1).pdf",
+   "Untitled document.docx",
+   "Document (1).docx",
+   "Untitled0.ipynb",
+   "archive.zip",
+   "GMT20261104-101500_Recording_1920x1080.mp4",
+   "slides.pdf",
+   "Untitled presentation.pptx",
+   "file_example_PDF_1MB.pdf",
+   "IMG_20261108_142201.jpg",
+   "doc_8812734.pdf",
+   "Untitled (4).png",
+   "file-sample_150kB.pdf",
+   "WhatsApp Image 2026-11-02 at 10.11.04.jpeg"
+  ],
+  "keep": [
+   "CV_janedoe.pdf",
+   "CivCore deck - Oct 2026.pdf",
+   "transcript-fall26.pdf",
+   "invoice-turkcell-nov26.pdf",
+   "Team Hatching from a Golden Egg.png",
+   "ceng213-hw2.pdf",
+   "lec05-decision-trees.pdf",
+   "imagenet-results.png",
+   "LuMon_CVPR2026_camera_ready.pdf",
+   "27oct2026sila_hoca_meet.txt",
+   "Thesis Draft v2.docx",
+   "budget_2027.xlsx",
+   "IMG-ideas-for-app.png",
+   "Screenshot of login bug.png",
+   "hw1.pdf",
+   "CENG315_HW2_solutions.pdf",
+   "Lecture1.pptx",
+   "Copy of Project Plan.docx",
+   "titanic-dataset.zip",
+   "linux-master.zip",
+   "ceng213-notes.pdf",
+   "resume-2026.pdf",
+   "thesis draft v3.docx",
+   "Linear Algebra Cheatsheet.pdf"
   ]
+ },
+ "naming": [
+  {
+   "id": "metu-transcript",
+   "file": "1234567_2026-11-04_124701.pdf",
+   "source": [
+    "https://student.metu.edu.tr/proxy/Student_Information/main.php"
+   ],
+   "title": "Student Transcript",
+   "lines": [
+    [
+     "Middle East Technical University",
+     12
+    ],
+    [
+     "Student Copy",
+     22
+    ],
+    [
+     "Name: Jane Doe   Student No: 1234567",
+     10
+    ]
+   ],
+   "expect": [
+    "transcript-fall26"
+   ]
+  },
+  {
+   "id": "ceng-syllabus",
+   "file": "8812_4471.pdf",
+   "source": [
+    "https://odtuclass.metu.edu.tr/pluginfile.php/8812/mod_resource/content/1/8812_4471.pdf"
+   ],
+   "created": "2027-02-20",
+   "lines": [
+    [
+     "CENG 334 Operating Systems",
+     22
+    ],
+    [
+     "Course Syllabus - Spring 2027",
+     16
+    ],
+    [
+     "Instructor: Dr. A. Yilmaz. Grading: 2 midterms, 1 final, 4 homeworks.",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng334-syllabus",
+    "ceng334-syllabus-spring27",
+    "syllabus-ceng334-spring27"
+   ]
+  },
+  {
+   "id": "turkcell-invoice",
+   "file": "EAF2026000123456.pdf",
+   "source": [
+    "https://www.turkcell.com.tr/hesabim/faturalarim"
+   ],
+   "created": "2026-11-05",
+   "lines": [
+    [
+     "e-Arşiv Fatura",
+     20
+    ],
+    [
+     "Turkcell İletişim Hizmetleri A.Ş.",
+     12
+    ],
+    [
+     "Fatura Dönemi: Ekim 2026   Toplam: 349,90 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "invoice-turkcell-nov26",
+    "invoice-turkcell-oct26"
+   ]
+  },
+  {
+   "id": "garanti-receipt",
+   "file": "Dekont_20261103_778812.pdf",
+   "source": [
+    "https://sube.garantibbva.com.tr/isube/login"
+   ],
+   "lines": [
+    [
+     "DEKONT",
+     20
+    ],
+    [
+     "Garanti BBVA - Para Transferi (EFT)",
+     12
+    ],
+    [
+     "Tutar: 1.500,00 TL   Tarih: 03.11.2026",
+     10
+    ]
+   ],
+   "expect": [
+    "receipt-garantibbva-nov26",
+    "receipt-garanti-nov26",
+    "eft-receipt-garanti"
+   ]
+  },
+  {
+   "id": "db-refund-letter",
+   "file": "Anfrage-26F04668426.pdf",
+   "source": [
+    "https://mail-attachment.googleusercontent.com/attachment/u/0/?view=att"
+   ],
+   "lines": [
+    [
+     "DB Fernverkehr AG - Servicecenter Fahrgastrechte",
+     10
+    ],
+    [
+     "Ihr Anliegen vom 02.10.2026 | Fall-ID 26F04668426",
+     10
+    ],
+    [
+     "Hallo Jane Doe, vielen Dank für Ihren Antrag auf Fahrpreisentschädigung wegen Verspätung. Wir erstatten Ihnen 25% des Fahrpreises.",
+     10
+    ]
+   ],
+   "expect": [
+    "db-refund-claim",
+    "db-refund",
+    "db-delay-refund",
+    "db-compensation"
+   ]
+  },
+  {
+   "id": "boarding-pass",
+   "file": "2026110812345.pdf",
+   "source": [
+    "https://www.lufthansa.com/de/en/online-check-in"
+   ],
+   "created": "2026-11-08",
+   "lines": [
+    [
+     "Boarding Pass",
+     24
+    ],
+    [
+     "Lufthansa LH1357  Ankara ESB - Frankfurt FRA",
+     12
+    ],
+    [
+     "Passenger: DOE/JANE  Seat 14C  Gate B12",
+     10
+    ]
+   ],
+   "expect": [
+    "ticket-lufthansa-nov26",
+    "boarding-pass-lufthansa",
+    "lufthansa-boarding-pass"
+   ]
+  },
+  {
+   "id": "rent-contract",
+   "file": "scan0001.pdf",
+   "created": "2026-09-01",
+   "lines": [
+    [
+     "KİRA SÖZLEŞMESİ",
+     22
+    ],
+    [
+     "Kiraya veren: A. Kaya   Kiracı: J. Doe",
+     11
+    ],
+    [
+     "Adres: Çankaya, Ankara   Aylık kira: 25.000 TL   Süre: 1 yıl",
+     10
+    ]
+   ],
+   "expect": [
+    "rent-contract",
+    "rent-contract-2026",
+    "lease-contract",
+    "contract-rent-2026"
+   ]
+  },
+  {
+   "id": "payslip",
+   "file": "document(3).pdf",
+   "created": "2026-11-01",
+   "lines": [
+    [
+     "BORDRO",
+     22
+    ],
+    [
+     "Acme Teknoloji A.Ş. - Ekim 2026",
+     12
+    ],
+    [
+     "Brüt: 60.000 TL   Net: 45.120 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "payslip-oct26",
+    "payslip-acme-oct26"
+   ]
+  },
+  {
+   "id": "paper-no-arxiv",
+   "file": "main.pdf",
+   "title": "LuMon: Lunar Monocular Depth Estimation Benchmark",
+   "lines": [
+    [
+     "LuMon: Lunar Monocular Depth Estimation Benchmark",
+     18
+    ],
+    [
+     "Anonymous CVPR submission",
+     11
+    ],
+    [
+     "Abstract. Monocular depth estimation for lunar rovers is hard because of harsh lighting...",
+     10
+    ]
+   ],
+   "expect": [
+    "lumon",
+    "lumon-2026",
+    "lumon-benchmark"
+   ]
+  },
+  {
+   "id": "lecture-slides",
+   "file": "1730987654321.pdf",
+   "source": [
+    "https://odtuclass.metu.edu.tr/pluginfile.php/1/mod_resource/content/2/1730987654321.pdf"
+   ],
+   "created": "2026-10-28",
+   "lines": [
+    [
+     "CENG 499 Introduction to Machine Learning",
+     14
+    ],
+    [
+     "Lecture 5: Decision Trees",
+     24
+    ],
+    [
+     "Entropy, information gain, pruning",
+     12
+    ]
+   ],
+   "expect": [
+    "ceng499-lecture5-decision-trees",
+    "ceng499-lecture5",
+    "ceng499-decision-trees",
+    "decision-trees-ceng499",
+    "lecture5-decision-trees"
+   ]
+  },
+  {
+   "id": "homework",
+   "file": "4f9a2c7e-81d4-4f0a-9b6c-1a2b3c4d5e6f.pdf",
+   "source": [
+    "https://odtuclass.metu.edu.tr/mod/assign/view.php?id=4411"
+   ],
+   "created": "2026-10-15",
+   "lines": [
+    [
+     "CENG 213 Data Structures",
+     14
+    ],
+    [
+     "Homework 2: Hash Tables",
+     22
+    ],
+    [
+     "Due: 30 October 2026, 23:59",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng213-hw2",
+    "hw2-ceng213",
+    "ceng213-hw2-hash-tables",
+    "hw2-hash-tables"
+   ]
+  },
+  {
+   "id": "scanned-medical",
+   "file": "SCAN_0042.pdf",
+   "scanned": true,
+   "lines": [
+    [
+     "ANKARA CITY HOSPITAL",
+     22
+    ],
+    [
+     "Medical Report",
+     20
+    ],
+    [
+     "Patient: Jane Doe. Diagnosis: sprained ankle. Rest for 5 days.",
+     12
+    ]
+   ],
+   "expect": [
+    "medical-report",
+    "medical-report-ankara",
+    "hospital-report"
+   ]
+  },
+  {
+   "id": "someone-elses-cv",
+   "file": "download.pdf",
+   "title": "Curriculum Vitae - John Smith",
+   "lines": [
+    [
+     "John Smith",
+     24
+    ],
+    [
+     "Curriculum Vitae",
+     14
+    ],
+    [
+     "Software Engineer - 6 years Swift, iOS, macOS",
+     10
+    ]
+   ],
+   "expect": [
+    "cv-john-smith",
+    "john-smith-cv"
+   ]
+  },
+  {
+   "id": "coursera-certificate",
+   "file": "f8d2a1c9b7e64c2a.pdf",
+   "source": [
+    "https://www.coursera.org/account/accomplishments"
+   ],
+   "lines": [
+    [
+     "Certificate of Completion",
+     22
+    ],
+    [
+     "Deep Learning Specialization",
+     16
+    ],
+    [
+     "Coursera - awarded to Jane Doe",
+     10
+    ]
+   ],
+   "expect": [
+    "certificate-deep-learning",
+    "deep-learning-certificate",
+    "coursera-deep-learning",
+    "deep-learning-coursera"
+   ]
+  },
+  {
+   "id": "arxiv-attention",
+   "file": "1706.03762v7.pdf",
+   "network": true,
+   "lines": [
+    [
+     "placeholder",
+     10
+    ]
+   ],
+   "expect": [
+    "attention-2017",
+    "transformer-2017",
+    "attention-is-all-2017"
+   ]
+  },
+  {
+   "id": "arxiv-depth-anything",
+   "file": "2401.10891v2.pdf",
+   "network": true,
+   "lines": [
+    [
+     "placeholder",
+     10
+    ]
+   ],
+   "expect": [
+    "depth-anything-2024"
+   ]
+  },
+  {
+   "id": "error-screenshot",
+   "file": "Screenshot 2026-11-03 at 14.22.10.png",
+   "lines": [
+    [
+     "Uncaught TypeError: Cannot read properties of undefined (reading 'map')",
+     22
+    ],
+    [
+     "at App.render (App.jsx:42)",
+     18
+    ]
+   ],
+   "expect": [
+    "typeerror",
+    "typeerror-undefined",
+    "typeerror-map",
+    "js-error"
+   ]
+  },
+  {
+   "id": "meeting-notes-photo",
+   "file": "IMG_5521.jpg",
+   "lines": [
+    [
+     "Thesis meeting - next steps",
+     34
+    ],
+    [
+     "1. ablation study",
+     28
+    ],
+    [
+     "2. related work",
+     28
+    ]
+   ],
+   "expect": [
+    "thesis-meeting",
+    "thesis-next-steps",
+    "thesis-meeting-notes"
+   ]
+  },
+  {
+   "id": "grocery-receipt",
+   "file": "WhatsApp Image 2026-10-30 at 13.45.29.jpeg",
+   "lines": [
+    [
+     "MIGROS",
+     34
+    ],
+    [
+     "SUT 1L          34,90",
+     22
+    ],
+    [
+     "EKMEK           15,00",
+     22
+    ],
+    [
+     "TOPLAM         245,90 TL",
+     26
+    ]
+   ],
+   "expect": [
+    "receipt-migros",
+    "migros-receipt",
+    "receipt-migros-oct26"
+   ]
+  },
+  {
+   "id": "event-poster",
+   "file": "images.png",
+   "lines": [
+    [
+     "GOLDEN EGG HACKATHON",
+     36
+    ],
+    [
+     "Ankara - 15 November 2026",
+     22
+    ],
+    [
+     "Register now",
+     20
+    ]
+   ],
+   "expect": [
+    "golden-egg-hackathon",
+    "hackathon-golden-egg"
+   ]
+  },
+  {
+   "id": "slides-week3",
+   "file": "Untitled presentation.pptx",
+   "source": [
+    "https://odtuclass.metu.edu.tr/pluginfile.php/99/mod_resource/content/1/x.pptx"
+   ],
+   "created": "2026-10-10",
+   "lines": [
+    [
+     "CENG 334 - Week 3",
+     30
+    ],
+    [
+     "Processes and Threads",
+     24
+    ],
+    [
+     "fork(), exec(), context switch",
+     14
+    ]
+   ],
+   "expect": [
+    "ceng334-week3",
+    "ceng334-processes-threads",
+    "ceng334-lecture3"
+   ]
+  },
+  {
+   "id": "past-exam",
+   "file": "1700000000.pdf",
+   "source": [
+    "https://odtuclass.metu.edu.tr/pluginfile.php/7/mod_resource/content/1/1700000000.pdf"
+   ],
+   "lines": [
+    [
+     "MATH 119 Calculus with Analytic Geometry",
+     14
+    ],
+    [
+     "2024 Fall Midterm 1 - Solutions",
+     22
+    ],
+    [
+     "Q1. Evaluate the limit...",
+     10
+    ]
+   ],
+   "expect": [
+    "math119-midterm1-fall24-solutions",
+    "math119-midterm1-fall24",
+    "math119-midterm1"
+   ]
+  },
+  {
+   "id": "lab-manual",
+   "file": "download (2).pdf",
+   "source": [
+    "https://odtuclass.metu.edu.tr/mod/resource/view.php?id=5"
+   ],
+   "lines": [
+    [
+     "EE 213 Electrical Circuits Laboratory",
+     14
+    ],
+    [
+     "Lab 4: Operational Amplifiers",
+     22
+    ],
+    [
+     "Objective: build an inverting amplifier",
+     10
+    ]
+   ],
+   "expect": [
+    "ee213-lab4",
+    "ee213-lab4-op-amps"
+   ]
+  },
+  {
+   "id": "student-certificate",
+   "file": "belge_8812.pdf",
+   "source": [
+    "https://www.turkiye.gov.tr/belge-dogrulama"
+   ],
+   "lines": [
+    [
+     "T.C. ORTA DOĞU TEKNİK ÜNİVERSİTESİ",
+     12
+    ],
+    [
+     "ÖĞRENCİ BELGESİ",
+     22
+    ],
+    [
+     "Sayın Jane Doe 2026-2027 Güz döneminde kayıtlı öğrencidir.",
+     10
+    ]
+   ],
+   "expect": [
+    "enrollment-fall26",
+    "student-certificate-fall26",
+    "enrollment-certificate-fall26"
+   ]
+  },
+  {
+   "id": "exam-schedule",
+   "file": "6620_exam.pdf",
+   "source": [
+    "https://oidb.metu.edu.tr/en/final-exam-schedule"
+   ],
+   "created": "2026-12-20",
+   "lines": [
+    [
+     "Final Exam Schedule",
+     22
+    ],
+    [
+     "Fall 2026 - Middle East Technical University",
+     12
+    ],
+    [
+     "CENG 213  Jan 12  09:30  BMB-1",
+     10
+    ]
+   ],
+   "expect": [
+    "exam-schedule-fall26",
+    "final-exam-schedule-fall26",
+    "finals-fall26"
+   ]
+  },
+  {
+   "id": "tuition-receipt",
+   "file": "Dekont_20260910_5521.pdf",
+   "source": [
+    "https://www.ziraatbank.com.tr/"
+   ],
+   "created": "2026-09-10",
+   "lines": [
+    [
+     "DEKONT",
+     20
+    ],
+    [
+     "Öğrenim Ücreti / Katkı Payı Ödemesi - ODTÜ",
+     12
+    ],
+    [
+     "Tutar: 12.500,00 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "tuition-fall26",
+    "tuition-receipt-fall26"
+   ]
+  },
+  {
+   "id": "internship-form",
+   "file": "Document (1).docx",
+   "lines": [
+    [
+     "Internship Evaluation Form",
+     22
+    ],
+    [
+     "To be filled by the supervisor at the end of the internship.",
+     11
+    ],
+    [
+     "Student: Jane Doe   Company: Acme",
+     10
+    ]
+   ],
+   "expect": [
+    "internship-evaluation-form",
+    "internship-evaluation",
+    "internship-form"
+   ]
+  },
+  {
+   "id": "learning-agreement",
+   "file": "LA_7731_2026.pdf",
+   "source": [
+    "https://erasmus-plus.ec.europa.eu/resources"
+   ],
+   "lines": [
+    [
+     "Learning Agreement",
+     24
+    ],
+    [
+     "Student Mobility for Studies - Erasmus+",
+     14
+    ],
+    [
+     "Sending institution: METU   Receiving: University of Helsinki",
+     10
+    ]
+   ],
+   "expect": [
+    "learning-agreement",
+    "erasmus-learning-agreement",
+    "learning-agreement-erasmus"
+   ]
+  },
+  {
+   "id": "colab-notebook",
+   "file": "Untitled0.ipynb",
+   "lines": [
+    [
+     "CENG 499 HW1 - Linear Regression",
+     20
+    ],
+    [
+     "import numpy as np",
+     10
+    ],
+    [
+     "X = np.load('train.npy')",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng499-hw1",
+    "ceng499-hw1-linear-regression"
+   ]
+  },
+  {
+   "id": "kaggle-dataset",
+   "file": "archive.zip",
+   "source": [
+    "https://www.kaggle.com/datasets/yasserh/titanic-dataset"
+   ],
+   "zipFiles": [
+    "train.csv",
+    "test.csv",
+    "gender_submission.csv"
+   ],
+   "expect": [
+    "titanic",
+    "titanic-dataset",
+    "kaggle-titanic"
+   ]
+  },
+  {
+   "id": "project-proposal",
+   "file": "Untitled document.docx",
+   "lines": [
+    [
+     "Project Proposal: Campus Food Waste Tracker",
+     20
+    ],
+    [
+     "Team: 4 students. Goal: measure and reduce cafeteria food waste with a mobile app.",
+     11
+    ]
+   ],
+   "expect": [
+    "food-waste-tracker-proposal",
+    "campus-food-waste-proposal",
+    "proposal-food-waste-tracker",
+    "food-waste-tracker"
+   ]
+  },
+  {
+   "id": "scholarship-form",
+   "file": "3341_basvuru.pdf",
+   "source": [
+    "https://www.tubitak.gov.tr/tr/burslar"
+   ],
+   "lines": [
+    [
+     "TÜBİTAK 2209-A",
+     22
+    ],
+    [
+     "Üniversite Öğrencileri Araştırma Projeleri Destekleme Programı - Başvuru Formu",
+     14
+    ],
+    [
+     "Proje başlığı: ...",
+     10
+    ]
+   ],
+   "expect": [
+    "tubitak-2209a-application",
+    "tubitak-2209a",
+    "tubitak-2209a-form"
+   ]
+  },
+  {
+   "id": "syllabus-no-word",
+   "file": "315-Fall 2026 (1).pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/1/mod_resource/content/1/315-Fall%202026.pdf"
+   ],
+   "title": "MIDDLE EAST TECHNICAL UNIVERSITY",
+   "lines": [
+    [
+     "MIDDLE EAST TECHNICAL UNIVERSITY",
+     14
+    ],
+    [
+     "CEng 315 – Algorithms",
+     18
+    ],
+    [
+     "Fall 2026-2027",
+     12
+    ],
+    [
+     "Instructors: Prof. Dr. A. Yilmaz",
+     10
+    ],
+    [
+     "Teaching Assistants: B. Kaya, C. Demir",
+     10
+    ],
+    [
+     "Lecture Hours: Mon 9:15-10:30",
+     10
+    ],
+    [
+     "Grading: Midterm 30%, Final 40%, Homeworks 30%",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng315-syllabus",
+    "ceng315-syllabus-fall26"
+   ]
+  },
+  {
+   "id": "old-final",
+   "file": "final_a.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/2/mod_resource/content/1/final_a.pdf"
+   ],
+   "lines": [
+    [
+     "Middle East Technical University",
+     11
+    ],
+    [
+     "Department of Computer Engineering CENG 331",
+     11
+    ],
+    [
+     "Fall '2022-2023",
+     11
+    ],
+    [
+     "FINAL",
+     16
+    ],
+    [
+     "Exam: This is a closed book, closed notes exam.",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng331-final-fall22"
+   ]
+  },
+  {
+   "id": "midterm-key",
+   "file": "Sample-MT.pdf",
+   "title": "midterm KEY",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/3/mod_resource/content/1/Sample-MT.pdf"
+   ],
+   "lines": [
+    [
+     "Middle East Technical University",
+     11
+    ],
+    [
+     "Department of Computer Engineering CENG 331",
+     11
+    ],
+    [
+     "Fall '2019-2020",
+     11
+    ],
+    [
+     "Midterm I",
+     16
+    ],
+    [
+     "Duration: 100 minutes. This is a closed book exam.",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng331-midterm1-fall19-solutions",
+    "ceng331-midterm1-fall19-key"
+   ]
+  },
+  {
+   "id": "chapter-topic",
+   "file": "ch8.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/21/mod_resource/content/1/ch8.pdf"
+   ],
+   "lines": [
+    [
+     "CENG 351 Data Management and File Structures",
+     12
+    ],
+    [
+     "Chapter 8: Indexing Structures",
+     22
+    ],
+    [
+     "B+ trees, hashing, bitmap indexes",
+     11
+    ]
+   ],
+   "expect": [
+    "ceng351-ch8-indexing-structures",
+    "ceng351-ch8-indexing"
+   ]
+  },
+  {
+   "id": "lecture-topic",
+   "file": "L04.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/22/mod_resource/content/1/L04.pdf"
+   ],
+   "lines": [
+    [
+     "EE 281 Electrical Circuits",
+     12
+    ],
+    [
+     "Lecture 4: Op-Amps",
+     22
+    ],
+    [
+     "Ideal op-amp model, inverting amplifier",
+     11
+    ]
+   ],
+   "expect": [
+    "ee281-lecture4-op-amps"
+   ]
+  },
+  {
+   "id": "hw-solutions",
+   "file": "sol1.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/23/mod_resource/content/1/sol1.pdf"
+   ],
+   "lines": [
+    [
+     "PHYS 105 General Physics I",
+     14
+    ],
+    [
+     "Homework 1 Solutions",
+     20
+    ],
+    [
+     "Problem 1. A ball is thrown upward...",
+     10
+    ]
+   ],
+   "expect": [
+    "phys105-hw1-solutions"
+   ]
+  },
+  {
+   "id": "quiz-key",
+   "file": "q3.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/24/mod_resource/content/1/q3.pdf"
+   ],
+   "lines": [
+    [
+     "STAT 201 Introduction to Statistics",
+     14
+    ],
+    [
+     "Quiz 3 Answer Key",
+     20
+    ],
+    [
+     "Fall 2025",
+     11
+    ]
+   ],
+   "expect": [
+    "stat201-quiz3-fall25-solutions"
+   ]
+  },
+  {
+   "id": "itinerary",
+   "file": "PNR_X7KQ2L.pdf",
+   "lines": [
+    [
+     "Itinerary",
+     22
+    ],
+    [
+     "Pegasus Airlines",
+     12
+    ],
+    [
+     "Istanbul Sabiha Gokcen (SAW) - Izmir (ADB)  03 Dec 2026",
+     10
+    ]
+   ],
+   "expect": [
+    "ticket-pegasus-dec26",
+    "ticket-pegasus"
+   ]
+  },
+  {
+   "id": "insurance-de",
+   "file": "VS_44120931.pdf",
+   "lines": [
+    [
+     "AXA Versicherung AG",
+     12
+    ],
+    [
+     "Versicherungsschein",
+     20
+    ],
+    [
+     "Auslandskrankenversicherung fur Studierende",
+     10
+    ]
+   ],
+   "expect": [
+    "insurance-axa"
+   ]
+  },
+  {
+   "id": "paper-accepted",
+   "file": "decision_1234.pdf",
+   "source": [
+    "https://mail.google.com/mail/u/0/"
+   ],
+   "lines": [
+    [
+     "MICCAI 2026",
+     16
+    ],
+    [
+     "Paper #1234 - Final Decision",
+     14
+    ],
+    [
+     "We are happy to tell you that your paper has been accepted for presentation.",
+     10
+    ]
+   ],
+   "expect": [
+    "miccai-acceptance"
+   ]
+  },
+  {
+   "id": "assignment-nb",
+   "file": "Untitled7.ipynb",
+   "lines": [
+    [
+     "Assignment 3: Transformers from Scratch",
+     0
+    ],
+    [
+     "import torch.nn as nn",
+     0
+    ]
+   ],
+   "expect": [
+    "hw3-transformers-scratch",
+    "hw3-transformers"
+   ]
+  },
+  {
+   "id": "order-de",
+   "file": "bestellung_302-1182.pdf",
+   "source": [
+    "https://www.amazon.de/gp/your-account/order-details"
+   ],
+   "lines": [
+    [
+     "Bestellbestatigung",
+     20
+    ],
+    [
+     "Kindle Paperwhite  1 Stuck  149,99 EUR",
+     10
+    ]
+   ],
+   "expect": [
+    "receipt-amazon-nov26",
+    "receipt-amazon"
+   ]
+  },
+  {
+   "id": "quiz-dash-sol",
+   "file": "quiz1s.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/25/mod_resource/content/1/quiz1s.pdf"
+   ],
+   "lines": [
+    [
+     "CHEM 107 General Chemistry",
+     15
+    ],
+    [
+     "Quiz 1 - Solutions",
+     17
+    ],
+    [
+     "Spring 2026",
+     11
+    ]
+   ],
+   "expect": [
+    "chem107-quiz1-spring26-solutions"
+   ]
+  },
+  {
+   "id": "was-ho-hw-hash",
+   "file": "hw3_2026.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/9/mod_resource/content/1/hw3_2026.pdf"
+   ],
+   "lines": [
+    [
+     "CENG 213 Data Structures",
+     18
+    ],
+    [
+     "Homework 3: Hash Tables",
+     16
+    ],
+    [
+     "Due: December 1, 2026, 23:59",
+     10
+    ]
+   ],
+   "expect": [
+    "ceng213-hw3",
+    "ceng213-hw3-hash-tables"
+   ]
+  },
+  {
+   "id": "was-ho-quiz-sol",
+   "file": "q2sol.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/10/mod_resource/content/1/q2sol.pdf"
+   ],
+   "lines": [
+    [
+     "MATH 260 Basic Linear Algebra",
+     16
+    ],
+    [
+     "Quiz 2 - Solutions",
+     18
+    ],
+    [
+     "Spring 2026",
+     11
+    ]
+   ],
+   "expect": [
+    "math260-quiz2-spring26-solutions",
+    "math260-quiz2-solutions",
+    "math260-quiz2-solutions-spring26"
+   ]
+  },
+  {
+   "id": "was-ho-electricity",
+   "file": "fatura_102938.pdf",
+   "source": [
+    "https://online.enerjisa.com.tr/fatura"
+   ],
+   "created": "2026-11-06",
+   "lines": [
+    [
+     "Enerjisa",
+     20
+    ],
+    [
+     "Elektrik Faturası",
+     16
+    ],
+    [
+     "Fatura Dönemi: Ekim 2026   Tutar: 612,40 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "invoice-enerjisa-oct26",
+    "electricity-enerjisa-oct26",
+    "invoice-enerjisa-nov26"
+   ]
+  },
+  {
+   "id": "was-ho-flight",
+   "file": "ETKT_2351234567890.pdf",
+   "source": [
+    "https://www.turkishairlines.com/en-tr/manage-booking"
+   ],
+   "lines": [
+    [
+     "Electronic Ticket Itinerary Receipt",
+     18
+    ],
+    [
+     "Turkish Airlines",
+     12
+    ],
+    [
+     "Istanbul (IST) - Munich (MUC)   12 Dec 2026   TK1635",
+     10
+    ]
+   ],
+   "expect": [
+    "ticket-turkishairlines-ist-muc",
+    "ticket-turkishairlines-dec26",
+    "ticket-istanbul-munich",
+    "ticket-turkishairlines"
+   ]
+  },
+  {
+   "id": "was-ho-statement",
+   "file": "hesap_ozeti_20261101.pdf",
+   "source": [
+    "https://www.isbank.com.tr/internet-subesi"
+   ],
+   "lines": [
+    [
+     "Türkiye İş Bankası",
+     14
+    ],
+    [
+     "Hesap Özeti",
+     20
+    ],
+    [
+     "Dönem: 01.10.2026 - 31.10.2026",
+     10
+    ]
+   ],
+   "expect": [
+    "statement-isbank-oct26"
+   ]
+  },
+  {
+   "id": "was-ho-insurance",
+   "file": "POL_8823411.pdf",
+   "lines": [
+    [
+     "Allianz Sigorta",
+     14
+    ],
+    [
+     "Seyahat Sağlık Sigortası Poliçesi",
+     18
+    ],
+    [
+     "Poliçe No: 8823411   Başlangıç: 10.12.2026",
+     10
+    ]
+   ],
+   "expect": [
+    "insurance-allianz",
+    "travel-insurance-allianz",
+    "allianz-travel-insurance"
+   ]
+  },
+  {
+   "id": "was-ho-acceptance",
+   "file": "notification_1182.pdf",
+   "source": [
+    "https://mail.google.com/mail/u/0/"
+   ],
+   "lines": [
+    [
+     "CVPR 2027 Workshop on Medical Vision",
+     16
+    ],
+    [
+     "Notification of Acceptance",
+     18
+    ],
+    [
+     "Dear authors, we are pleased to inform you that your paper has been accepted.",
+     10
+    ]
+   ],
+   "expect": [
+    "cvpr-acceptance",
+    "acceptance-cvpr",
+    "cvpr-workshop-acceptance"
+   ]
+  },
+  {
+   "id": "was-ho-visa",
+   "file": "Appointment_Confirmation.pdf",
+   "source": [
+    "https://visa.vfsglobal.com/tur/en/deu/"
+   ],
+   "lines": [
+    [
+     "VFS Global",
+     12
+    ],
+    [
+     "Germany Visa Application - Appointment Confirmation",
+     16
+    ],
+    [
+     "Date: 15 January 2027, 10:30, Ankara",
+     10
+    ]
+   ],
+   "expect": [
+    "visa-appointment-germany",
+    "visa-appointment",
+    "germany-visa-appointment"
+   ]
+  },
+  {
+   "id": "was-ho-backprop-photo",
+   "file": "IMG_4821.jpg",
+   "lines": [
+    [
+     "Backpropagation",
+     40
+    ],
+    [
+     "dL/dW = dL/dy * x",
+     30
+    ],
+    [
+     "chain rule through each layer",
+     26
+    ]
+   ],
+   "expect": [
+    "backpropagation",
+    "backprop",
+    "backpropagation-chain-rule"
+   ]
+  },
+  {
+   "id": "was-ho-zoom-shot",
+   "file": "Screenshot 2026-11-08 at 14.22.01.png",
+   "lines": [
+    [
+     "CENG 491 Senior Project - Weekly Meeting",
+     28
+    ],
+    [
+     "Zoom Meeting ID: 812 3344 5566",
+     22
+    ],
+    [
+     "Passcode: 4411",
+     22
+    ]
+   ],
+   "expect": [
+    "ceng491-meeting",
+    "ceng491-zoom",
+    "ceng491-weekly-meeting"
+   ]
+  },
+  {
+   "id": "was-ho-cover-letter",
+   "file": "Document1.docx",
+   "lines": [
+    [
+     "Cover Letter",
+     16
+    ],
+    [
+     "Dear Hiring Manager, I am applying for the Machine Learning Intern position at Aselsan.",
+     11
+    ]
+   ],
+   "expect": [
+    "cover-letter-aselsan",
+    "aselsan-cover-letter"
+   ]
+  },
+  {
+   "id": "was-ho-group-pres",
+   "file": "Presentation1.pptx",
+   "lines": [
+    [
+     "Smart Parking System",
+     28
+    ],
+    [
+     "CENG 356 - Group 4 Final Presentation",
+     16
+    ],
+    [
+     "Problem, design, demo",
+     12
+    ]
+   ],
+   "expect": [
+    "ceng356-smart-parking",
+    "ceng356-presentation",
+    "ceng356-smart-parking-presentation"
+   ]
+  },
+  {
+   "id": "was-ho-notebook",
+   "file": "Untitled3.ipynb",
+   "lines": [
+    [
+     "Homework 2: CNN on CIFAR-10",
+     0
+    ],
+    [
+     "import torch",
+     0
+    ],
+    [
+     "model = ResNet18()",
+     0
+    ]
+   ],
+   "expect": [
+    "hw2-cifar10",
+    "cifar10-cnn",
+    "hw2-cnn-cifar10"
+   ]
+  },
+  {
+   "id": "was-ho-zip-hw",
+   "file": "archive (2).zip",
+   "zipFiles": [
+    "hw4/main.c",
+    "hw4/Makefile",
+    "hw4/report.pdf"
+   ],
+   "expect": [
+    "hw4"
+   ]
+  },
+  {
+   "id": "was-ho-chapter",
+   "file": "ch05.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/11/mod_resource/content/1/ch05.pdf"
+   ],
+   "lines": [
+    [
+     "CENG 334 Operating Systems",
+     12
+    ],
+    [
+     "Chapter 5: CPU Scheduling",
+     22
+    ],
+    [
+     "Basic concepts, scheduling criteria, algorithms",
+     11
+    ]
+   ],
+   "expect": [
+    "ceng334-cpu-scheduling",
+    "ceng334-ch5-cpu-scheduling",
+    "ceng334-chapter5"
+   ]
+  },
+  {
+   "id": "was-ho-order",
+   "file": "order_details.pdf",
+   "source": [
+    "https://www.trendyol.com/hesabim/siparislerim"
+   ],
+   "lines": [
+    [
+     "Sipariş Detayı",
+     18
+    ],
+    [
+     "Logitech MX Master 3S Kablosuz Mouse   1 adet   3.299,00 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "receipt-trendyol-mouse",
+    "receipt-trendyol",
+    "receipt-trendyol-nov26"
+   ]
+  }
+ ]
 }

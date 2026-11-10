@@ -1,40 +1,404 @@
 {
-  "note": "Held-out set. Expected names were written before namer ever ran on these files. Never change rules or prompts to fix a case here; add the file to cases.json instead and write a new held-out case. All names and numbers are made up.",
-  "decision": {
-    "rename": ["IMG_20261108_142201.jpg", "doc_8812734.pdf", "Untitled (4).png", "file-sample_150kB.pdf", "WhatsApp Image 2026-11-02 at 10.11.04.jpeg"],
-    "keep": ["ceng213-notes.pdf", "resume-2026.pdf", "thesis draft v3.docx", "Linear Algebra Cheatsheet.pdf", "budget_2027.xlsx"]
-  },
-  "naming": [
-    {"id": "ho-hw-hash", "file": "hw3_2026.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/9/mod_resource/content/1/hw3_2026.pdf"],
-     "lines": [["CENG 213 Data Structures", 18], ["Homework 3: Hash Tables", 16], ["Due: December 1, 2026, 23:59", 10]], "expect": ["ceng213-hw3", "ceng213-hw3-hash-tables"]},
-    {"id": "ho-quiz-sol", "file": "q2sol.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/10/mod_resource/content/1/q2sol.pdf"],
-     "lines": [["MATH 260 Basic Linear Algebra", 16], ["Quiz 2 - Solutions", 18], ["Spring 2026", 11]], "expect": ["math260-quiz2-solutions", "math260-quiz2-solutions-spring26"]},
-    {"id": "ho-electricity", "file": "fatura_102938.pdf", "source": ["https://online.enerjisa.com.tr/fatura"], "created": "2026-11-06",
-     "lines": [["Enerjisa", 20], ["Elektrik Faturası", 16], ["Fatura Dönemi: Ekim 2026   Tutar: 612,40 TL", 10]], "expect": ["invoice-enerjisa-oct26", "electricity-enerjisa-oct26", "invoice-enerjisa-nov26"]},
-    {"id": "ho-flight", "file": "ETKT_2351234567890.pdf", "source": ["https://www.turkishairlines.com/en-tr/manage-booking"],
-     "lines": [["Electronic Ticket Itinerary Receipt", 18], ["Turkish Airlines", 12], ["Istanbul (IST) - Munich (MUC)   12 Dec 2026   TK1635", 10]], "expect": ["ticket-turkishairlines-ist-muc", "ticket-turkishairlines-dec26", "ticket-istanbul-munich", "ticket-turkishairlines"]},
-    {"id": "ho-statement", "file": "hesap_ozeti_20261101.pdf", "source": ["https://www.isbank.com.tr/internet-subesi"],
-     "lines": [["Türkiye İş Bankası", 14], ["Hesap Özeti", 20], ["Dönem: 01.10.2026 - 31.10.2026", 10]], "expect": ["statement-isbank-oct26"]},
-    {"id": "ho-insurance", "file": "POL_8823411.pdf",
-     "lines": [["Allianz Sigorta", 14], ["Seyahat Sağlık Sigortası Poliçesi", 18], ["Poliçe No: 8823411   Başlangıç: 10.12.2026", 10]], "expect": ["insurance-allianz", "travel-insurance-allianz", "allianz-travel-insurance"]},
-    {"id": "ho-acceptance", "file": "notification_1182.pdf", "source": ["https://mail.google.com/mail/u/0/"],
-     "lines": [["CVPR 2027 Workshop on Medical Vision", 16], ["Notification of Acceptance", 18], ["Dear authors, we are pleased to inform you that your paper has been accepted.", 10]], "expect": ["cvpr-acceptance", "acceptance-cvpr", "cvpr-workshop-acceptance"]},
-    {"id": "ho-visa", "file": "Appointment_Confirmation.pdf", "source": ["https://visa.vfsglobal.com/tur/en/deu/"],
-     "lines": [["VFS Global", 12], ["Germany Visa Application - Appointment Confirmation", 16], ["Date: 15 January 2027, 10:30, Ankara", 10]], "expect": ["visa-appointment-germany", "visa-appointment", "germany-visa-appointment"]},
-    {"id": "ho-backprop-photo", "file": "IMG_4821.jpg",
-     "lines": [["Backpropagation", 40], ["dL/dW = dL/dy * x", 30], ["chain rule through each layer", 26]], "expect": ["backpropagation", "backprop", "backpropagation-chain-rule"]},
-    {"id": "ho-zoom-shot", "file": "Screenshot 2026-11-08 at 14.22.01.png",
-     "lines": [["CENG 491 Senior Project - Weekly Meeting", 28], ["Zoom Meeting ID: 812 3344 5566", 22], ["Passcode: 4411", 22]], "expect": ["ceng491-meeting", "ceng491-zoom", "ceng491-weekly-meeting"]},
-    {"id": "ho-cover-letter", "file": "Document1.docx",
-     "lines": [["Cover Letter", 16], ["Dear Hiring Manager, I am applying for the Machine Learning Intern position at Aselsan.", 11]], "expect": ["cover-letter-aselsan", "aselsan-cover-letter"]},
-    {"id": "ho-group-pres", "file": "Presentation1.pptx",
-     "lines": [["Smart Parking System", 28], ["CENG 356 - Group 4 Final Presentation", 16], ["Problem, design, demo", 12]], "expect": ["ceng356-smart-parking", "ceng356-presentation", "ceng356-smart-parking-presentation"]},
-    {"id": "ho-notebook", "file": "Untitled3.ipynb",
-     "lines": [["Homework 2: CNN on CIFAR-10", 0], ["import torch", 0], ["model = ResNet18()", 0]], "expect": ["hw2-cifar10", "cifar10-cnn", "hw2-cnn-cifar10"]},
-    {"id": "ho-zip-hw", "file": "archive (2).zip", "zipFiles": ["hw4/main.c", "hw4/Makefile", "hw4/report.pdf"], "expect": ["hw4"]},
-    {"id": "ho-chapter", "file": "ch05.pdf", "source": ["https://odtuclass2026f.metu.edu.tr/pluginfile.php/11/mod_resource/content/1/ch05.pdf"],
-     "lines": [["CENG 334 Operating Systems", 12], ["Chapter 5: CPU Scheduling", 22], ["Basic concepts, scheduling criteria, algorithms", 11]], "expect": ["ceng334-cpu-scheduling", "ceng334-ch5-cpu-scheduling", "ceng334-chapter5"]},
-    {"id": "ho-order", "file": "order_details.pdf", "source": ["https://www.trendyol.com/hesabim/siparislerim"],
-     "lines": [["Sipariş Detayı", 18], ["Logitech MX Master 3S Kablosuz Mouse   1 adet   3.299,00 TL", 10]], "expect": ["receipt-trendyol-mouse", "receipt-trendyol", "receipt-trendyol-nov26"]}
+ "note": "Held-out set. Expected names were written before namer ever ran on these files. Never change rules or prompts to fix a case here; add the file to cases.json instead and write a new held-out case. All names and numbers are made up. Round 2, written 2026-11-10 after round 1 moved into cases.json.",
+ "decision": {
+  "rename": [
+   "Scan 12 Nov 2026.pdf",
+   "attachment(3).pdf",
+   "document (17).docx",
+   "CamScanner 11-08-2026 14.22.pdf",
+   "8f14e45fceea167a5a36dedd4bea2543.png"
+  ],
+  "keep": [
+   "metu-erasmus-checklist.pdf",
+   "ProjectPlan.docx",
+   "Thesis_Final_Draft.pdf",
+   "grocery list.txt",
+   "CVPR rebuttal.pdf"
   ]
+ },
+ "naming": [
+  {
+   "id": "h2-lecture",
+   "file": "lecture08.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/31/mod_resource/content/1/lecture08.pdf"
+   ],
+   "lines": [
+    [
+     "CENG 384 Signals and Systems",
+     12
+    ],
+    [
+     "Lecture 8: Fourier Series",
+     22
+    ],
+    [
+     "Periodic signals, coefficients",
+     11
+    ]
+   ],
+   "expect": [
+    "ceng384-lecture8-fourier-series"
+   ]
+  },
+  {
+   "id": "h2-second-mt",
+   "file": "midterm2_2024.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/32/mod_resource/content/1/midterm2_2024.pdf"
+   ],
+   "lines": [
+    [
+     "MATH 120 Calculus II",
+     14
+    ],
+    [
+     "Second Midterm Exam",
+     20
+    ],
+    [
+     "Spring 2024   Duration: 120 minutes",
+     10
+    ]
+   ],
+   "expect": [
+    "math120-midterm2-spring24"
+   ]
+  },
+  {
+   "id": "h2-recit-sol",
+   "file": "recit5.pdf",
+   "source": [
+    "https://odtuclass2026f.metu.edu.tr/pluginfile.php/33/mod_resource/content/1/recit5.pdf"
+   ],
+   "lines": [
+    [
+     "PHYS 106 General Physics II",
+     13
+    ],
+    [
+     "Recitation 5 Solutions",
+     20
+    ],
+    [
+     "Fall 2026",
+     10
+    ]
+   ],
+   "expect": [
+    "phys106-rec5-solutions",
+    "phys106-recitation5-solutions"
+   ]
+  },
+  {
+   "id": "h2-vodafone",
+   "file": "fatura_00918273.pdf",
+   "source": [
+    "https://www.vodafone.com.tr/faturalarim"
+   ],
+   "created": "2026-10-03",
+   "lines": [
+    [
+     "Vodafone",
+     20
+    ],
+    [
+     "Fatura",
+     16
+    ],
+    [
+     "Fatura Dönemi: Eylül 2026   Toplam: 299,00 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "invoice-vodafone-sep26"
+   ]
+  },
+  {
+   "id": "h2-netflix",
+   "file": "receipt_1199.pdf",
+   "source": [
+    "https://mail.google.com/mail/u/0/"
+   ],
+   "lines": [
+    [
+     "Your receipt from Netflix",
+     18
+    ],
+    [
+     "Standard plan, November 2026   229,99 TL",
+     10
+    ]
+   ],
+   "expect": [
+    "receipt-netflix-nov26",
+    "receipt-netflix"
+   ]
+  },
+  {
+   "id": "h2-bus",
+   "file": "bilet_88213.pdf",
+   "source": [
+    "https://www.obilet.com/biletlerim"
+   ],
+   "lines": [
+    [
+     "Otobüs Bileti",
+     20
+    ],
+    [
+     "Ankara - İstanbul   20 Kasım 2026   22:30",
+     11
+    ]
+   ],
+   "expect": [
+    "ticket-obilet-nov26",
+    "ticket-obilet"
+   ]
+  },
+  {
+   "id": "h2-train",
+   "file": "Fahrkarte_X81.pdf",
+   "source": [
+    "https://www.bahn.de/buchung/meine-reisen"
+   ],
+   "lines": [
+    [
+     "Online-Ticket",
+     20
+    ],
+    [
+     "Berlin Hbf - München Hbf   14.12.2026   ICE 1001",
+     11
+    ]
+   ],
+   "expect": [
+    "ticket-bahn-dec26",
+    "ticket-bahn"
+   ]
+  },
+  {
+   "id": "h2-lease",
+   "file": "lease_signed.pdf",
+   "lines": [
+    [
+     "Residential Lease Agreement",
+     20
+    ],
+    [
+     "This lease is made between the Landlord and the Tenant for the property at 12 Elm Street.",
+     10
+    ]
+   ],
+   "expect": [
+    "lease-agreement",
+    "contract-2026",
+    "lease"
+   ]
+  },
+  {
+   "id": "h2-offer",
+   "file": "OL_2026_44.pdf",
+   "source": [
+    "https://mail.google.com/mail/u/0/"
+   ],
+   "lines": [
+    [
+     "Offer Letter",
+     20
+    ],
+    [
+     "Dear Jane, we are pleased to offer you the position of Software Engineer Intern at Getir.",
+     10
+    ]
+   ],
+   "expect": [
+    "offer-getir",
+    "getir-offer-letter",
+    "offer-letter-getir",
+    "getir-offer"
+   ]
+  },
+  {
+   "id": "h2-pr-shot",
+   "file": "Screen Shot 2026-11-09 at 10.02.11.png",
+   "lines": [
+    [
+     "Pull request #482",
+     30
+    ],
+    [
+     "Fix memory leak in data loader",
+     26
+    ],
+    [
+     "3 commits, 2 files changed",
+     20
+    ]
+   ],
+   "expect": [
+    "pr482-memory-leak",
+    "memory-leak-fix",
+    "data-loader-memory-leak",
+    "memory-leak-data-loader"
+   ]
+  },
+  {
+   "id": "h2-market",
+   "file": "IMG_7781.jpg",
+   "lines": [
+    [
+     "MIGROS",
+     40
+    ],
+    [
+     "SÜT 1L      34,50",
+     24
+    ],
+    [
+     "EKMEK       15,00",
+     24
+    ],
+    [
+     "TOPLAM     412,50",
+     28
+    ]
+   ],
+   "expect": [
+    "receipt-migros",
+    "receipt-migros-nov26"
+   ]
+  },
+  {
+   "id": "h2-report",
+   "file": "Rapor_son.docx",
+   "lines": [
+    [
+     "CENG 435 Data Communications and Networking",
+     14
+    ],
+    [
+     "Term Project Report: Reliable UDP",
+     18
+    ]
+   ],
+   "expect": [
+    "ceng435-reliable-udp",
+    "ceng435-project-report",
+    "ceng435-report"
+   ]
+  },
+  {
+   "id": "h2-defense",
+   "file": "sunum.pptx",
+   "lines": [
+    [
+     "Thesis Defense",
+     28
+    ],
+    [
+     "Self-supervised Depth Estimation for Endoscopy",
+     16
+    ]
+   ],
+   "expect": [
+    "thesis-defense",
+    "thesis-defense-endoscopy",
+    "depth-estimation-endoscopy"
+   ]
+  },
+  {
+   "id": "h2-lab-nb",
+   "file": "Untitled.ipynb",
+   "lines": [
+    [
+     "Lab 6: Image Segmentation with U-Net",
+     0
+    ],
+    [
+     "import tensorflow as tf",
+     0
+    ]
+   ],
+   "expect": [
+    "lab6-image-segmentation",
+    "lab6-unet"
+   ]
+  },
+  {
+   "id": "h2-zip",
+   "file": "drive-download-20261108T101112Z-001.zip",
+   "zipFiles": [
+    "erasmus-documents/passport.pdf",
+    "erasmus-documents/acceptance.pdf"
+   ],
+   "expect": [
+    "erasmus-documents"
+   ]
+  },
+  {
+   "id": "h2-paper-title",
+   "file": "2410.12345v1.pdf",
+   "title": "DepthCrafter: Generating Consistent Long Depth Sequences for Open-world Videos",
+   "lines": [
+    [
+     "DepthCrafter: Generating Consistent Long Depth Sequences for Open-world Videos",
+     18
+    ],
+    [
+     "Abstract",
+     12
+    ]
+   ],
+   "expect": [
+    "depthcrafter",
+    "depthcrafter-2024"
+   ]
+  },
+  {
+   "id": "h2-certificate",
+   "file": "certificate.pdf",
+   "lines": [
+    [
+     "Certificate of Completion",
+     22
+    ],
+    [
+     "Deep Learning Specialization",
+     16
+    ],
+    [
+     "DeepLearning.AI",
+     12
+    ]
+   ],
+   "expect": [
+    "certificate-deep-learning",
+    "deep-learning-certificate",
+    "certificate-deep-learning-specialization"
+   ]
+  },
+  {
+   "id": "h2-residence",
+   "file": "belge_5521.pdf",
+   "source": [
+    "https://e-ikamet.goc.gov.tr/"
+   ],
+   "lines": [
+    [
+     "T.C. İçişleri Bakanlığı Göç İdaresi",
+     12
+    ],
+    [
+     "İkamet İzni Belgesi",
+     20
+    ]
+   ],
+   "expect": [
+    "residence-permit",
+    "ikamet-izni"
+   ]
+  }
+ ]
 }

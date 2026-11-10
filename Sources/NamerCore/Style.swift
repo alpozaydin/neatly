@@ -71,6 +71,7 @@ public enum Style {
         public let qualifier: Qualifier
         public let keepIssuer: Bool      // invoice-turkcell-nov26 vs transcript-fall26
         let triggers: [String]
+        var issuerFirst = false          // cvpr-acceptance: the issuer is the distinctive part
     }
 
     /// First match wins, so more specific kinds come first. Triggers are matched as whole slug words/phrases.
@@ -81,11 +82,18 @@ public enum Style {
         .init(word: "schedule", qualifier: .term, keepIssuer: false, triggers: ["course schedule", "ders programi", "weekly schedule"]),
         .init(word: "tuition", qualifier: .term, keepIssuer: false, triggers: ["tuition fee", "harc", "ogrenim ucreti", "katki payi"]),
         .init(word: "enrollment", qualifier: .term, keepIssuer: false, triggers: ["ogrenci belgesi", "enrollment certificate", "certificate of enrollment"]),
-        .init(word: "invoice", qualifier: .month, keepIssuer: true, triggers: ["invoice", "fatura", "e arsiv fatura"]),
-        .init(word: "receipt", qualifier: .month, keepIssuer: true, triggers: ["receipt", "dekont", "makbuz"]),
+        // Before invoice/receipt: an airline's "Itinerary Receipt" is a ticket.
+        .init(word: "ticket", qualifier: .month, keepIssuer: true, triggers: ["boarding pass", "e ticket", "eticket", "electronic ticket",
+                                                                               "itinerary", "bilet", "binis karti"]),
+        .init(word: "acceptance", qualifier: .none, keepIssuer: true, triggers: ["notification of acceptance", "acceptance letter",
+            "letter of acceptance", "has been accepted", "have been accepted", "kabul mektubu"], issuerFirst: true),
+        .init(word: "insurance", qualifier: .none, keepIssuer: true, triggers: ["insurance policy", "insurance certificate", "sigorta",
+                                                                                 "sigortasi", "versicherung", "versicherungsschein"]),
+        .init(word: "invoice", qualifier: .month, keepIssuer: true, triggers: ["invoice", "fatura", "e arsiv fatura", "rechnung"]),
+        .init(word: "receipt", qualifier: .month, keepIssuer: true, triggers: ["receipt", "dekont", "makbuz", "order details",
+            "order confirmation", "siparis detayi", "siparis ozeti", "bestellbestatigung", "quittung"]),
         .init(word: "statement", qualifier: .month, keepIssuer: true, triggers: ["account statement", "hesap ozeti", "ekstre"]),
         .init(word: "payslip", qualifier: .month, keepIssuer: true, triggers: ["payslip", "bordro", "pay stub"]),
-        .init(word: "ticket", qualifier: .month, keepIssuer: true, triggers: ["boarding pass", "e ticket", "bilet"]),
         .init(word: "learning-agreement", qualifier: .none, keepIssuer: false, triggers: ["learning agreement"]),
         .init(word: "contract", qualifier: .year, keepIssuer: true, triggers: ["contract", "agreement", "sozlesme"]),
         .init(word: "cv", qualifier: .none, keepIssuer: false, triggers: ["curriculum vitae", "resume", "ozgecmis"]),
@@ -106,6 +114,36 @@ public enum Style {
         }
     }
 
+    /// Issuer from the document itself, when the download link doesn't say: a short line with a company word.
+    /// "Allianz Sigorta" → allianz, "AXA Versicherung AG" → axa. Conferences: "CVPR 2027 Workshop…" → cvpr.
+    public static func issuer(inText text: String, kind: String) -> String? {
+        if kind == "acceptance" {
+            let re = try! Regex(#"\b([A-Z][A-Za-z]{2,7})\s?'?(?:20)?\d{2}\b"#)
+            for m in text.matches(of: re) {
+                guard let a = m.output[1].substring, a.filter(\.isUppercase).count >= 3 else { continue }
+                return a.lowercased()
+            }
+            return nil
+        }
+        let company: Set<String> = ["sigorta", "versicherung", "insurance", "bank", "bankasi", "gmbh", "ag", "as",
+                                    "inc", "ltd", "llc", "airlines", "telekom", "energy", "enerji"]
+        for line in text.split(whereSeparator: \.isNewline).prefix(8) {
+            let w = words(String(line))
+            guard (2...3).contains(w.count), w.dropFirst().contains(where: { company.contains($0) }),
+                  let first = w.first, !company.contains(first), first.count >= 2 else { continue }
+            return first
+        }
+        return nil
+    }
+
+    /// "Chapter 5: CPU Scheduling" → [cpu, scheduling]. The words after the colon, at most 2. "CIFAR-10" → cifar10.
+    public static func topic(after title: String, max n: Int = 2) -> [String] {
+        guard let colon = title.firstIndex(of: ":") else { return [] }
+        let rest = String(title[title.index(after: colon)...])
+            .replacing(try! Regex(#"([A-Za-z])-(\d)"#)) { "\($0.output[1].substring!)\($0.output[2].substring!)" }
+        return Array(words(rest).prefix(n))
+    }
+
     /// Short issuer word from the download host: student.metu.edu.tr → metu.
     public static func issuer(host: String?) -> String? {
         guard let host else { return nil }
@@ -113,7 +151,9 @@ public enum Style {
                                     "app", "portal", "secure", "online", "my", "web", "cdn", "files", "download", "static"]
         let known = ["turkiye.gov.tr": "edevlet", "mail.google.com": "gmail", "drive.google.com": "gdrive"]
         if let k = known.first(where: { host.hasSuffix($0.key) }) { return k.value }
-        return host.split(separator: ".").map(String.init).last { !generic.contains($0) }
+        // Drop the country/top-level part first: www.amazon.de → amazon, not "de".
+        let labels = host.split(separator: ".").map(String.init)
+        return labels.dropLast().last { !generic.contains($0) } ?? labels.last { !generic.contains($0) }
     }
 
     // MARK: Papers
@@ -162,6 +202,7 @@ public enum Style {
         let patterns: [(String, String)] = [
             (#"\b(?:homework|hw|odev|assignment|ass)\s?(\d{1,2})\b"#, "hw"),
             (#"\b(?:lecture|lec)\s?(\d{1,2})\b"#, "lecture"),
+            (#"\b(?:chapter|ch|bolum|unit)\s?(\d{1,2})\b"#, "ch"),
             (#"\b(?:lab|laboratory)\s?(\d{1,2})\b"#, "lab"),
             (#"\b(?:recitation|rec)\s?(\d{1,2})\b"#, "rec"),
             (#"\b(?:quiz)\s?(\d{1,2})\b"#, "quiz"),
