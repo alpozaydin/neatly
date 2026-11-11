@@ -9,7 +9,13 @@ public enum Destination {
     }
 
     /// Folders a person organises files in: home folders except system ones, 3 levels deep, no code repos.
-    public static func index(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [Folder] {
+    /// Your home folder — or NEATLY_HOME in tests, so they never suggest (or move files into) your real folders.
+    public static var homeRoot: URL {
+        if let h = ProcessInfo.processInfo.environment["NEATLY_HOME"] { return URL(fileURLWithPath: h) }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    public static func index(home: URL = homeRoot) -> [Folder] {
         // Desktop and Documents are privacy-protected: scanning them from the background would pop macOS prompts.
         let skipTop: Set<String> = ["Library", "Applications", "Downloads", "Movies", "Music", "Pictures", "Public", "Desktop", "Documents",
                                     "src", "miniconda3", "anaconda3", "venvs", "node_modules", "go", "opt"]
@@ -109,7 +115,7 @@ public enum Destination {
     public static func best(name: String, evidence e: Evidence, folders: [Folder], useModel: Bool = true) async -> URL? {
         if let f = suggest(name: name, evidence: e, folders: folders) { return f }
         guard useModel else { return nil }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path + "/"
+        let home = homeRoot.path + "/"
         let options = shortlist(name: name, evidence: e, folders: folders)
             .map { $0.url.path.replacingOccurrences(of: home, with: "") }
         guard let pick = await Model.pickFolder(for: e, name: name, options: options) else { return nil }
@@ -164,7 +170,8 @@ public enum Destination {
         guard let folder, let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
               let items = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])
         else { return nil }
-        for other in items where other.pathExtension.lowercased() == url.pathExtension.lowercased() {
+        for other in items where other.pathExtension.lowercased() == url.pathExtension.lowercased()
+            && other.resolvingSymlinksInPath() != url.resolvingSymlinksInPath() {   // not itself
             guard (try? other.resourceValues(forKeys: [.fileSizeKey]))?.fileSize == size else { continue }
             if FileManager.default.contentsEqual(atPath: url.path, andPath: other.path) { return other }
         }

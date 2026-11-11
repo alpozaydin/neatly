@@ -134,6 +134,11 @@ All test data is made up — no real personal files.
 
 To add a case: copy one block in `cases.json`, change the text and the wanted names, run `neatly-eval`.
 
+`Tests/e2e/run.sh` tests the whole app end to end: the real watcher, download popup, screenshot pill,
+Tidy window and menu bar, with every button pressed by code. It runs headless (nothing appears on screen)
+in a temp folder with its own fake home and data, so it never touches your files.
+`Tests/e2e/run.sh dl-` runs only the download tests.
+
 `Tests/eval/holdout.json` is a second set that the rules were **never** tuned on
 (`neatly-eval --holdout`). Its score is the honest one. Don't change neatly to fix a held-out case:
 move the pattern into `cases.json` and write a fresh held-out case instead.

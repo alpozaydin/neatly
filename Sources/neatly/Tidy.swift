@@ -145,10 +145,12 @@ final class TidyWindow: NSObject, NSWindowDelegate {
     }
 
     func run() -> Never {
-        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.setActivationPolicy(headless ? .prohibited : .regular)
         window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if !headless {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
         Task { await nameAll() }
         NSApp.run()
         exit(0)
