@@ -12,6 +12,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var date: DatePosition?   // nil = no date
     public var appName: Bool?        // screenshots: add the app they were taken in ("… in Safari")
     public var copyScreenshots: Bool? // screenshots: also put the image on the clipboard
+    public var countdown: Int?        // download popup: seconds before it saves by itself (0 = wait)
 
     public enum Length: String, Codable, Sendable, CaseIterable {
         case short, standard, detailed

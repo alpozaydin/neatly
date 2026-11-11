@@ -19,7 +19,19 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         // Drops on the icon: the window forwards dragging messages to its delegate.
         item.button?.window?.registerForDraggedTypes([.fileURL])
         item.button?.window?.delegate = self
+        // "Open neatly" from Spotlight/Applications while it runs → show the window here.
+        DistributedNotificationCenter.default().addObserver(forName: HomeWindow.showNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { HomeWindow.shared.show() }
+        }
+        // First run after installing: show the window once, so nobody wonders where the app went.
+        let welcomed = Correction.fileURL.deletingLastPathComponent().appending(path: ".welcomed")
+        if !headless, !FileManager.default.fileExists(atPath: welcomed.path) {
+            try? FileManager.default.createDirectory(at: welcomed.deletingLastPathComponent(), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: welcomed.path, contents: nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { HomeWindow.shared.show() }
+        }
         uiTest()
+        if ProcessInfo.processInfo.environment["NEATLY_UI_TEST"]?.contains("home:") == true { HomeWindow.shared.show() }
     }
 
     // MARK: Menu (rebuilt each time it opens, so checkmarks are always current)
@@ -30,6 +42,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         let status = NSMenuItem(title: paused ? "Paused" : "Naming downloads and screenshots", action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
+        menu.addItem(entry("Open neatly…", #selector(openHome)))
         menu.addItem(.separator())
         menu.addItem(entry("Tidy Desktop…", #selector(tidyDesktop)))
         menu.addItem(entry("Tidy a Folder…", #selector(tidyFolder)))
@@ -88,6 +101,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         p.arguments = ["tidy"] + paths
         try? p.run()
     }
+
+    @objc func openHome() { HomeWindow.shared.show() }
 
     @objc func tidyDesktop() { tidy([screenshotFolder().path]) }
 

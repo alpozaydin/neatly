@@ -36,6 +36,9 @@ lowercase-kebab, most distinctive word first, qualifier last, as short as possib
 
 ## What it does
 
+Open **neatly** from Spotlight or Applications: a window with a drop zone (drop files or folders to name them),
+one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No Terminal needed.
+
 - **Downloads** get a small dialog with a suggested name **and folder** (below).
 - **Screenshots** are named the moment you take them, in place. A small pill under the menu bar shows the
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.

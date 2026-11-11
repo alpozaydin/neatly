@@ -11,6 +11,7 @@ B=${NEATLY_BIN:-$ROOT/.build/debug/neatly}
 E=${NEATLY_EVAL:-$ROOT/.build/release/neatly-eval}
 W=$(mktemp -d /tmp/neatly-e2e.XXXXXX)
 export NEATLY_HEADLESS=1   # never show a window or take focus while testing
+export NEATLY_NOTIFY=".test$$"   # our own "show window" signal: never reaches the neatly you actually run
 FILTER=${1:-}
 pass=0; fail=0; failed=()
 
@@ -185,6 +186,21 @@ if want menu; then setup menu
     s=$(cat "$T/data/style.json")
     check "length, date, case, clipboard saved" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"lowercase\" : false" && echo "$s" | grep -q "\"copyScreenshots\" : true"'
 fi
+
+# ─── The neatly window (opened from Spotlight/Applications) ──────────────────
+if want home; then setup home
+    cp "$ROOT/Package.swift" "$T/stage/x"; "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
+    NEATLY_UI_TEST="home:length=detailed,home:date=suffix,home:case=title,home:countdown=10,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png" \
+        "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
+    s=$(cat "$T/data/style.json")
+    check "window controls change the settings" 'echo "$s" | grep -q detailed && echo "$s" | grep -q suffix && echo "$s" | grep -q "\"countdown\" : 10" && echo "$s" | grep -q "\"lowercase\" : false"'
+    check "dropping files on the window opens Tidy for them" 'grep -q "dropped 1 item" "$T/log"'
+    pkill -f "neatly tidy $T" 2>/dev/null
+    n=$(grep -c "home: shown" "$T/log")
+    osascript -l JavaScript -e 'ObjC.import("Foundation"); $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObjectUserInfoDeliverImmediately("dev.neatly.show'"$NEATLY_NOTIFY"'", $(), $(), true)' >/dev/null
+    sleep 2
+    check "opening the app while it runs shows the window (no second copy)" '[ "$(grep -c "home: shown" "$T/log")" -gt "$n" ]'
+    stop; fi
 
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
 if want app; then setup app; mkdir -p "$T/apps"
