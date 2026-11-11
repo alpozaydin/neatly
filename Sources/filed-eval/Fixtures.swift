@@ -76,7 +76,7 @@ enum Fixtures {
 
     /// Build a zip from {path inside zip: content} using the system zip tool.
     static func zip(_ url: URL, _ files: [String: String]) throws {
-        let tmp = FileManager.default.temporaryDirectory.appending(path: "namer-zip-\(UUID().uuidString)")
+        let tmp = FileManager.default.temporaryDirectory.appending(path: "filed-zip-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
         for (path, content) in files {
             let f = tmp.appending(path: path)

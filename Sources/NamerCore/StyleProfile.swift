@@ -126,7 +126,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
 
     public static var fileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Application Support/namer/style.json")
+            .appending(path: "Library/Application Support/filed/style.json")
     }
 
     public static func load() -> StyleProfile? {

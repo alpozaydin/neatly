@@ -10,14 +10,16 @@ public enum Decision: Sendable, Equatable {
 
     /// Set on a file when the user renames it themselves or dismisses a suggestion.
     /// From then on the file is theirs: no automatic suggestion ever again.
-    static let keepAttr = "dev.namer.keep"
+    static let keepAttr = "dev.filed.keep"
 
     public static func markKeep(_ url: URL) {
         let v: [UInt8] = [49]   // "1"
         _ = setxattr(url.path, keepAttr, v, v.count, 0, 0)
     }
 
-    static func hasKeepMark(_ url: URL) -> Bool { getxattr(url.path, keepAttr, nil, 0, 0, 0) > 0 }
+    static func hasKeepMark(_ url: URL) -> Bool {
+        getxattr(url.path, keepAttr, nil, 0, 0, 0) > 0 || getxattr(url.path, "dev.namer.keep", nil, 0, 0, 0) > 0   // old name
+    }
 
     /// `explicit` = the user asked for this file (hotkey / CLI --force): only their own keep mark stops us.
     public static func make(for url: URL, explicit: Bool = false) -> Decision {

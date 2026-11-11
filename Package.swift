@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "namer",
+    name: "filed",
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "NamerCore", targets: ["NamerCore"]),
-        .executable(name: "namer", targets: ["namer"]),
+        .executable(name: "filed", targets: ["filed"]),
     ],
     targets: [
         .target(name: "NamerCore"),
-        .executableTarget(name: "namer", dependencies: ["NamerCore"]),
-        .executableTarget(name: "namer-eval", dependencies: ["NamerCore"]),
+        .executableTarget(name: "filed", dependencies: ["NamerCore"]),
+        .executableTarget(name: "filed-eval", dependencies: ["NamerCore"]),
         // Plain executable instead of a test target: swift-testing/XCTest need full Xcode.
         .executableTarget(name: "checks", dependencies: ["NamerCore"], path: "Tests/NamerCoreTests"),
     ]
