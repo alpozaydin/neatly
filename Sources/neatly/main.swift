@@ -163,6 +163,12 @@ if args.isEmpty && AppBundle.isRunningInside {
     } else {
         try? installService()
     }
+    // Ask the running copy to show its window (it may need a moment to start).
+    for _ in 0..<2 {
+        DistributedNotificationCenter.default().postNotificationName(HomeWindow.showNotification, object: nil,
+                                                                     userInfo: nil, deliverImmediately: true)
+        usleep(1_500_000)
+    }
     exit(0)
 }
 
@@ -259,7 +265,7 @@ var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
 namer.useNetwork = !flag("--offline")
 namer.useModel = !flag("--no-model")
-var timeout = 5
+var timeout = namer.profile.countdown ?? 5   // set in the neatly window, or --timeout N
 if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(args[i + 1]) {
     timeout = max(0, n); args.removeSubrange(i...(i + 1))
 }
