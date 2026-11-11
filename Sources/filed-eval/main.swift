@@ -46,6 +46,7 @@ var exact = 0, head = 0, none = 0, run = 0
 var times: [Double] = []
 for c in cases.naming {
     if offline && c.network == true { continue }
+    if let i = args.firstIndex(of: "--only"), i + 1 < args.count, c.id != args[i + 1] { continue }   // debug one case
     run += 1
     let sub = dir.appending(path: c.id)   // own folder per case: some cases share a filename
     try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)

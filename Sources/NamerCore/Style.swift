@@ -31,7 +31,7 @@ public enum Style {
             .filter { !$0.isEmpty }
     }
 
-    public static func join(_ parts: [String]) -> String {
+    public static func join(_ parts: [String], maxWords: Int = maxWords, maxLength: Int = maxLength) -> String {
         var out: [String] = []
         for p in parts where !p.isEmpty && !out.contains(p) {
             if out.count == maxWords { break }

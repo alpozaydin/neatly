@@ -36,7 +36,8 @@ public struct Namer: Sendable {
 
     /// `explicit`: the user pointed at this file (Finder hotkey, CLI --force), so skip the
     /// "name already meaningful" check — but never override a name they chose themselves.
-    public func suggest(for url: URL, explicit: Bool = false) async -> Outcome {
+    /// `app`: the app a screenshot was taken in, if known (added only when the style asks for it).
+    public func suggest(for url: URL, explicit: Bool = false, app: String? = nil) async -> Outcome {
         let clock = ContinuousClock()
         let start = clock.now
         var e = Evidence(url: url)
@@ -54,7 +55,7 @@ public struct Namer: Sendable {
             }
             let c = (clock.now - start).components
             let ms = Double(c.seconds) * 1000 + Double(c.attoseconds) / 1e15
-            return .suggested(Suggestion(name: profile.render(stem), via: via, millis: ms, evidence: e))
+            return .suggested(Suggestion(name: profile.render(stem, date: e.date, app: app), via: via, millis: ms, evidence: e))
         }
         var trail: String { e.steps.joined(separator: "+") }
 
@@ -106,7 +107,9 @@ public struct Namer: Sendable {
             }
         } else if isImage {
             // 5. Cheap image signals first: text in the image, and Apple's label classifier.
-            if let text = Extract.ocr(image: url) { e.bodySnippet = text; e.steps.append("ocr") }
+            let (text, headline) = Extract.ocrWithHeadline(image: url)
+            if let text { e.bodySnippet = text; e.steps.append("ocr") }
+            e.headline = headline
             e.labels = Extract.labels(image: url)
             if !e.labels.isEmpty { e.steps.append("labels") }
         }
@@ -129,11 +132,19 @@ public struct Namer: Sendable {
             if look { e.steps.append("vision") }
             let examples = learnFromCorrections ? Examples.similar(to: snapshot, history: history ?? Correction.all()) : []
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
-            if let w = await withTimeout(remaining, { await Model.name(for: snapshot, lookAtImage: look, examples: examples) }) ?? nil {
-                if let course = courseCode(e) {
-                    return done(Style.join([course] + w.filter { $0 != course }), "model[\(trail)]")
+            if let w = await withTimeout(remaining, { [words = profile.len.modelWords] in await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words) }) ?? nil {
+                let (mw, ml) = (profile.len.maxWords, profile.len.maxLength)
+                // The model picked part of the page's own title ("cornbread" from "Hot Honey Cornbread"):
+                // the whole title is more specific, if it fits.
+                var w = w
+                if let h = e.headline {
+                    let hw = Style.words(h)
+                    if !hw.isEmpty, hw.count <= min(mw, 5), w.count == 1, Set(w).isSubset(of: Set(hw)), hw.count > 1 { w = hw }
                 }
-                return done(Style.join(w + [qualifierFor(e)].compactMap { $0 }), "model[\(trail)]")
+                if let course = courseCode(e) {
+                    return done(Style.join([course] + w.filter { $0 != course }, maxWords: mw, maxLength: ml), "model[\(trail)]")
+                }
+                return done(Style.join(w + [qualifierFor(e)].compactMap { $0 }, maxWords: mw, maxLength: ml), "model[\(trail)]")
             }
         }
 
@@ -199,6 +210,16 @@ public struct Namer: Sendable {
         // Archives from Kaggle, GitHub etc.: the link names the dataset or repo.
         if kind == nil, e.ext == "zip", let hint = e.linkHint { return Style.join(Style.words(hint)) }
 
+        // A photo or screenshot of a till receipt never says "receipt": it says TOTAL under a list of prices.
+        if kind == nil, let body = e.bodySnippet {
+            let lines = body.split(whereSeparator: \.isNewline).map { Style.tokens(String($0)).joined(separator: " ") }
+            let priced = body.split(whereSeparator: \.isNewline).filter { $0.range(of: #"\d+[.,]\d{2}\s*$"#, options: .regularExpression) != nil }
+            if priced.count >= 2, lines.contains(where: { $0.hasPrefix("total") || $0.hasPrefix("toplam") || $0.hasPrefix("summe") || $0.hasPrefix("grand total") }) {
+                let shop = (e.headline ?? body.split(whereSeparator: \.isNewline).first.map(String.init)).map { Array(Style.words($0).prefix(3)) } ?? []
+                return Style.join(["receipt"] + shop.filter { !$0.allSatisfy(\.isNumber) })
+            }
+        }
+
         guard let kind else { return nil }
         if kind.word == "cv" { return cvName(e) }
         // A webmail host says nothing about who wrote the document: prefer the text then.
@@ -249,12 +270,19 @@ public struct Namer: Sendable {
     }
 }
 
+/// Run `op`, but give up after `d`. Returns as soon as either finishes — unlike a task group, which would
+/// wait for the model call to end even after cancelling it (model calls don't stop when cancelled).
 func withTimeout<T: Sendable>(_ d: Duration, _ op: @escaping @Sendable () async -> T) async -> T? {
-    await withTaskGroup(of: T?.self) { g in
-        g.addTask { await op() }
-        g.addTask { try? await Task.sleep(for: d); return nil }
-        let first = await g.next() ?? nil
-        g.cancelAll()
-        return first
+    let once = Once()
+    return await withCheckedContinuation { (c: CheckedContinuation<T?, Never>) in
+        let work = Task { let v = await op(); if once.claim() { c.resume(returning: v) } }
+        Task { try? await Task.sleep(for: d); if once.claim() { work.cancel(); c.resume(returning: nil) } }
     }
+}
+
+/// First caller wins: whichever of "result" and "deadline" comes first resumes the continuation.
+final class Once: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }

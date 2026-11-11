@@ -25,7 +25,14 @@ enum Model {
         }
     }
 
-    static let instructions = """
+    static func instructions(words: ClosedRange<Int>) -> String {
+        let base = baseInstructions.replacingOccurrences(of: "Answer with 1 to 3 lowercase words", with: "Answer with \(words.lowerBound) to \(words.upperBound) lowercase words")
+        return words.upperBound > 3
+            ? base + "\nUse the extra words for specifics that tell this file apart: names, places, numbers, versions."
+            : base
+    }
+
+    static let baseInstructions = """
     You name files. Produce the shortest name that lets the owner recognise the file later.
     Rules:
     - Say WHAT the document is, and WHO it is from if that is a company or institution.
@@ -33,6 +40,7 @@ enum Model {
     - Name the TOPIC, never the form. Never answer "handwriting", "notes", "text", "screenshot" alone.
     - Drop generic words: document, file, image, photo, picture, student, official, final, copy.
     - Never include personal names of the owner, ids, order numbers, dates, or file types.
+    - Keep names of places, products, apps and companies: they are usually the most distinctive words.
     Examples:
     - title "Student Transcript" -> transcript
     - "UniDepth: Universal Monocular Metric Depth Estimation" -> unidepth
@@ -54,10 +62,11 @@ enum Model {
     /// Load the model into memory now, so the first real request doesn't pay for it.
     static func prewarm() {
         guard isAvailable else { return }
-        LanguageModelSession(instructions: instructions).prewarm()
+        LanguageModelSession(instructions: instructions(words: 1...3)).prewarm()
     }
 
-    static func name(for e: Evidence, lookAtImage: Bool = false, examples: [Examples.Example] = []) async -> [String]? {
+    static func name(for e: Evidence, lookAtImage: Bool = false, examples: [Examples.Example] = [],
+                     words: ClosedRange<Int> = 1...3) async -> [String]? {
         guard isAvailable else { return nil }
         var shots = ""
         if !examples.isEmpty {
@@ -98,7 +107,7 @@ enum Model {
             if let summary { prompt = shots + "Summary: \(summary)\n" + (e.sourceDescription.map { "Downloaded from: \($0)\n" } ?? "") + "Name:" }
         }
 
-        let session = LanguageModelSession(instructions: instructions)
+        let session = LanguageModelSession(instructions: instructions(words: words))
         let options = GenerationOptions(temperature: 0)
         let text: String
         if lookAtImage, #available(macOS 27.0, *), let img = thumbnail(e.url) {
@@ -122,9 +131,15 @@ enum Model {
         if let lang, summary == nil, copiedForeignWords(line, from: e) {
             line2 = await translate(line, from: lang) ?? line
         }
+        // Small models misspell names they copy ("Aselsan" → "aseslan"): use the document's own spelling.
+        let source = Set(Style.words([e.metadataTitle, e.headline, e.bodySnippet, e.linkHint].compactMap { $0 }.joined(separator: " ")))
+        line2 = Style.words(line2).map { w in
+            guard w.count >= 5, !source.contains(w) else { return w }
+            return source.first { $0.first == w.first && abs($0.count - w.count) <= 2 && editDistance($0, w) <= 2 } ?? w
+        }.joined(separator: " ")
         let stemWords = Set(Style.words(e.stem))
         let w = Style.words(line2).filter { $0.count >= 2 && !banned.contains($0) && !stemWords.contains($0) && $0 != e.ext }
-        return w.isEmpty ? nil : Array(w.prefix(3))
+        return w.isEmpty ? nil : Array(w.prefix(words.upperBound))
     }
 
     /// Downsampled copy: the model doesn't need 12 megapixels to tell a receipt from a cat.
@@ -208,4 +223,19 @@ enum Model {
         let answer = out.content.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "-`\"'")))
         return options.first { $0.caseInsensitiveCompare(answer) == .orderedSame }   // must be a real folder
     }
+}
+
+/// Levenshtein distance, for short words.
+func editDistance(_ a: String, _ b: String) -> Int {
+    let a = Array(a), b = Array(b)
+    var row = Array(0...b.count)
+    for i in 1...max(a.count, 1) where !a.isEmpty {
+        var prev = row[0]; row[0] = i
+        for j in 1...max(b.count, 1) where !b.isEmpty {
+            let cur = row[j]
+            row[j] = min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] == b[j - 1] ? 0 : 1))
+            prev = cur
+        }
+    }
+    return a.isEmpty ? b.count : row[b.count]
 }

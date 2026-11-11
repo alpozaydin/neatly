@@ -32,12 +32,21 @@ No confident name → no suggestion. A guess is worse than a junk name.
 lowercase-kebab, most distinctive word first, qualifier last, as short as possible:
 `transcript-fall26`, `unidepth-2024`, `invoice-turkcell-nov26`.
 
+## What it does
+
+- **Downloads** get a small dialog with a suggested name **and folder** (below).
+- **Screenshots** are named the moment you take them, in place, with a small Undo pill under the menu bar.
+  It never takes focus, so you can keep typing.
+- **Tidy Up** names a whole folder at once in a review window: `filed tidy` (Desktop) or `filed tidy ~/Downloads`.
+  Edit any name, untick what to keep, then Rename. **Undo All** puts every name back (`filed undo --last` later).
+- Works on PDFs, Word, PowerPoint, notebooks, zips, images and screenshots, not just images.
+
 ## Live mode
 
 ```sh
-filed --watch ~/Downloads --ask   # a small dialog for each new download
-filed service install             # same, in the background, starting at login
+filed service install             # watch Downloads + screenshots in the background, starting at login
 filed service uninstall           # stop it
+filed --watch ~/Downloads --ask --screenshots   # the same, in this terminal
 ```
 
 Every new download gets a dialog with a suggested folder and name:
@@ -70,8 +79,17 @@ filed can copy how you already name files. It reads only file **names**, never c
 
 ```sh
 filed learn ~/courses-fall26     # learns e.g. "lowercase, '-'"  → transcript-fall26
-filed style                       # show what it learned
+filed style                       # show the current style
 filed style --reset               # forget it
+```
+
+Or set it yourself:
+
+```sh
+filed style --length detailed     # short (default) · standard · detailed
+filed style --case title --sep space   # Hot Honey Cornbread  (lower|title, dash|underscore|space)
+filed style --date prefix         # 2026-11-11-hot-honey-cornbread  (none|prefix|suffix)
+filed style --app on              # screenshots end with the app: …-in-safari
 ```
 
 It learns per folder and skips code repos. If your folders disagree, it saves nothing and tells you.
