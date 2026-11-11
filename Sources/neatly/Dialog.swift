@@ -143,17 +143,24 @@ func shortFolder(_ url: URL?) -> String {
     CountdownDialog(file: a[1], name: a[2], folder: folder, seconds: seconds).run()
 }
 
-/// The screenshot pill: a small panel under the menu bar — thumbnail, new name, Undo. It never takes focus,
-/// so you keep typing while it shows. Disappears after a few seconds (hovering keeps it open).
-/// Prints "undo" or "ok".
+/// The screenshot pill: a small panel under the menu bar — thumbnail, the new name, ↻ and Undo.
+/// It never steals focus: you keep typing while it shows. Click the name to change it (Return saves),
+/// ↻ asks for a different name, Undo puts the original back. Hovering keeps it open.
+/// Prints "ok", "undo", "redo" or "rename\t<name>".
 @MainActor
-final class Toast: NSObject {
-    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 60),
-                        styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
+final class Toast: NSObject, NSTextFieldDelegate {
+    /// Borderless panels can't take keyboard input by default; this one can, so the name is editable.
+    final class KeyPanel: NSPanel { override var canBecomeKey: Bool { true } }
+
+    let panel = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 60),
+                         styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
+    let field = NSTextField()
+    let original: String
     var remaining: Int
     var timer: Timer?
 
     init(name: String, file: URL, seconds: Int) {
+        original = name
         remaining = seconds
         super.init()
         let fx = NSVisualEffectView()
@@ -168,16 +175,27 @@ final class Toast: NSObject {
         thumb.imageScaling = .scaleProportionallyUpOrDown
         thumb.widthAnchor.constraint(equalToConstant: 52).isActive = true
         thumb.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        let label = NSTextField(labelWithString: "✦ " + name)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.lineBreakMode = .byTruncatingMiddle
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let spark = NSTextField(labelWithString: "✦")
+        field.stringValue = name
+        field.font = .systemFont(ofSize: 13, weight: .semibold)
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.lineBreakMode = .byTruncatingMiddle
+        field.delegate = self
+        field.target = self
+        field.action = #selector(commit)
+        field.toolTip = "Click to change the name, Return to save"
+        field.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
+        let redo = NSButton(title: "↻", target: self, action: #selector(another))
+        redo.bezelStyle = .rounded
+        redo.toolTip = "Another name"
         let undo = NSButton(title: "Undo", target: self, action: #selector(undoRename))
         undo.bezelStyle = .rounded
         undo.bezelColor = .controlAccentColor
 
-        let row = NSStackView(views: [thumb, label, undo])
-        row.spacing = 10
+        let row = NSStackView(views: [thumb, spark, field, redo, undo])
+        row.spacing = 8
         row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
         row.translatesAutoresizingMaskIntoConstraints = false
         fx.addSubview(row)
@@ -193,7 +211,7 @@ final class Toast: NSObject {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
-        let size = NSSize(width: min(460, max(300, row.fittingSize.width)), height: 56)
+        let size = NSSize(width: min(480, max(340, row.fittingSize.width)), height: 56)
         panel.setContentSize(size)
         if let screen = NSScreen.main?.visibleFrame {   // top-right, just under the menu bar
             panel.setFrameOrigin(NSPoint(x: screen.maxX - size.width - 16, y: screen.maxY - size.height - 10))
@@ -205,23 +223,45 @@ final class Toast: NSObject {
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(.accessory)
         panel.orderFrontRegardless()
+        panel.makeFirstResponder(nil)   // nothing selected, no keyboard focus until you click the name
         startTimer()
+        uiTest()
         NSApp.run()
         exit(0)
     }
 
     func startTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            MainActor.assumeIsolated { self.remaining -= 1; if self.remaining <= 0 { self.finish("ok") } }
+            MainActor.assumeIsolated { self.remaining -= 1; if self.remaining <= 0 { self.commit() } }
         }
     }
 
+    var editing = false
     @objc func mouseEntered(_ event: NSEvent) { timer?.invalidate(); timer = nil }
-    @objc func mouseExited(_ event: NSEvent) { remaining = max(remaining, 2); startTimer() }
+    @objc func mouseExited(_ event: NSEvent) { if !editing { remaining = max(remaining, 2); startTimer() } }
+    func controlTextDidBeginEditing(_ obj: Notification) { editing = true; timer?.invalidate(); timer = nil }
+
+    /// Return in the field, or time is up: keep the name as it is now.
+    @objc func commit() {
+        let typed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        finish(typed.isEmpty || typed == original ? "ok" : "rename\t" + typed)
+    }
+    @objc func another() { finish("redo") }
     @objc func undoRename() { finish("undo") }
 
     func finish(_ line: String) -> Never {
         print(line); fflush(stdout); exit(0)
+    }
+
+    /// NEATLY_UI_TEST="edit:new name" | "redo" | "undo": press the buttons by code, to test the whole path.
+    func uiTest() {
+        guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"] else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if t.hasPrefix("edit:") { self.field.stringValue = String(t.dropFirst(5)); self.commit() }
+            if t == "redo" { self.another() }
+            if t == "undo" { self.undoRename() }
+        }
     }
 }
 

@@ -89,6 +89,7 @@ if args.first == "style" {
         p.separator = sep
     }
     if let v = value("--app") { p.appName = v == "on" }
+    if let v = value("--copy") { p.copyScreenshots = v == "on" }
     if changed { try p.save() }
     let sep = ["-": "dash", "_": "underscore", " ": "space"][p.separator] ?? p.separator
     print("""
@@ -97,6 +98,7 @@ if args.first == "style" {
     sep     \(sep)           (--sep dash|underscore|space)
     date    \(p.date?.rawValue ?? "none")           (--date none|prefix|suffix)
     app     \(p.appName == true ? "on" : "off")            (--app on|off: screenshots end with the app they were taken in)
+    copy    \(p.copyScreenshots == true ? "on" : "off")            (--copy on|off: new screenshots also go to the clipboard)
     """ + (p.suffix.map { "\nsuffix  \($0)" } ?? ""))
     print("\nexample: \(p.render(p.len == .short ? "hot-honey-cornbread" : p.len == .standard ? "hot-honey-cornbread-recipe" : "hot-honey-cornbread-recipe-10-inch-skillet", date: Date(), app: "Safari"))")
     exit(0)
@@ -289,6 +291,7 @@ func helper(_ a: [String]) async -> String {
 
 /// Where macOS saves screenshots (System Settings or Cmd-Shift-5 → Options), Desktop by default.
 func screenshotFolder() -> URL {
+    if let d = ProcessInfo.processInfo.environment["NEATLY_SCREENSHOT_DIR"] { return URL(fileURLWithPath: d) }   // tests
     let home = FileManager.default.homeDirectoryForCurrentUser
     if let loc = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"), !loc.isEmpty {
         let u = URL(fileURLWithPath: (loc as NSString).expandingTildeInPath)
@@ -333,15 +336,45 @@ func isScreenshot(_ name: String) -> Bool {
                   let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
             seen.insert(renamed.lastPathComponent)
             print("\(name)  →  \(renamed.lastPathComponent)   [screenshot, \(s.via)]")
-            let reply = await helper(["toast", String(max(timeout, 4)), s.name, renamed.path])
-            let ev = s.evidence
-            if reply == "undo", let back = try? Rename.undo(renamed) {
-                Decision.markKeep(back); seen.insert(back.lastPathComponent)
-                print("   undone")
+            if namer.profile.copyScreenshots == true, let img = NSImage(contentsOf: renamed) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.writeObjects([img])
             }
-            Correction(original: name, suggested: s.name, chosen: reply == "undo" ? "" : s.name, via: s.via,
-                       source: nil, title: ev.headline, auto: reply == "undo" ? nil : true,
-                       context: String(gist(ev).prefix(300))).save()
+            // The pill: keep, change the name, ask for another one (up to 3 times), or undo.
+            var file = renamed, shown = s.name, rejected: [String] = []
+            var chosen: String? = s.name, byYou = false
+            pill: while true {
+                let reply = await helper(["toast", String(max(timeout, 4)), shown, file.path])
+                switch reply {
+                case "undo":
+                    if let back = try? Rename.undo(file) { Decision.markKeep(back); seen.insert(back.lastPathComponent) }
+                    chosen = nil; byYou = true
+                    print("   undone")
+                    break pill
+                case "redo" where rejected.count < 3:
+                    rejected.append(shown)
+                    var alt = namer; alt.avoid = rejected
+                    guard case .suggested(let s2) = await alt.suggest(for: file, explicit: true, app: p.app),
+                          let moved = try? Rename.apply(file, to: s2.name) else { print("   no other name found"); byYou = true; break pill }
+                    seen.insert(moved.lastPathComponent)
+                    file = moved; shown = s2.name; chosen = s2.name
+                    print("   another name: \(moved.lastPathComponent)")
+                case let r where r.hasPrefix("rename\t"):
+                    let typed = String(r.dropFirst(7))
+                    if let moved = try? Rename.apply(file, to: typed) { seen.insert(moved.lastPathComponent); file = moved }
+                    Decision.markKeep(file)
+                    chosen = typed; byYou = true
+                    print("   you named it: \(file.lastPathComponent)")
+                    break pill
+                default:
+                    if !rejected.isEmpty { byYou = true }   // you asked for another name and kept it
+                    break pill
+                }
+            }
+            let ev = s.evidence
+            // Your edits (and undos) teach future names; a pill that just timed out doesn't.
+            Correction(original: name, suggested: s.name, chosen: chosen ?? "", via: s.via, source: nil, title: ev.headline,
+                       auto: byYou ? nil : true, context: String(gist(ev).prefix(300))).save()
         }
         seen.formIntersection(now.keys)
     }

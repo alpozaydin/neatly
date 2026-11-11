@@ -66,7 +66,7 @@ enum Model {
     }
 
     static func name(for e: Evidence, lookAtImage: Bool = false, examples: [Examples.Example] = [],
-                     words: ClosedRange<Int> = 1...3) async -> [String]? {
+                     words: ClosedRange<Int> = 1...3, avoid: [String] = []) async -> [String]? {
         guard isAvailable else { return nil }
         var shots = ""
         if !examples.isEmpty {
@@ -92,6 +92,9 @@ enum Model {
                 ? "The image is attached. Name it by what its text is about.\n"
                 : "The image is attached. Name it by what it shows.\n"
         }
+        if !avoid.isEmpty {
+            prompt += "The owner rejected these names: \(avoid.joined(separator: ", ")). Give a different name that is still specific to this file.\n"
+        }
         prompt += "Name:"
         let summaryInput = prompt
         prompt = shots + prompt
@@ -108,7 +111,7 @@ enum Model {
         }
 
         let session = LanguageModelSession(instructions: instructions(words: words))
-        let options = GenerationOptions(temperature: 0)
+        let options = GenerationOptions(temperature: avoid.isEmpty ? 0 : 0.7)   // a retry needs some variety
         let text: String
         if lookAtImage, #available(macOS 27.0, *), let img = thumbnail(e.url) {
             let p = prompt
