@@ -28,14 +28,21 @@ final class TidyWindow: NSObject, NSWindowDelegate {
     let doneButton = NSButton(title: "Done", target: nil, action: nil)
     let closeButton = NSButton(title: "Close", target: nil, action: nil)
 
-    init(folder: URL, namer: Namer) {
-        self.folder = folder
+    /// `paths`: one folder (tidy what's inside) or several files (dropped on the menu-bar icon).
+    init(paths: [URL], namer: Namer) {
+        var isDir: ObjCBool = false
+        let oneFolder = paths.count == 1 && FileManager.default.fileExists(atPath: paths[0].path, isDirectory: &isDir) && isDir.boolValue
+        self.folder = oneFolder ? paths[0] : paths[0].deletingLastPathComponent()
         self.namer = namer
         super.init()
-        let files = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
-                                                                    options: [.skipsHiddenFiles])) ?? [])
+        let candidates = oneFolder
+            ? ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
+                                                             options: [.skipsHiddenFiles])) ?? [])
+            : paths
+        let files = candidates
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
-            .filter { Decision.make(for: $0).shouldRename }          // only meaningless names; yours are left alone
+            // A folder: only meaningless names (yours are left alone). Files you dropped: you asked for them.
+            .filter { Decision.make(for: $0, explicit: !oneFolder).shouldRename }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
         items = files.map { Item(url: $0) }
         build()
