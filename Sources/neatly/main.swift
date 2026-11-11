@@ -30,9 +30,9 @@ usage: neatly [options] <file or folder>...
 
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
-var args = Array(CommandLine.arguments.dropFirst())
+var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
 let version = "0.2.1"
-if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
+if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
 if args.first == "dialog" { runDialog(Array(args.dropFirst())) }   // the popup, started by the watcher
@@ -105,57 +105,90 @@ if args.first == "style" {
     exit(0)
 }
 
-if args.first == "service" {
-    let label = "dev.neatly.watch"
-    let plist = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/\(label).plist")
+let serviceLabel = "dev.neatly.watch"
+var servicePlist: URL { FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/\(serviceLabel).plist") }
+
+func launchctl(_ a: [String]) {
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl"); p.arguments = a
+    p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+    try? p.run(); p.waitUntilExit()
+}
+
+/// Build neatly.app from this binary, link the `neatly` command to it, and run it at login.
+/// The service runs the app's own binary: macOS shows "neatly" (with its icon) when it asks for folder
+/// access, and asks again only when the app is updated.
+@MainActor func installService() throws {
+    let home = FileManager.default.homeDirectoryForCurrentUser
     let uid = getuid()
-    func launchctl(_ a: [String]) {
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl"); p.arguments = a
-        p.standardError = FileHandle.nullDevice; try? p.run(); p.waitUntilExit()
+    let me = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let exe = try AppBundle.build(from: me, version: version)
+    // The command line: ~/.local/bin/neatly → the app's binary (replaces an older copied binary).
+    let link = home.appending(path: ".local/bin/neatly")
+    try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? FileManager.default.removeItem(at: link)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: exe)
+
+    let log = home.appending(path: "Library/Logs/neatly.log").path
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0"><dict>
+      <key>Label</key><string>\(serviceLabel)</string>
+      <key>ProgramArguments</key><array><string>\(exe.path)</string><string>--watch</string>
+        <string>\(home.path)/Downloads</string><string>--ask</string><string>--screenshots</string><string>--menubar</string></array>
+      <key>RunAtLoad</key><true/>
+      <key>KeepAlive</key><true/>
+      <key>StandardOutPath</key><string>\(log)</string>
+      <key>StandardErrorPath</key><string>/dev/null</string>
+    </dict></plist>
+    """
+    try FileManager.default.createDirectory(at: servicePlist.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try xml.write(to: servicePlist, atomically: true, encoding: .utf8)
+    for oldName in ["namer", "filed"] {   // earlier names of this project: stop and remove their service and binary
+        launchctl(["bootout", "gui/\(uid)/dev.\(oldName).watch"])
+        try? FileManager.default.removeItem(at: servicePlist.deletingLastPathComponent().appending(path: "dev.\(oldName).watch.plist"))
+        try? FileManager.default.removeItem(at: home.appending(path: ".local/bin/\(oldName)"))
     }
+    migrateFromOldName()   // again: the old service may have written while it was still running
+    launchctl(["bootout", "gui/\(uid)/\(serviceLabel)"])
+    launchctl(["bootstrap", "gui/\(uid)", servicePlist.path])
+}
+
+// Opened from Finder, Spotlight or Launchpad (no arguments): make sure it's running, then get out of the way.
+// The service is the one copy that shows the menu-bar icon; opening the app never starts a second one.
+if args.isEmpty && AppBundle.isRunningInside {
+    if FileManager.default.fileExists(atPath: servicePlist.path) {
+        launchctl(["bootstrap", "gui/\(getuid())", servicePlist.path])          // no-op if already loaded
+        launchctl(["kickstart", "gui/\(getuid())/\(serviceLabel)"])           // starts it only if not running
+    } else {
+        try? installService()
+    }
+    exit(0)
+}
+
+// Tests: build the app into NEATLY_APP_DIR without touching the login item.
+if args.first == "app-bundle" {
+    let me = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    print(try AppBundle.build(from: me, version: version).path)
+    exit(0)
+}
+
+if args.first == "service" {
     switch args.dropFirst().first {
     case "install":
-        // Run a stable copy, not the build output: macOS asks for folder access again whenever the
-        // program file changes, so developer rebuilds must not touch the one the service runs.
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let installed = home.appending(path: ".local/bin/neatly")
-        let built = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
-        if built.path != installed.path {
-            try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? FileManager.default.removeItem(at: installed)
-            try FileManager.default.copyItem(at: built, to: installed)
-        }
-        let exe = installed.path
-        let log = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/neatly.log").path
-        let xml = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0"><dict>
-          <key>Label</key><string>\(label)</string>
-          <key>ProgramArguments</key><array><string>\(exe)</string><string>--watch</string>
-            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string><string>--screenshots</string><string>--menubar</string></array>
-          <key>RunAtLoad</key><true/>
-          <key>KeepAlive</key><true/>
-          <key>StandardOutPath</key><string>\(log)</string>
-          <key>StandardErrorPath</key><string>/dev/null</string>
-        </dict></plist>
-        """
-        try xml.write(to: plist, atomically: true, encoding: .utf8)
-                for oldName in ["namer", "filed"] {   // earlier names of this project: stop and remove their service and binary
-            launchctl(["bootout", "gui/\(uid)/dev.\(oldName).watch"])
-            try? FileManager.default.removeItem(at: plist.deletingLastPathComponent().appending(path: "dev.\(oldName).watch.plist"))
-            try? FileManager.default.removeItem(at: home.appending(path: ".local/bin/\(oldName)"))
-        }
-        migrateFromOldName()   // again: the old service may have written while it was still running
-        launchctl(["bootout", "gui/\(uid)/\(label)"])
-        launchctl(["bootstrap", "gui/\(uid)", plist.path])
-        print("neatly now watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/neatly.log")
-        print("Installed at ~/.local/bin/neatly. After updating neatly, run 'neatly service install' again.")
+        try installService()
+        print("neatly is in \(AppBundle.location.path) and in your menu bar.")
+        print("It watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/neatly.log")
         print("Stop it any time: neatly service uninstall")
     case "uninstall":
-        launchctl(["bootout", "gui/\(uid)/\(label)"])
-        try? FileManager.default.removeItem(at: plist)
-        print("stopped and removed")
+        launchctl(["bootout", "gui/\(getuid())/\(serviceLabel)"])
+        try? FileManager.default.removeItem(at: servicePlist)
+        let link = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/bin/neatly")
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))?.contains("neatly.app") == true {
+            try? FileManager.default.removeItem(at: link)
+        }
+        AppBundle.remove()
+        print("stopped and removed (the app, the login item and the neatly command)")
     default: print("usage: neatly service install|uninstall")
     }
     exit(0)

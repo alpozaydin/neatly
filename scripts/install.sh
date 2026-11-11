@@ -1,7 +1,7 @@
 #!/bin/sh
 # One-line install:  curl -fsSL https://raw.githubusercontent.com/alpozaydin/neatly/main/scripts/install.sh | sh
-# Downloads the latest release, puts `neatly` in ~/.local/bin, and starts watching ~/Downloads.
-# Nothing else is changed. Remove everything with:  neatly service uninstall && rm ~/.local/bin/neatly
+# Downloads the latest release, installs neatly.app, links the `neatly` command in ~/.local/bin, and starts it.
+# Nothing else is changed. Remove everything with:  neatly service uninstall
 set -eu
 
 REPO="alpozaydin/neatly"
@@ -18,11 +18,10 @@ trap 'rm -rf "$tmp"' EXIT
 URL="${NEATLY_URL:-https://github.com/$REPO/releases/latest/download/neatly-macos-arm64.tar.gz}"   # NEATLY_URL: for testing
 curl -fsSL "$URL" -o "$tmp/neatly.tar.gz"
 tar -xzf "$tmp/neatly.tar.gz" -C "$tmp"
-mkdir -p "$BIN"
-mv "$tmp/neatly" "$BIN/neatly"
-chmod +x "$BIN/neatly"
+chmod +x "$tmp/neatly"
 
-"$BIN/neatly" service install
+# Builds neatly.app (in /Applications, or ~/Applications), links the neatly command to it, starts it at login.
+"$tmp/neatly" service install
 
 case ":$PATH:" in
   *":$BIN:"*) ;;
@@ -31,4 +30,4 @@ case ":$PATH:" in
      echo "  export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
 esac
 echo
-echo "Done. Download any file and a small window will suggest a name and a folder."
+echo "Done. neatly is in your menu bar and in Applications (open it from Spotlight any time)."
