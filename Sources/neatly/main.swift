@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst())
-let version = "0.2.0"
+let version = "0.2.1"
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
