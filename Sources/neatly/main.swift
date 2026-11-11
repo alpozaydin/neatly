@@ -258,9 +258,10 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     let expanded = (typed as NSString).expandingTildeInPath
     let name = (expanded as NSString).lastPathComponent
     var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : shown
-    let home = FileManager.default.homeDirectoryForCurrentUser
-    if let f = chosenFolder, !f.path.hasPrefix(home.path) { chosenFolder = nil }          // only inside your home
-    if let f = chosenFolder, f.standardizedFileURL == home.appending(path: "Downloads").standardizedFileURL {
+    // Compare real paths: /tmp and /private/tmp (or a symlinked home) are the same place.
+    let home = Destination.homeRoot.resolvingSymlinksInPath()
+    if let f = chosenFolder?.resolvingSymlinksInPath(), !(f.path + "/").hasPrefix(home.path + "/") { chosenFolder = nil }          // only inside your home
+    if let f = chosenFolder?.resolvingSymlinksInPath(), f == home.appending(path: "Downloads").resolvingSymlinksInPath() {
         chosenFolder = nil                                                                 // picked Downloads = stay
     }
     return .save(name: name, folder: chosenFolder, auto: parts.count > 3 && parts[3] == "auto")
@@ -457,9 +458,11 @@ var paused = false
                     if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
                 }
                 // Downloaded the same file twice? Say so instead of making a "-2" copy.
-                if let twin = Destination.duplicate(of: url, in: target) {
-                    let r = osascript("""
-                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(target)) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))\(timeout > 0 ? "\\n\\nMoves to Trash in \(timeout) s if you don’t answer." : "")" ¬
+                // Same bytes already in the suggested folder, or still sitting in Downloads?
+                if let twin = Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir) {
+                    // Headless tests: no AppleScript window; behave as if nobody answered.
+                    let r = headless ? (ok: true, out: "gave up:true") : osascript("""
+                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(twin.deletingLastPathComponent())) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))\(timeout > 0 ? "\\n\\nMoves to Trash in \(timeout) s if you don’t answer." : "")" ¬
                       with title "neatly" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after \(timeout > 0 ? timeout : 300)
                     """)
                     // No answer: an exact copy already exists, so trashing this one loses nothing (and it's in the Trash).

@@ -50,6 +50,11 @@ enum Model {
     - photo labels: food, pizza; no text -> pizza
     - handwritten notes: "integration by parts, u = x, dv = e^x dx" -> integration by parts
     - whiteboard: "sprint 4 retro: what went well / blockers" -> sprint4 retro
+    Screenshots of web pages and apps: say WHAT it is and WHOSE (product, site, app), not a slogan, price or menu item:
+    - GitLab page of the linux-kernel repository -> linux kernel gitlab
+    - Zara product page "Linen Blend Shirt", 39.95 -> linen shirt zara
+    - Samsung marketing page "Epic, just like that." for Galaxy S24 -> galaxy s24
+    - Rust book chapter "5. Using Structs" -> rust structs
     Answer with 1 to 3 lowercase words separated by spaces and nothing else.
     """
 
@@ -79,7 +84,7 @@ enum Model {
         if let s = e.sourceDescription { prompt += "Downloaded from: \(s)\n" }
         if let h = e.linkHint { prompt += "The download link mentions: \(h)\n" }
         if let t = e.metadataTitle { prompt += "Embedded title: \(t)\n" }
-        if let h = e.headline { prompt += "Biggest text (usually the topic; name the file after it unless it is just an app or site name): \(h)\n" }
+        if let h = e.headline { prompt += "Biggest text (usually the topic; if it is a slogan, a number or a menu item, name the product or page instead): \(h)\n" }
         if !e.labels.isEmpty { prompt += "Photo labels: \(e.labels.joined(separator: ", "))\n" }
         if let b = e.bodySnippet { prompt += "Beginning of content:\n\(withoutLetterhead(b).prefix(800))\n" }
         let lang = language(of: e)

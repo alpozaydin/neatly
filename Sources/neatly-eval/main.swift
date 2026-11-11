@@ -15,6 +15,14 @@ let offline = args.contains("--offline")
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 let cases = try JSONDecoder().decode(Cases.self, from: Data(contentsOf: root.appending(path: args.contains("--holdout") ? "Tests/eval/holdout.json" : "Tests/eval/cases.json")))
 
+// --make <case id> <folder>: just write that test file (with its download source and dates), for the end-to-end tests.
+if let i = args.firstIndex(of: "--make"), i + 2 < args.count {
+    let all = try JSONDecoder().decode(Cases.self, from: Data(contentsOf: root.appending(path: "Tests/eval/cases.json"))).naming
+    guard let c = all.first(where: { $0.id == args[i + 1] }) else { print("no case \(args[i + 1])"); exit(1) }
+    print(try Fixtures.make(c, in: URL(fileURLWithPath: args[i + 2])).path)
+    exit(0)
+}
+
 // MARK: 1. Rename-or-keep decision (filenames only)
 
 var decisionMisses: [String] = []

@@ -11,6 +11,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
 
     func start() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.isVisible = !headless
         item.button?.image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: "neatly")
         item.button?.toolTip = "neatly — drop files or a folder here to name them"
         menu.delegate = self

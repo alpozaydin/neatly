@@ -67,16 +67,31 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(.accessory)
         panel.center()
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if !headless {
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
         if remaining > 0 {
             tick()
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated { self.remaining -= 1; self.tick() }
             }
         }
+        uiTest()
         NSApp.run()
         exit(0)
+    }
+
+    /// NEATLY_UI_TEST="dialog:save" | "dialog:edit:<name>" | "dialog:place:<folder>" | "dialog:keep" | "dialog:wait" (let the countdown run).
+    func uiTest() {
+        guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"], t.hasPrefix("dialog:") else { return }
+        let step = String(t.dropFirst(7))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            if step == "save" { self.save() }
+            if step == "keep" { self.leaveAsIs() }
+            if step.hasPrefix("edit:") { self.field.stringValue = String(step.dropFirst(5)); self.controlTextDidChange(Notification(name: .init("t"))); self.save() }
+            if step.hasPrefix("place:") { self.folder = URL(fileURLWithPath: String(step.dropFirst(6))); self.saveNow(auto: false) }
+        }
     }
 
     func tick() {
@@ -129,6 +144,10 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         save()
     }
 }
+
+/// NEATLY_HEADLESS=1 (tests): windows are built and their buttons pressed by code, but nothing is ever shown
+/// on screen and nothing takes focus.
+let headless = ProcessInfo.processInfo.environment["NEATLY_HEADLESS"] != nil
 
 /// "courses-fall26 › ceng491", or "Downloads" for none.
 func shortFolder(_ url: URL?) -> String {
@@ -222,7 +241,7 @@ final class Toast: NSObject, NSTextFieldDelegate {
 
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(.accessory)
-        panel.orderFrontRegardless()
+        if !headless { panel.orderFrontRegardless() }
         panel.makeFirstResponder(nil)   // nothing selected, no keyboard focus until you click the name
         startTimer()
         uiTest()

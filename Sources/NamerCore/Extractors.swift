@@ -1,6 +1,6 @@
 import Foundation
 import PDFKit
-import Vision
+@preconcurrency import Vision
 import ImageIO
 
 /// Cheap, bounded readers. None of them ever looks past page 2 or a fixed text budget.
@@ -93,8 +93,14 @@ enum Extract {
             kCGImageSourceThumbnailMaxPixelSize: 2400,          // handwriting needs more pixels than print
         ]
         guard let img = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return (nil, nil) }
-        // Photos get the slow, accurate recognizer: it can read handwriting; .fast cannot.
-        let lines = ocrLines(img, accurate: true)
+        // Fast reader first (~0.05 s). The accurate one reads handwriting, but on a screen full of text it
+        // can take over a minute (66 s on a terminal weather report), so it only runs when the fast one finds
+        // little: photos, handwriting, a few words on a whiteboard.
+        var lines = ocrLines(img, accurate: false)
+        if lines.count < 15 {
+            let better = ocrLines(img, accurate: true)
+            if better.count >= lines.count { lines = better }
+        }
         let text = lines.map(\.text).joined(separator: "\n")
         let heights = lines.map(\.height).sorted()
         var headline: String?
@@ -109,6 +115,8 @@ enum Extract {
         let req = VNRecognizeTextRequest()
         req.recognitionLevel = accurate ? .accurate : .fast
         req.usesLanguageCorrection = accurate
+        // Never let one image hold everything up: give up on the accurate pass after 4 s.
+        if accurate { DispatchQueue.global().asyncAfter(deadline: .now() + 4) { [req] in req.cancel() } }
         try? VNImageRequestHandler(cgImage: img).perform([req])
         return (req.results ?? []).compactMap { o in o.topCandidates(1).first.map { ($0.string, o.boundingBox.height) } }
     }
