@@ -15,7 +15,7 @@ class Neatly < Formula
 
   def caveats
     <<~EOS
-      Start watching ~/Downloads (also after every upgrade):
+      Install neatly.app (Applications + menu bar) and start it — also after every upgrade:
         neatly service install
     EOS
   end

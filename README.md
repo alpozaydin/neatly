@@ -14,7 +14,9 @@ or with Homebrew: `brew install alpozaydin/tap/neatly && neatly service install`
 Needs a Mac with Apple silicon and macOS 26 or newer. Turn on Apple Intelligence for the best names;
 everything except the last step below works without it. No Xcode needed.
 
-Uninstall: `neatly service uninstall && rm ~/.local/bin/neatly` (or `brew uninstall neatly`).
+This installs **neatly.app** (in Applications, Spotlight and your menu bar) and starts it at login.
+Uninstall: `neatly service uninstall` removes the app, the login item and the command (then `brew uninstall neatly`
+if you used Homebrew).
 
 ## How it decides (cheapest first, stops as soon as it's sure)
 

@@ -186,6 +186,17 @@ if want menu; then setup menu
     check "length, date, case, clipboard saved" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"lowercase\" : false" && echo "$s" | grep -q "\"copyScreenshots\" : true"'
 fi
 
+# ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
+if want app; then setup app; mkdir -p "$T/apps"
+    NEATLY_APP_DIR=$T/apps "$B" app-bundle > /dev/null
+    A=$T/apps/neatly.app
+    check "app bundle built" '[ -x "$A/Contents/MacOS/neatly" ]'
+    check "menu-bar app (no Dock icon), right id" '[ "$(plutil -extract LSUIElement raw "$A/Contents/Info.plist")" = "true" ] && [ "$(plutil -extract CFBundleIdentifier raw "$A/Contents/Info.plist")" = "dev.neatly.app" ]'
+    check "has an icon" '[ -s "$A/Contents/Resources/AppIcon.icns" ]'
+    check "signature valid" 'codesign --verify --deep "$A" 2>/dev/null'
+    check "app binary runs" '"$A/Contents/MacOS/neatly" --version | grep -q "^neatly "'
+fi
+
 echo
 echo "$pass passed, $fail failed   (work folder: $W)"
 for f in ${failed[@]+"${failed[@]}"}; do echo "  ✗ $f"; done
