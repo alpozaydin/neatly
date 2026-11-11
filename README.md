@@ -1,7 +1,20 @@
 # namer
 
 Suggests short, meaningful names for badly named files — `1234567_2026-11-04_124701.pdf` → `transcript-fall26.pdf`.
-Runs entirely on your Mac. Changes nothing unless you say so.
+It also suggests **which folder** each download belongs in. Runs entirely on your Mac, with Apple's on-device model.
+
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/alpozaydin/tidy-mac/main/scripts/install.sh | sh
+```
+
+or with Homebrew: `brew install alpozaydin/tap/namer && namer service install`
+
+Needs a Mac with Apple silicon and macOS 26 or newer. Turn on Apple Intelligence for the best names;
+everything except the last step below works without it. No Xcode needed.
+
+Uninstall: `namer service uninstall && rm ~/.local/bin/namer` (or `brew uninstall namer`).
 
 ## How it decides (cheapest first, stops as soon as it's sure)
 
@@ -78,6 +91,8 @@ namer stats      # how often you saved the suggestion unchanged, and your recent
 
 ## Usage
 
+Building from source needs Xcode or the Command Line Tools:
+
 ```sh
 swift build -c release --product namer
 .build/release/namer ~/Downloads            # dry run: prints suggestions
@@ -86,6 +101,9 @@ swift build -c release --product namer
 swift run checks                            # self-checks
 swift run -c release namer-eval             # accuracy + speed score
 ```
+
+Releases: push a tag (`git tag v0.1.1 && git push --tags`). GitHub builds the binary and publishes it;
+then `scripts/update-tap.sh 0.1.1` updates Homebrew.
 
 ## Testing accuracy
 

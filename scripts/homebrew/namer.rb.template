@@ -1,0 +1,26 @@
+class Namer < Formula
+  desc "Suggests short names and folders for your downloads, on-device"
+  homepage "https://github.com/alpozaydin/tidy-mac"
+  url "https://github.com/alpozaydin/tidy-mac/releases/download/v__VERSION__/namer-macos-arm64.tar.gz"
+  version "__VERSION__"
+  sha256 "__SHA256__"
+  license "MIT"
+
+  depends_on arch: :arm64
+  depends_on macos: :tahoe
+
+  def install
+    bin.install "namer"
+  end
+
+  def caveats
+    <<~EOS
+      Start watching ~/Downloads (also after every upgrade):
+        namer service install
+    EOS
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/namer --version")
+  end
+end
