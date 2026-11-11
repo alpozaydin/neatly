@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 public enum Outcome: Sendable {
     case suggested(Suggestion)
@@ -157,10 +158,21 @@ public struct Namer: Sendable {
         }
 
         // Fallback: a clean title is still better than a junk name.
-        if let t = e.metadataTitle ?? e.headline {
+        // Only if it reads like words: OCR of an old scan gives "ennra ficenim poffumuf", worse than the junk name.
+        if let t = e.metadataTitle ?? e.headline, Self.readable(t) {
             return done(Style.join(Array(Style.words(t).prefix(3)) + [qualifierFor(e)].compactMap { $0 }), "title")
         }
         return .unsure(why: "not enough evidence")
+    }
+
+    /// Most words are real (English or Turkish/German/… via the language's word list), not OCR noise.
+    static func readable(_ text: String) -> Bool {
+        let w = Style.words(text).filter { $0.count >= 3 && !$0.contains(where: \.isNumber) }
+        guard !w.isEmpty else { return false }
+        let lang = NLLanguageRecognizer.dominantLanguage(for: text) ?? .english
+        let vocab = NLEmbedding.wordEmbedding(for: lang) ?? NLEmbedding.wordEmbedding(for: .english)
+        guard let vocab else { return true }
+        return Double(w.filter { vocab.contains($0) }.count) / Double(w.count) >= 0.6
     }
 
     /// Rules: known document kinds and course files are named directly — fast and predictable.
