@@ -80,12 +80,18 @@ public enum Examples {
     public struct Example: Sendable { public let about: String; public let name: String }
 
     /// Below this, a past file isn't similar enough to teach anything (and a bad example misleads a small model).
-    static let minSimilarity: Float = 0.86
+    static let minSimilarity: Float = 0.9   // 0.86 let a "learning agreement" teach a screenshot's name
 
     public static func similar(to e: Evidence, k: Int = 3, history: [Correction] = Correction.all()) -> [Example] {
         var seen = Set<String>()
+        // Same kind of file only: how you name photos says little about how you name PDFs.
+        func kind(_ name: String) -> String {
+            let ext = (name as NSString).pathExtension.lowercased()
+            return ["png", "jpg", "jpeg", "heic", "gif", "webp", "tiff"].contains(ext) ? "image" : "document"
+        }
+        let mine = kind(e.url.lastPathComponent)
         let pool = history.reversed().filter { c in
-            !c.chosen.isEmpty && c.auto != true && c.via != "kept" && seen.insert(c.chosen).inserted
+            !c.chosen.isEmpty && c.auto != true && c.via != "kept" && kind(c.original) == mine && seen.insert(c.chosen).inserted
         }.prefix(300)
         guard !pool.isEmpty else { return [] }
         let abouts = pool.map(\.about)
