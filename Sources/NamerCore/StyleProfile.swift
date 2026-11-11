@@ -7,19 +7,43 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var suffix: String?       // e.g. initials: "MAO" in "CivCore AI Model - MAO"
     public var learnedFrom = 0       // how many names this is based on
     public var examples: [String] = []
+    // Settings you choose (filed style --length … --date … --app …). Optional so older style.json files still load.
+    public var length: Length?       // nil = short
+    public var date: DatePosition?   // nil = no date
+    public var appName: Bool?        // screenshots: add the app they were taken in ("… in Safari")
+
+    public enum Length: String, Codable, Sendable, CaseIterable {
+        case short, standard, detailed
+        /// Words the model may use, and the limits for the whole name.
+        public var modelWords: ClosedRange<Int> { switch self { case .short: 1...3; case .standard: 2...5; case .detailed: 4...8 } }
+        public var maxWords: Int { switch self { case .short: 4; case .standard: 6; case .detailed: 10 } }
+        public var maxLength: Int { switch self { case .short: 40; case .standard: 60; case .detailed: 90 } }
+    }
+    public enum DatePosition: String, Codable, Sendable, CaseIterable { case prefix, suffix }
+
+    public var len: Length { length ?? .short }
 
     public static let standard = StyleProfile()
 
     public init() {}
 
     /// Turn a canonical name (lowercase-kebab) into this person's style.
-    public func render(_ kebab: String) -> String {
+    public func render(_ kebab: String, date d: Date? = nil, app: String? = nil) -> String {
         var parts = kebab.split(separator: "-").map(String.init)
+        if appName == true, let app, !app.isEmpty { parts += ["in"] + Style.words(app) }   // shot-name-in-safari
         if !lowercase {
-            parts = parts.map { $0.first?.isLetter == true ? $0.prefix(1).uppercased() + $0.dropFirst() : $0 }
+            let small: Set<String> = ["a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "at", "by"]
+            parts = parts.enumerated().map { i, w in
+                (i > 0 && small.contains(w)) || w.first?.isLetter != true ? w : w.prefix(1).uppercased() + w.dropFirst()
+            }
         }
         var out = parts.joined(separator: separator)
         if let suffix { out += (separator == " " ? " - " : separator) + suffix }
+        if let date, let d {
+            let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+            let stamp = f.string(from: d)
+            out = date == .prefix ? stamp + separator + out : out + separator + stamp
+        }
         return out
     }
 

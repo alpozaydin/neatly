@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import NamerCore
 
 let usage = """
@@ -11,14 +12,17 @@ usage: filed [options] <file or folder>...
   --watch      wait for new files in the folder and suggest names as they arrive
   --where      also suggest a folder to move each file to
   --ask        with --watch: show a dialog for each file (Save / Select place… / Leave as is)
+  --screenshots  with --watch: also name new screenshots where macOS saves them, with an Undo pill
   --timeout N  with --ask: save the suggestion after N seconds without an answer (default 5, 0 = wait)
   service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
-  undo <file>  restore a file's original name
+  tidy [folder]  review window: name every badly named file in a folder (Desktop by default), then Rename
+  undo <file>  restore a file's original name  (undo --last: the last Tidy Up)
   keep <file>  mark a name as yours: never suggest for it again
   learn <folder>...  learn your naming style from names you already chose (reads names only)
-  style        show the saved style  (style --reset to delete it)
+  style        show or set the naming style: --length short|standard|detailed, --case lower|title,
+               --sep dash|underscore|space, --date none|prefix|suffix, --app on|off  (--reset to delete)
   --version    print the version
   stats        how often you saved the suggestion unchanged, and your recent edits
 """
@@ -26,11 +30,12 @@ usage: filed [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst())
-let version = "0.1.0"
+let version = "0.2.0"
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("filed \(version)"); exit(0) }
 
 if args.first == "dialog" { runDialog(Array(args.dropFirst())) }   // the popup, started by the watcher
+if args.first == "toast" { runToast(Array(args.dropFirst())) }     // the screenshot pill
 
 if args.first == "learn" {
     let roots = args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
@@ -61,8 +66,39 @@ if args.first == "learn" {
 
 if args.first == "style" {
     if args.contains("--reset") { try? FileManager.default.removeItem(at: StyleProfile.fileURL); print("style reset"); exit(0) }
-    if let p = StyleProfile.load() { print(String(data: try JSONEncoder().encode(p), encoding: .utf8)!) }
-    else { print("no saved style — using: lowercase, '-' (run: filed learn <folder>)") }
+    var p = StyleProfile.load() ?? .standard
+    var changed = false
+    func value(_ flag: String) -> String? {
+        guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+        changed = true; return args[i + 1].lowercased()
+    }
+    if let v = value("--length") {
+        guard let l = StyleProfile.Length(rawValue: v) else { print("--length short|standard|detailed"); exit(1) }
+        p.length = l
+    }
+    if let v = value("--date") {
+        guard v == "none" || StyleProfile.DatePosition(rawValue: v) != nil else { print("--date none|prefix|suffix"); exit(1) }
+        p.date = StyleProfile.DatePosition(rawValue: v)
+    }
+    if let v = value("--case") {
+        guard ["lower", "title"].contains(v) else { print("--case lower|title"); exit(1) }
+        p.lowercase = v == "lower"
+    }
+    if let v = value("--sep") {
+        guard let sep = ["dash": "-", "underscore": "_", "space": " "][v] else { print("--sep dash|underscore|space"); exit(1) }
+        p.separator = sep
+    }
+    if let v = value("--app") { p.appName = v == "on" }
+    if changed { try p.save() }
+    let sep = ["-": "dash", "_": "underscore", " ": "space"][p.separator] ?? p.separator
+    print("""
+    length  \(p.len.rawValue)        (--length short|standard|detailed)
+    case    \(p.lowercase ? "lower" : "title")          (--case lower|title)
+    sep     \(sep)           (--sep dash|underscore|space)
+    date    \(p.date?.rawValue ?? "none")           (--date none|prefix|suffix)
+    app     \(p.appName == true ? "on" : "off")            (--app on|off: screenshots end with the app they were taken in)
+    """ + (p.suffix.map { "\nsuffix  \($0)" } ?? ""))
+    print("\nexample: \(p.render(p.len == .short ? "hot-honey-cornbread" : p.len == .standard ? "hot-honey-cornbread-recipe" : "hot-honey-cornbread-recipe-10-inch-skillet", date: Date(), app: "Safari"))")
     exit(0)
 }
 
@@ -94,7 +130,7 @@ if args.first == "service" {
         <plist version="1.0"><dict>
           <key>Label</key><string>\(label)</string>
           <key>ProgramArguments</key><array><string>\(exe)</string><string>--watch</string>
-            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string></array>
+            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string><string>--screenshots</string></array>
           <key>RunAtLoad</key><true/>
           <key>KeepAlive</key><true/>
           <key>StandardOutPath</key><string>\(log)</string>
@@ -109,7 +145,7 @@ if args.first == "service" {
         migrateFromOldName()   // again: the old service may have written while it was still running
         launchctl(["bootout", "gui/\(uid)/\(label)"])
         launchctl(["bootstrap", "gui/\(uid)", plist.path])
-        print("filed now watches ~/Downloads and asks before renaming. Log: ~/Library/Logs/filed.log")
+        print("filed now watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/filed.log")
         print("Installed at ~/.local/bin/filed. After updating filed, run 'filed service install' again.")
         print("Stop it any time: filed service uninstall")
     case "uninstall":
@@ -160,6 +196,10 @@ if args.first == "keep" {
     exit(0)
 }
 
+if args.first == "undo", args.dropFirst().first == "--last" {
+    print("put back \(Tidy.undoLast()) name(s) from the last Tidy Up"); exit(0)
+}
+
 if args.first == "undo" {
     for p in args.dropFirst() {
         let url = URL(fileURLWithPath: p)
@@ -175,6 +215,7 @@ if args.first == "undo" {
     guard let i = args.firstIndex(of: f) else { return false }
     args.remove(at: i); return true
 }
+let screenshots = flag("--screenshots")
 let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask"), whereTo = flag("--where")
 var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
@@ -225,6 +266,86 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     return .save(name: name, folder: chosenFolder, auto: parts.count > 3 && parts[3] == "auto")
 }
 
+if args.first == "tidy" {
+    let target = args.count > 1 ? URL(fileURLWithPath: (args[1] as NSString).expandingTildeInPath) : screenshotFolder()
+    TidyWindow(folder: target, namer: namer).run()
+}
+
+/// Run `filed <args>` (popup, pill) without blocking the watchers; returns what it printed.
+func helper(_ a: [String]) async -> String {
+    await withCheckedContinuation { (done: CheckedContinuation<String, Never>) in
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        p.arguments = a
+        let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+        p.terminationHandler = { _ in
+            done.resume(returning: String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        }
+        if (try? p.run()) == nil { done.resume(returning: "") }
+    }
+}
+
+/// Where macOS saves screenshots (System Settings or Cmd-Shift-5 → Options), Desktop by default.
+func screenshotFolder() -> URL {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    if let loc = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"), !loc.isEmpty {
+        let u = URL(fileURLWithPath: (loc as NSString).expandingTildeInPath)
+        if FileManager.default.fileExists(atPath: u.path) { return u }
+    }
+    return home.appending(path: "Desktop")
+}
+
+/// "Screenshot 2026-…", "Screen Shot …" and the same in other languages and tools.
+func isScreenshot(_ name: String) -> Bool {
+    ["Screenshot ", "Screen Shot ", "CleanShot ", "Ekran Resmi ", "Bildschirmfoto ", "Capture d’écran ", "Captura de pantalla ",
+     "Schermafbeelding ", "Istantanea schermo "].contains { name.hasPrefix($0) }
+}
+
+/// Screenshots are named the moment they're taken, in place: no popup, no folder question. A pill shows the
+/// new name with Undo. The app you were in when you took it is remembered (for the optional "… in Safari").
+@MainActor func watchScreenshots(_ dir: URL) async {
+    func listing() -> [String: Int] {
+        var out: [String: Int] = [:]
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] where isScreenshot(name) {
+            out[name] = (try? FileManager.default.attributesOfItem(atPath: dir.appending(path: name).path)[.size] as? Int) ?? -1
+        }
+        return out
+    }
+    var seen = Set(listing().keys)
+    var pending: [String: (size: Int, app: String?)] = [:]
+    print("watching \(dir.path) for screenshots")
+    while true {
+        try? await Task.sleep(for: .seconds(1))
+        let now = listing()
+        for (name, size) in now where !seen.contains(name) {
+            guard let p = pending[name], p.size == size else {
+                // First sight: the app in front is the one being captured (not the screenshot tool itself).
+                let front = NSWorkspace.shared.frontmostApplication?.localizedName
+                let app = ["screencaptureui", "Screenshot", "filed", "loginwindow"].contains(front ?? "") ? nil : front
+                pending[name] = (size, pending[name]?.app ?? app)
+                continue
+            }
+            seen.insert(name); pending[name] = nil
+            let url = dir.appending(path: name)
+            guard case .suggested(let s) = await namer.suggest(for: url, app: p.app),
+                  let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
+            seen.insert(renamed.lastPathComponent)
+            print("\(name)  →  \(renamed.lastPathComponent)   [screenshot, \(s.via)]")
+            let reply = await helper(["toast", String(max(timeout, 4)), s.name, renamed.path])
+            let ev = s.evidence
+            if reply == "undo", let back = try? Rename.undo(renamed) {
+                Decision.markKeep(back); seen.insert(back.lastPathComponent)
+                print("   undone")
+            }
+            Correction(original: name, suggested: s.name, chosen: reply == "undo" ? "" : s.name, via: s.via,
+                       source: nil, title: ev.headline, auto: reply == "undo" ? nil : true,
+                       context: String(gist(ev).prefix(300))).save()
+        }
+        seen.formIntersection(now.keys)
+    }
+}
+
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
 if watch {
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
@@ -235,6 +356,7 @@ if watch {
                                                                    options: [.skipsHiddenFiles])) ?? []
         var out: [String: Int] = [:]
         for u in items where !skip.contains(u.pathExtension.lowercased())
+            && !(screenshots && isScreenshot(u.lastPathComponent) && dir.standardizedFileURL == screenshotFolder().standardizedFileURL)
             && (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {   // files only
             out[u.lastPathComponent] = (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
         }
@@ -244,6 +366,8 @@ if watch {
     var pending: [String: Int] = [:]
     var warmed = Date.distantPast
     if namer.useModel { Task.detached { Namer.prewarm() } }
+    let shotDir = screenshotFolder()
+    if screenshots { Task { await watchScreenshots(shotDir) } }
     print("watching \(dir.path) — download something (Ctrl-C to stop)")
     while true {
         try? await Task.sleep(for: .seconds(1))
@@ -290,7 +414,8 @@ if watch {
                                                     useModel: namer.useModel)
                 print("   folder: \(Destination.short(target))")
                 // Match the neighbours: in a folder of "Lab Report - MAO" files, a new one is styled the same way.
-                if nameIdea != original, let local = Destination.style(of: target) {
+                if nameIdea != original, var local = Destination.style(of: target) {
+                    local.length = namer.profile.length; local.date = namer.profile.date; local.appName = namer.profile.appName
                     let styled = local.render(kebab)
                     if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
                 }

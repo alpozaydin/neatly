@@ -1546,6 +1546,153 @@
     "receipt-trendyol",
     "receipt-trendyol-nov26"
    ]
+  },
+  {
+   "id": "shot-recipe",
+   "file": "Screenshot 2026-10-09 at 11.26.48.png",
+   "lines": [
+    [
+     "saltykitchen.com   Recipes   Baking",
+     14
+    ],
+    [
+     "Smoky Black Bean Chili",
+     40
+    ],
+    [
+     "Serves 6. Prep 15 min, cook 45 min.",
+     16
+    ],
+    [
+     "Ingredients: black beans, chipotle, onion, cumin",
+     16
+    ]
+   ],
+   "expect": [
+    "smoky-black-bean-chili",
+    "black-bean-chili"
+   ]
+  },
+  {
+   "id": "shot-cafe-receipt",
+   "file": "Screenshot 2026-10-10 at 08.12.40.png",
+   "lines": [
+    [
+     "HARBOR STREET COFFEE",
+     30
+    ],
+    [
+     "Oat latte        5.50",
+     18
+    ],
+    [
+     "Croissant        4.25",
+     18
+    ],
+    [
+     "TOTAL            9.75",
+     20
+    ]
+   ],
+   "expect": [
+    "receipt-harbor-street-coffee",
+    "harbor-street-coffee-receipt",
+    "harbor-street-coffee"
+   ]
+  },
+  {
+   "id": "shot-appointment",
+   "file": "Screenshot 2026-10-10 at 07.15.41.png",
+   "lines": [
+    [
+     "Dentist appointment",
+     34
+    ],
+    [
+     "Tuesday, October 14, 2026, 9:30 AM",
+     18
+    ],
+    [
+     "Bright Smile Dental, 22 Oak Ave",
+     16
+    ]
+   ],
+   "expect": [
+    "dentist-appointment",
+    "dentist-appointment-oct14"
+   ]
+  },
+  {
+   "id": "shot-build-error",
+   "file": "Screenshot 2026-10-10 at 13.02.11.png",
+   "lines": [
+    [
+     "Build Failed",
+     30
+    ],
+    [
+     "ProfileKit: error: cannot find 'UserSession' in scope",
+     18
+    ],
+    [
+     "ProfileView.swift:88",
+     16
+    ]
+   ],
+   "expect": [
+    "profilekit-build-error",
+    "build-error-profilekit"
+   ]
+  },
+  {
+   "id": "shot-weather",
+   "file": "Screenshot 2026-10-11 at 09.20.03.png",
+   "lines": [
+    [
+     "Reykjavik",
+     36
+    ],
+    [
+     "4°  Light Rain",
+     26
+    ],
+    [
+     "H:6° L:1°   10-day forecast",
+     18
+    ]
+   ],
+   "expect": [
+    "reykjavik-weather",
+    "reykjavik-weather-forecast",
+    "weather-reykjavik"
+   ]
+  },
+  {
+   "id": "shot-chat-plan",
+   "file": "Screenshot 2026-10-11 at 21.40.19.png",
+   "lines": [
+    [
+     "Mom, Dad, Sam",
+     22
+    ],
+    [
+     "Thanksgiving is at our place this year!",
+     18
+    ],
+    [
+     "Who's bringing what?",
+     18
+    ],
+    [
+     "I'll do the pumpkin pie",
+     18
+    ]
+   ],
+   "expect": [
+    "thanksgiving-plan",
+    "thanksgiving-meal-plan",
+    "thanksgiving"
+   ]
   }
  ]
 }

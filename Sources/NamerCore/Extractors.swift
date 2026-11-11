@@ -81,16 +81,36 @@ enum Extract {
 
     // MARK: Stage 5 — OCR, only for images and scanned PDFs (page 1)
 
-    static func ocr(image url: URL) -> String? {
-        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+    static func ocr(image url: URL) -> String? { ocrWithHeadline(image: url).text }
+
+    /// Text in an image, plus its headline: the tallest line, if it clearly stands out (a page title,
+    /// an app's heading). Lets a screenshot get a good name even without Apple Intelligence.
+    static func ocrWithHeadline(image url: URL) -> (text: String?, headline: String?) {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return (nil, nil) }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,   // respect phone rotation
             kCGImageSourceThumbnailMaxPixelSize: 2400,          // handwriting needs more pixels than print
         ]
-        guard let img = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        guard let img = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return (nil, nil) }
         // Photos get the slow, accurate recognizer: it can read handwriting; .fast cannot.
-        return ocr(img, accurate: true)
+        let lines = ocrLines(img, accurate: true)
+        let text = lines.map(\.text).joined(separator: "\n")
+        let heights = lines.map(\.height).sorted()
+        var headline: String?
+        if lines.count >= 2, let top = lines.max(by: { $0.height < $1.height }),
+           top.height >= heights[heights.count / 2] * 1.3, top.text.filter(\.isLetter).count >= 3 {
+            headline = String(top.text.prefix(headlineMax))
+        }
+        return (text.isEmpty ? nil : String(text.prefix(snippetBudget)), headline)
+    }
+
+    private static func ocrLines(_ img: CGImage, accurate: Bool) -> [(text: String, height: CGFloat)] {
+        let req = VNRecognizeTextRequest()
+        req.recognitionLevel = accurate ? .accurate : .fast
+        req.usesLanguageCorrection = accurate
+        try? VNImageRequestHandler(cgImage: img).perform([req])
+        return (req.results ?? []).compactMap { o in o.topCandidates(1).first.map { ($0.string, o.boundingBox.height) } }
     }
 
     static func ocr(pdfFirstPage url: URL) -> String? {
