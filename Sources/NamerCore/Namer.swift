@@ -20,6 +20,9 @@ public struct Namer: Sendable {
     /// Few-shot learning: show the model names you chose for similar files. nil = read corrections.jsonl.
     public var learnFromCorrections = true
     public var history: [Correction]? = nil
+    /// "↻ another name": names already shown and rejected. Skips the rules (they'd give the same answer)
+    /// and asks the model for something different.
+    public var avoid: [String] = []
 
     public init() {}
 
@@ -52,6 +55,10 @@ public struct Namer: Sendable {
         func done(_ stem: String?, _ via: String) -> Outcome {
             guard let stem, stem.count >= 2, stem != e.stem.lowercased() else {
                 return .unsure(why: "no better name found")
+            }
+            // "↻ another name": never hand back one that was already rejected.
+            if avoid.contains(where: { Style.join(Style.tokens($0)) == Style.join(Style.tokens(stem)) }) {
+                return .unsure(why: "no different name found")
             }
             let c = (clock.now - start).components
             let ms = Double(c.seconds) * 1000 + Double(c.attoseconds) / 1e15
@@ -96,7 +103,7 @@ public struct Namer: Sendable {
         } else if Self.pdfLike.contains(e.ext), let info = Extract.pdf(url) {
             // 3. Embedded title. If it already names a known kind, stop before reading the page.
             if !Extract.isJunkTitle(info.title, stem: e.stem) { e.metadataTitle = info.title; e.steps.append("meta") }
-            if e.metadataTitle != nil, let n = ruleName(e) { return done(n, "rules[\(trail)]") }
+            if avoid.isEmpty, e.metadataTitle != nil, let n = ruleName(e) { return done(n, "rules[\(trail)]") }
             // 4. Page 1 only
             e.headline = info.headline
             e.bodySnippet = info.snippet
@@ -115,7 +122,7 @@ public struct Namer: Sendable {
         }
 
         // Known document kinds are decided by rules: fast and predictable.
-        if let n = ruleName(e) {
+        if avoid.isEmpty, let n = ruleName(e) {
             if verifyRules, useModel, await Model.rejects(name: n, for: e) {
                 e.steps.append("rule-rejected:\(n)")
             } else {
@@ -132,12 +139,13 @@ public struct Namer: Sendable {
             if look { e.steps.append("vision") }
             let examples = learnFromCorrections ? Examples.similar(to: snapshot, history: history ?? Correction.all()) : []
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
-            if let w = await withTimeout(remaining, { [words = profile.len.modelWords] in await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words) }) ?? nil {
+            if let w = await withTimeout(remaining, { [words = profile.len.modelWords, avoid] in
+                await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil {
                 let (mw, ml) = (profile.len.maxWords, profile.len.maxLength)
                 // The model picked part of the page's own title ("cornbread" from "Hot Honey Cornbread"):
                 // the whole title is more specific, if it fits.
                 var w = w
-                if let h = e.headline {
+                if avoid.isEmpty, let h = e.headline {
                     let hw = Style.words(h)
                     if !hw.isEmpty, hw.count <= min(mw, 5), w.count == 1, Set(w).isSubset(of: Set(hw)), hw.count > 1 { w = hw }
                 }

@@ -11,6 +11,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var length: Length?       // nil = short
     public var date: DatePosition?   // nil = no date
     public var appName: Bool?        // screenshots: add the app they were taken in ("… in Safari")
+    public var copyScreenshots: Bool? // screenshots: also put the image on the clipboard
 
     public enum Length: String, Codable, Sendable, CaseIterable {
         case short, standard, detailed
@@ -149,7 +150,9 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     // MARK: Storage — one small JSON file the user can read, edit or delete.
 
     public static var fileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        // NEATLY_DATA_DIR: tests use their own folder, so they never touch your corrections or style.
+        if let d = ProcessInfo.processInfo.environment["NEATLY_DATA_DIR"] { return URL(fileURLWithPath: d).appending(path: "style.json") }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/neatly/style.json")
     }
 
