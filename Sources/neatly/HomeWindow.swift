@@ -1,271 +1,403 @@
 import AppKit
+import SwiftUI
+import UniformTypeIdentifiers
 import NamerCore
 
-/// The window you get when you open neatly (Spotlight, Applications, or "Open neatly…" in the menu):
-/// a drop zone, one-click tidying, and every setting — no Terminal needed. It lives in the running service,
-/// so changes apply to the very next file.
+/// The window you get when you open neatly (Spotlight, Applications, or "Open neatly…" in the menu).
+/// Written for people who never open Terminal: one promise, a big drop target, three big buttons,
+/// plain-language switches, and name styles you pick by their look. Everything else is under "More options".
+/// It lives in the running service, so changes apply to the very next file.
 @MainActor
 final class HomeWindow: NSObject, NSWindowDelegate {
     static let shared = HomeWindow()
     /// Tests use their own name (NEATLY_NOTIFY), so they never open the window of the neatly you actually run.
     static let showNotification = Notification.Name("dev.neatly.show" + (ProcessInfo.processInfo.environment["NEATLY_NOTIFY"] ?? ""))
 
+    let model = HomeModel()
     var window: NSWindow?
-    let example = NSTextField(labelWithString: "")
-    let status = NSTextField(labelWithString: "")
-    let pauseButton = NSButton(checkboxWithTitle: "Pause neatly", target: nil, action: nil)
-    let length = NSSegmentedControl(labels: ["Short", "Standard", "Detailed"], trackingMode: .selectOne, target: nil, action: nil)
-    let caseMenu = NSPopUpButton()
-    let sepMenu = NSPopUpButton()
-    let dateMenu = NSPopUpButton()
-    let appName = NSButton(checkboxWithTitle: "Add the app's name to screenshots (… in Safari)", target: nil, action: nil)
-    let copyShots = NSButton(checkboxWithTitle: "Copy new screenshots to the clipboard", target: nil, action: nil)
-    let countdown = NSPopUpButton()
 
     func show() {
-        if window == nil { build() }
-        refresh()
+        model.reload()
+        if window == nil {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 700),
+                             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
+                             backing: .buffered, defer: false)
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
+            w.isMovableByWindowBackground = true
+            w.isReleasedWhenClosed = false
+            w.contentView = NSHostingView(rootView: HomeView(model: model))
+            w.setContentSize(w.contentView!.fittingSize)
+            window = w
+        }
         print("home: shown")
-        guard let window else { return }
-        if headless { uiTest(); return }
-        NSApp.activate(ignoringOtherApps: true)
-        window.center()
-        window.makeKeyAndOrderFront(nil)
+        if !headless, let window {
+            NSApp.activate(ignoringOtherApps: true)
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+        }
         uiTest()
     }
 
-    // MARK: Layout
-
-    func build() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640), styleMask: [.titled, .closable, .miniaturizable],
-                         backing: .buffered, defer: false)
-        w.title = "neatly"
-        w.isReleasedWhenClosed = false
-        w.delegate = self
-
-        // Header: icon, name, what it's doing.
-        let icon = NSImageView(image: NSImage(contentsOf: Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
-                                               ?? AppBundle.location.appending(path: "Contents/Resources/AppIcon.icns"))
-                               ?? NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: nil)!)
-        icon.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
-        let title = NSTextField(labelWithString: "neatly")
-        title.font = .boldSystemFont(ofSize: 22)
-        status.textColor = .secondaryLabelColor
-        let headText = NSStackView(views: [title, status])
-        headText.orientation = .vertical
-        headText.alignment = .leading
-        headText.spacing = 2
-        let head = NSStackView(views: [icon, headText])
-        head.spacing = 14
-
-        // Drop zone.
-        let drop = DropZone { urls in MenuBar.shared.dropped(urls) }
-
-        // One click.
-        let tidyDesktop = NSButton(title: "Tidy Desktop", target: self, action: #selector(tidyDesktop))
-        let tidyDownloads = NSButton(title: "Tidy Downloads", target: self, action: #selector(tidyDownloads))
-        let tidyFolder = NSButton(title: "Choose a Folder…", target: self, action: #selector(tidyFolder))
-        let undo = NSButton(title: "Undo Last Tidy", target: self, action: #selector(undoLast))
-        let actions = NSStackView(views: [tidyDesktop, tidyDownloads, tidyFolder, undo])
-        actions.spacing = 8
-
-        // Settings.
-        length.target = self; length.action = #selector(changed)
-        caseMenu.addItems(withTitles: ["lowercase", "Title Case"])
-        sepMenu.addItems(withTitles: ["dashes  a-b", "underscores  a_b", "spaces  a b"])
-        dateMenu.addItems(withTitles: ["no date", "date first", "date last"])
-        countdown.addItems(withTitles: ["3 seconds", "5 seconds", "10 seconds", "30 seconds", "wait for me"])
-        for c in [caseMenu, sepMenu, dateMenu, countdown] { c.target = self; c.action = #selector(changed) }
-        for b in [appName, copyShots, pauseButton] { b.target = self; b.action = #selector(changed) }
-
-        let grid = NSGridView(views: [
-            [label("Name length"), length],
-            [label("Style"), NSStackView(views: [caseMenu, sepMenu])],
-            [label("Date"), dateMenu],
-            [label("Download popup saves after"), countdown],
-        ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.column(at: 0).xPlacement = .trailing
-        example.font = .monospacedSystemFont(ofSize: 13, weight: .medium)
-        example.textColor = .controlAccentColor
-
-        // Footer: where it lives, and how to stop it.
-        let hint = NSTextField(wrappingLabelWithString:
-            "neatly runs in your menu bar (the ✦ icon at the top right). New downloads get a small popup with a name and "
-            + "folder; new screenshots are named on their own, with Undo. Drop files on the menu-bar icon too.")
-        hint.textColor = .secondaryLabelColor
-        hint.font = .systemFont(ofSize: 12)
-        hint.preferredMaxLayoutWidth = 512
-        let quit = NSButton(title: "Quit neatly", target: MenuBar.shared, action: #selector(MenuBar.quit))
-        let log = NSButton(title: "Open Log", target: MenuBar.shared, action: #selector(MenuBar.openLog))
-        let footerButtons = NSStackView(views: [pauseButton, NSView(), log, quit])
-
-        let stack = NSStackView(views: [head, drop, actions, separator(), section("Naming"), grid, example,
-                                        appName, copyShots, separator(), hint, footerButtons])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 14
-        stack.edgeInsets = NSEdgeInsets(top: 22, left: 24, bottom: 18, right: 24)
-        for v in [drop, hint, footerButtons] as [NSView] {
-            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48).isActive = true
-        }
-        drop.heightAnchor.constraint(equalToConstant: 130).isActive = true
-        stack.widthAnchor.constraint(equalToConstant: 560).isActive = true
-        stack.setCustomSpacing(6, after: grid)
-        w.contentView = stack
-        w.setContentSize(stack.fittingSize)
-        window = w
-    }
-
-    func label(_ s: String) -> NSTextField {
-        let l = NSTextField(labelWithString: s)
-        l.textColor = .secondaryLabelColor
-        return l
-    }
-    func section(_ s: String) -> NSTextField {
-        let l = NSTextField(labelWithString: s)
-        l.font = .boldSystemFont(ofSize: 13)
-        return l
-    }
-    func separator() -> NSView {
-        let b = NSBox(); b.boxType = .separator
-        b.widthAnchor.constraint(equalToConstant: 512).isActive = true
-        return b
-    }
-
-    // MARK: Settings ⇄ controls
-
-    let countdownValues = [3, 5, 10, 30, 0]
-
-    func refresh() {
-        let p = namer.profile
-        length.selectedSegment = StyleProfile.Length.allCases.firstIndex(of: p.len) ?? 0
-        caseMenu.selectItem(at: p.lowercase ? 0 : 1)
-        sepMenu.selectItem(at: ["-": 0, "_": 1, " ": 2][p.separator] ?? 0)
-        dateMenu.selectItem(at: p.date == .prefix ? 1 : p.date == .suffix ? 2 : 0)
-        countdown.selectItem(at: countdownValues.firstIndex(of: timeout) ?? 1)
-        appName.state = p.appName == true ? .on : .off
-        copyShots.state = p.copyScreenshots == true ? .on : .off
-        pauseButton.state = paused ? .on : .off
-        let sample = p.len == .short ? "hot-honey-cornbread" : p.len == .standard ? "hot-honey-cornbread-recipe"
-                                                                               : "hot-honey-cornbread-recipe-10-inch-skillet"
-        example.stringValue = "Example:  " + p.render(sample, date: Date(), app: "Safari")
-        let all = Correction.all().filter { $0.auto != true }
-        let kept = all.filter { !$0.chosen.isEmpty && $0.chosen == $0.suggested }.count
-        status.stringValue = (paused ? "Paused" : "Running")
-            + (all.isEmpty ? " — waiting for your first download or screenshot"
-                           : " — you kept \(Int((Double(kept) / Double(all.count) * 100).rounded()))% of \(all.count) suggestions as they were")
-    }
-
-    @objc func changed() {
-        MenuBar.shared.change { p in
-            p.length = StyleProfile.Length.allCases[max(0, length.selectedSegment)]
-            p.lowercase = caseMenu.indexOfSelectedItem == 0
-            p.separator = ["-", "_", " "][max(0, sepMenu.indexOfSelectedItem)]
-            p.date = [nil, .prefix, .suffix][max(0, dateMenu.indexOfSelectedItem)]
-            p.appName = appName.state == .on
-            p.copyScreenshots = copyShots.state == .on
-            p.countdown = countdownValues[max(0, countdown.indexOfSelectedItem)]
-        }
-        timeout = namer.profile.countdown ?? timeout
-        if (pauseButton.state == .on) != paused { MenuBar.shared.togglePause() }
-        refresh()
-    }
-
-    // MARK: Actions
-
-    @objc func tidyDesktop() { MenuBar.shared.tidyDesktop() }
-    @objc func tidyDownloads() { MenuBar.shared.tidy([FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads").path]) }
-    @objc func tidyFolder() { MenuBar.shared.tidyFolder() }
-    @objc func undoLast() { MenuBar.shared.undoLastTidy(); refresh() }
-
-    /// NEATLY_UI_TEST="home:length=standard,home:date=prefix,home:case=title,home:countdown=10,home:drop=<path>,home:snapshot=<png>"
+    /// NEATLY_UI_TEST="home:length=standard,home:style=title,home:date=on,home:downloads=off,home:screenshots=off,
+    ///                 home:countdown=10,home:drop=<path>,home:snapshot=<png>"
     func uiTest() {
         guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"] else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [model] in
             for step in t.split(separator: ",").map(String.init) where step.hasPrefix("home:") {
                 let kv = step.dropFirst(5).split(separator: "=", maxSplits: 1).map(String.init)
                 guard kv.count == 2 else { continue }
                 switch kv[0] {
-                case "length": self.length.selectedSegment = ["short", "standard", "detailed"].firstIndex(of: kv[1]) ?? 0; self.changed()
-                case "date": self.dateMenu.selectItem(at: ["none", "prefix", "suffix"].firstIndex(of: kv[1]) ?? 0); self.changed()
-                case "case": self.caseMenu.selectItem(at: kv[1] == "title" ? 1 : 0); self.changed()
-                case "countdown": self.countdown.selectItem(at: self.countdownValues.firstIndex(of: Int(kv[1]) ?? 5) ?? 1); self.changed()
+                case "length": model.length = StyleProfile.Length(rawValue: kv[1]) ?? .short
+                case "style": model.style = NameStyle(rawValue: kv[1]) ?? .dashes
+                case "date": model.dateFirst = kv[1] == "on"
+                case "downloads": model.downloads = kv[1] == "on"
+                case "screenshots": model.screenshots = kv[1] == "on"
+                case "countdown": model.countdown = Int(kv[1]) ?? 5
                 case "drop": MenuBar.shared.dropped(kv[1].split(separator: "|").map { URL(fileURLWithPath: String($0)) })
-                case "snapshot": self.snapshot(to: kv[1])
+                case "snapshot": HomeWindow.snapshot(model, to: kv[1])
                 default: break
                 }
             }
         }
     }
 
-    /// Draw the window into a PNG without putting it on screen (tests check the layout this way).
-    func snapshot(to path: String) {
-        guard let view = window?.contentView else { return }
-        view.appearance = NSAppearance(named: .aqua)          // light mode, so text shows up on the white below
-        view.layoutSubtreeIfNeeded()
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        view.appearance = nil
-        let img = NSImage(size: view.bounds.size)
-        img.lockFocus()
-        NSColor.windowBackgroundColor.usingColorSpace(.deviceRGB)?.setFill()
-        NSColor(white: 0.93, alpha: 1).setFill()
-        NSRect(origin: .zero, size: view.bounds.size).fill()
-        rep.draw(in: NSRect(origin: .zero, size: view.bounds.size))
-        img.unlockFocus()
-        guard let tiff = img.tiffRepresentation, let out = NSBitmapImageRep(data: tiff) else { return }
-        try? out.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    /// Draw the window into PNGs (light and dark) without putting it on screen: the tests check the layout this way.
+    static func snapshot(_ model: HomeModel, to path: String) {
+        for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
+            model.moreOpen = true
+            model.forPicture = true
+            defer { model.forPicture = false }
+            let r = ImageRenderer(content: HomeView(model: model)
+                .environment(\.colorScheme, scheme)
+                .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.97)))
+            r.scale = 2
+            guard let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { continue }
+            let out = suffix.isEmpty ? path : path.replacingOccurrences(of: ".png", with: "\(suffix).png")
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
+        }
         print("home: snapshot \(path)")
     }
 }
 
-/// "Drop files or folders here": a dashed box that takes files from Finder.
-final class DropZone: NSView {
-    let onDrop: ([URL]) -> Void
-    var hovering = false { didSet { needsDisplay = true } }
+// MARK: - Model: the window's switches ⇄ neatly's settings
 
-    init(onDrop: @escaping ([URL]) -> Void) {
-        self.onDrop = onDrop
-        super.init(frame: .zero)
-        registerForDraggedTypes([.fileURL])
-        let icon = NSImageView(image: NSImage(systemSymbolName: "square.and.arrow.down.on.square", accessibilityDescription: nil)!)
-        icon.symbolConfiguration = .init(pointSize: 30, weight: .regular)
-        icon.contentTintColor = .secondaryLabelColor
-        let title = NSTextField(labelWithString: "Drop files or folders here")
-        title.font = .systemFont(ofSize: 15, weight: .semibold)
-        let sub = NSTextField(labelWithString: "neatly suggests a name for each one. Nothing changes until you click Rename.")
-        sub.textColor = .secondaryLabelColor
-        sub.font = .systemFont(ofSize: 12)
-        let stack = NSStackView(views: [icon, title, sub])
-        stack.orientation = .vertical
-        stack.spacing = 6
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-                                     stack.centerYAnchor.constraint(equalTo: centerYAnchor)])
+enum NameStyle: String, CaseIterable {
+    case dashes, title, underscores
+    var example: String {
+        switch self { case .dashes: "beach-trip"; case .title: "Beach Trip"; case .underscores: "beach_trip" }
     }
-    required init?(coder: NSCoder) { fatalError() }
+}
 
-    override func draw(_ dirtyRect: NSRect) {
-        let r = bounds.insetBy(dx: 1.5, dy: 1.5)
-        let path = NSBezierPath(roundedRect: r, xRadius: 14, yRadius: 14)
-        (hovering ? NSColor.controlAccentColor.withAlphaComponent(0.12) : NSColor.quaternaryLabelColor.withAlphaComponent(0.08)).setFill()
-        path.fill()
-        path.lineWidth = 2
-        path.setLineDash([7, 5], count: 2, phase: 0)
-        (hovering ? NSColor.controlAccentColor : NSColor.tertiaryLabelColor).setStroke()
-        path.stroke()
+@MainActor
+final class HomeModel: ObservableObject {
+    @Published var on = true { didSet { if !loading, on == paused { MenuBar.shared.togglePause() } } }
+    @Published var downloads = true { didSet { save() } }
+    @Published var screenshots = true { didSet { save() } }
+    @Published var style = NameStyle.dashes { didSet { save() } }
+    @Published var length = StyleProfile.Length.short { didSet { save() } }
+    @Published var dateFirst = false { didSet { save() } }
+    @Published var appName = false { didSet { save() } }
+    @Published var copyShots = false { didSet { save() } }
+    @Published var countdown = 5 { didSet { save() } }
+    @Published var named = 0
+    @Published var moreOpen = false      // view state lives here: SwiftUI's @State needs Xcode's macro plugin
+    @Published var dropping = false
+    var forPicture = false               // drawing for a test picture: the drop handler can't be drawn off screen
+    private var loading = false
+
+    func reload() {
+        loading = true
+        let p = namer.profile
+        on = !paused
+        downloads = p.watchDownloads != false
+        screenshots = p.watchScreenshots != false
+        style = p.separator == "_" ? .underscores : (!p.lowercase || p.separator == " ") ? .title : .dashes
+        length = p.len
+        dateFirst = p.date != nil
+        appName = p.appName == true
+        copyShots = p.copyScreenshots == true
+        countdown = timeout
+        named = Correction.all().filter { !$0.chosen.isEmpty }.count
+        loading = false
     }
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { hovering = true; return .copy }
-    override func draggingExited(_ sender: NSDraggingInfo?) { hovering = false }
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        hovering = false
-        let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
-        onDrop(urls)
-        return !urls.isEmpty
+    func save() {
+        guard !loading else { return }
+        MenuBar.shared.change { p in
+            p.watchDownloads = downloads
+            p.watchScreenshots = screenshots
+            switch style {
+            case .dashes: p.separator = "-"; p.lowercase = true
+            case .title: p.separator = " "; p.lowercase = false
+            case .underscores: p.separator = "_"; p.lowercase = true
+            }
+            p.length = length
+            p.date = dateFirst ? .prefix : nil
+            p.appName = appName
+            p.copyScreenshots = copyShots
+            p.countdown = countdown
+        }
+        timeout = countdown
+        objectWillChange.send()   // the preview name follows
+    }
+
+    /// What a name looks like with the current choices — shown live in the window.
+    var preview: String {
+        let base = length == .short ? "hot-honey-cornbread" : length == .standard ? "hot-honey-cornbread-recipe"
+                                                                                 : "hot-honey-cornbread-recipe-cast-iron"
+        return namer.profile.render(base, date: Date(), app: appName ? "Safari" : nil) + ".png"
+    }
+}
+
+// MARK: - The look
+
+/// neatly's colors: the teal → blue of the app icon.
+let brand = Color(red: 0.13, green: 0.62, blue: 0.68)
+let brandGradient = LinearGradient(colors: [Color(red: 0.20, green: 0.78, blue: 0.72), Color(red: 0.16, green: 0.42, blue: 0.86)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+
+struct HomeView: View {
+    @ObservedObject var model: HomeModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            header
+            dropZone
+            HStack(spacing: 12) {
+                Tile(icon: "menubar.dock.rectangle", color: .blue, title: "Tidy Desktop", subtitle: "Name what's on it") {
+                    MenuBar.shared.tidyDesktop()
+                }
+                Tile(icon: "arrow.down.circle.fill", color: .green, title: "Tidy Downloads", subtitle: "Name your downloads") {
+                    MenuBar.shared.tidy([FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads").path])
+                }
+                Tile(icon: "folder.fill", color: .orange, title: "Pick a Folder", subtitle: "Any folder you like") {
+                    MenuBar.shared.tidyFolder()
+                }
+            }
+
+            Card(title: "Automatically") {
+                SwitchRow(icon: "arrow.down.circle.fill", color: .green, title: "New downloads",
+                          subtitle: "Suggest a clear name and a place to keep it", isOn: $model.downloads)
+                Divider().padding(.leading, 44)
+                SwitchRow(icon: "camera.viewfinder", color: .purple, title: "New screenshots",
+                          subtitle: "Give them a real name right away — you can always undo", isOn: $model.screenshots)
+            }
+
+            Card(title: "How names look") {
+                HStack(spacing: 8) {
+                    ForEach(NameStyle.allCases, id: \.self) { s in
+                        Chip(text: s.example, selected: model.style == s) { model.style = s }
+                    }
+                }
+                HStack(spacing: 8) {
+                    Text("Length").foregroundStyle(.secondary).frame(width: 60, alignment: .leading)
+                    ForEach(StyleProfile.Length.allCases, id: \.self) { l in
+                        Chip(text: l == .short ? "Short" : l == .standard ? "Medium" : "Long", selected: model.length == l) { model.length = l }
+                    }
+                    Spacer()
+                }
+                SwitchRow(icon: "calendar", color: .red, title: "Start with the date", subtitle: nil, isOn: $model.dateFirst)
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.fill").foregroundStyle(brand)
+                    Text(model.preview).font(.system(.body, design: .rounded).weight(.medium)).lineLimit(1).truncationMode(.middle)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(brand.opacity(0.10)))
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Button { withAnimation(.easeOut(duration: 0.15)) { model.moreOpen.toggle() } } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.right").rotationEffect(.degrees(model.moreOpen ? 90 : 0)).font(.caption.weight(.bold))
+                        Text("More options").font(.callout.weight(.medium))
+                    }.foregroundStyle(.secondary).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                if model.moreOpen {
+                    Card(title: nil) {
+                        SwitchRow(icon: "app.badge", color: .indigo, title: "Add the app's name to screenshots",
+                                  subtitle: "e.g. “…-in-safari”", isOn: $model.appName)
+                        Divider().padding(.leading, 44)
+                        SwitchRow(icon: "doc.on.clipboard", color: .teal, title: "Copy new screenshots",
+                                  subtitle: "So you can paste them right away", isOn: $model.copyShots)
+                        Divider().padding(.leading, 44)
+                        HStack(spacing: 12) {
+                            IconBadge(icon: "timer", color: .gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("If I don't answer a download suggestion")
+                                Text("neatly saves it as suggested after:").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        HStack(spacing: 6) {
+                            ForEach([3, 5, 10, 30, 0], id: \.self) { s in
+                                Chip(text: s == 0 ? "Wait for me" : "\(s) sec", selected: model.countdown == s) { model.countdown = s }
+                            }
+                        }.padding(.leading, 44)
+                    }
+                }
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill").font(.caption)
+                Text("Everything stays on your Mac. neatly lives in your menu bar ✦").font(.caption)
+                Spacer()
+                Button("Quit neatly") { MenuBar.shared.quit() }.buttonStyle(.plain).font(.caption).foregroundStyle(brand)
+            }.foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 26).padding(.top, 34).padding(.bottom, 20)
+        .frame(width: 520)
+    }
+
+    var header: some View {
+        HStack(spacing: 14) {
+            Image(nsImage: AppBundle.iconPNG(256).flatMap(NSImage.init(data:)) ?? NSImage())
+                .resizable().frame(width: 58, height: 58)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("neatly").font(.system(size: 28, weight: .bold, design: .rounded))
+                Text(model.named == 0 ? "Clear names for your files, automatically."
+                                      : "\(model.named) files named so far.")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(spacing: 4) {
+                Switch(isOn: $model.on)
+                Text(model.on ? "On" : "Paused").font(.caption.weight(.medium)).foregroundStyle(model.on ? brand : .secondary)
+            }
+        }
+    }
+
+    var dropZone: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "tray.and.arrow.down.fill").font(.system(size: 34)).foregroundStyle(brandGradient)
+            Text("Drop files here to rename them").font(.system(.title3, design: .rounded).weight(.semibold))
+            Text("neatly suggests clear names. Nothing changes until you say so.").font(.callout).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 26)
+        .background(RoundedRectangle(cornerRadius: 18).fill(brand.opacity(model.dropping ? 0.18 : 0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(brand.opacity(model.dropping ? 0.9 : 0.45),
+                                                                 style: StrokeStyle(lineWidth: 2, dash: [8, 6])))
+        .modifier(DropTarget(model: model))
+    }
+}
+
+/// The drop handling, separate so test pictures can leave it out.
+struct DropTarget: ViewModifier {
+    @ObservedObject var model: HomeModel
+    func body(content: Content) -> some View {
+        if model.forPicture { content } else { content.onDrop(of: [.fileURL], isTargeted: $model.dropping) { providers in
+            let box = URLBox()
+            let group = DispatchGroup()
+            for p in providers {
+                group.enter()
+                _ = p.loadObject(ofClass: URL.self) { u, _ in if let u { box.add(u) }; group.leave() }
+            }
+            group.notify(queue: .main) { MainActor.assumeIsolated { MenuBar.shared.dropped(box.urls) } }
+            return true
+        } }
+    }
+}
+
+/// Collects dropped file URLs from background callbacks.
+final class URLBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var list: [URL] = []
+    func add(_ u: URL) { lock.lock(); list.append(u); lock.unlock() }
+    var urls: [URL] { lock.lock(); defer { lock.unlock() }; return list }
+}
+
+// MARK: - Building blocks (drawn in SwiftUI, so they look like neatly and render in tests)
+
+struct Card<Content: View>: View {
+    let title: String?
+    @ViewBuilder let content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title { Text(title).font(.headline) }
+            VStack(alignment: .leading, spacing: 12) { content }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.04)))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.primary.opacity(0.07)))
+        }
+    }
+}
+
+struct IconBadge: View {
+    let icon: String, color: Color
+    var body: some View {
+        Image(systemName: icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+            .frame(width: 32, height: 32).background(RoundedRectangle(cornerRadius: 8).fill(color.gradient))
+    }
+}
+
+struct SwitchRow: View {
+    let icon: String, color: Color, title: String, subtitle: String?
+    @Binding var isOn: Bool
+    var body: some View {
+        HStack(spacing: 12) {
+            IconBadge(icon: icon, color: color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            Switch(isOn: $isOn)
+        }
+    }
+}
+
+struct Switch: View {
+    @Binding var isOn: Bool
+    var body: some View {
+        Button { withAnimation(.easeOut(duration: 0.15)) { isOn.toggle() } } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule().fill(isOn ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.primary.opacity(0.15)))
+                    .frame(width: 42, height: 24)
+                Circle().fill(.white).shadow(color: .black.opacity(0.2), radius: 1, y: 1).frame(width: 20, height: 20).padding(2)
+            }
+        }.buttonStyle(.plain).accessibilityValue(isOn ? "on" : "off")
+    }
+}
+
+struct Chip: View {
+    let text: String, selected: Bool, action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(text).font(.system(.callout, design: .rounded).weight(selected ? .semibold : .regular))
+                .lineLimit(1)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .foregroundStyle(selected ? .white : .primary)
+                .background(Capsule().fill(selected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.primary.opacity(0.06))))
+        }.buttonStyle(.plain)
+    }
+}
+
+struct Tile: View {
+    let icon: String, color: Color, title: String, subtitle: String, action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon).font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 40, height: 40).background(Circle().fill(color.gradient))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(.body, design: .rounded).weight(.semibold)).foregroundStyle(.primary)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.primary.opacity(0.07)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+    }
+}
+
+/// Tiles dim a little while pressed, like Apple's.
+struct PressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.7 : 1).scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }

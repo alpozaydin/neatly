@@ -363,13 +363,14 @@ func isScreenshot(_ name: String) -> Bool {
         for (name, size) in now where !seen.contains(name) {
             guard let p = pending[name], p.size == size else {
                 // First sight: the app in front is the one being captured (not the screenshot tool itself).
-                let front = NSWorkspace.shared.frontmostApplication?.localizedName
+                let front = ProcessInfo.processInfo.environment["NEATLY_FRONT_APP"]   // tests: don't depend on the screen
+                    ?? NSWorkspace.shared.frontmostApplication?.localizedName
                 let app = ["screencaptureui", "Screenshot", "neatly", "loginwindow"].contains(front ?? "") ? nil : front
                 pending[name] = (size, pending[name]?.app ?? app)
                 continue
             }
             seen.insert(name); pending[name] = nil
-            if paused { continue }
+            if paused || namer.profile.watchScreenshots == false { continue }
             let url = dir.appending(path: name)
             guard case .suggested(let s) = await namer.suggest(for: url, app: p.app),
                   let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
@@ -457,7 +458,7 @@ var paused = false
         for (name, size) in now where !seen.contains(name) {
             if pending[name] == size {           // same size two checks in a row: finished
                 seen.insert(name); pending[name] = nil
-                if paused { print("\(name)  skip (paused)"); continue }
+                if paused || namer.profile.watchDownloads == false { print("\(name)  skip (paused)"); continue }
                 let url = dir.appending(path: name)
                 let original = url.deletingPathExtension().lastPathComponent
                 // Every new download gets a name and a folder — except installers and files already handled.

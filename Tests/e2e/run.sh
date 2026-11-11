@@ -155,9 +155,9 @@ if want shot-redo; then setup shot-redo; start "redo"
     check "pill: ↻ never repeats a name" '[ "$(echo "$names" | sort | uniq -d | wc -l | tr -d " ")" = "0" ]'
     stop; fi
 
-if want shot-app; then setup shot-app; NEATLY_DATA_DIR=$T/data "$B" style --app on >/dev/null; start "none"
+if want shot-app; then setup shot-app; NEATLY_DATA_DIR=$T/data "$B" style --app on >/dev/null; NEATLY_FRONT_APP=Safari start "none"
     shot; waitfor 'ls "$T/shots" | grep -qv "^Screenshot"' 90
-    check "app name added (…-in-<app>)" 'ls "$T/shots" | grep -q -- "-in-"'
+    check "app name added (…-in-safari)" 'ls "$T/shots" | grep -q -- "-in-safari"'
     stop; fi
 
 if want shot-paused; then setup shot-paused; NEATLY_UI_TEST="menu:Pause" "$B" --watch "$T/dl" --screenshots --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
@@ -189,13 +189,16 @@ fi
 
 # ─── The neatly window (opened from Spotlight/Applications) ──────────────────
 if want home; then setup home
-    cp "$ROOT/Package.swift" "$T/stage/x"; "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
-    NEATLY_UI_TEST="home:length=detailed,home:date=suffix,home:case=title,home:countdown=10,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png" \
-        "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
+    "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
+    NEATLY_UI_TEST="home:length=detailed,home:style=title,home:date=on,home:countdown=10,home:screenshots=off,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png,home:snapshot=$T/home.png" \
+        "$B" --watch "$T/dl" --screenshots --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
     s=$(cat "$T/data/style.json")
-    check "window controls change the settings" 'echo "$s" | grep -q detailed && echo "$s" | grep -q suffix && echo "$s" | grep -q "\"countdown\" : 10" && echo "$s" | grep -q "\"lowercase\" : false"'
+    check "window choices are saved (length, style, date, countdown)" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"countdown\" : 10" && echo "$s" | grep -q "\"lowercase\" : false"'
     check "dropping files on the window opens Tidy for them" 'grep -q "dropped 1 item" "$T/log"'
     pkill -f "neatly tidy $T" 2>/dev/null
+    "$E" --make shot-weather "$T/stage" >/dev/null 2>&1; mv "$T/stage/Screenshot 2026-10-11 at 09.20.03.png" "$T/shots/"; sleep 6
+    check "“New screenshots” off: screenshots are left alone" '[ -f "$T/shots/Screenshot 2026-10-11 at 09.20.03.png" ]'
+    check "window drawn (light and dark)" '[ -s "$T/home.png" ] && [ -s "$T/home-dark.png" ]'
     n=$(grep -c "home: shown" "$T/log")
     osascript -l JavaScript -e 'ObjC.import("Foundation"); $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObjectUserInfoDeliverImmediately("dev.neatly.show'"$NEATLY_NOTIFY"'", $(), $(), true)' >/dev/null
     sleep 2
