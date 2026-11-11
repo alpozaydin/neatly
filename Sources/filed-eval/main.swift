@@ -1,7 +1,7 @@
 import Foundation
 import NamerCore
 
-// Runs Tests/eval/cases.json and prints a score. Usage: swift run namer-eval [--offline] [--no-model] [--holdout]
+// Runs Tests/eval/cases.json and prints a score. Usage: swift run filed-eval [--offline] [--no-model] [--holdout]
 // --holdout runs Tests/eval/holdout.json instead: cases nobody tuned the rules on, for an honest score.
 
 struct Cases: Decodable {
@@ -31,7 +31,7 @@ for m in decisionMisses { print("  ✗ \(m)") }
 
 // MARK: 2. Naming (generated files)
 
-let dir = FileManager.default.temporaryDirectory.appending(path: "namer-eval-\(ProcessInfo.processInfo.processIdentifier)")
+let dir = FileManager.default.temporaryDirectory.appending(path: "filed-eval-\(ProcessInfo.processInfo.processIdentifier)")
 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: dir) }
 

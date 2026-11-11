@@ -112,7 +112,7 @@ enum Model {
             guard let out = try? await session.respond(to: prompt, options: options) else { return nil }
             text = out.content
         }
-        if ProcessInfo.processInfo.environment["NAMER_DEBUG"] != nil {
+        if ProcessInfo.processInfo.environment["FILED_DEBUG"] != nil {
             FileHandle.standardError.write(Data("--- prompt\n\(prompt)\n--- answer\n\(text)\n---\n".utf8))
         }
         // First line only; models sometimes add an explanation after it.

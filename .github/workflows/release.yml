@@ -1,4 +1,4 @@
-# Push a tag like v0.1.0 → GitHub builds namer on a Mac with Xcode and attaches it to a release.
+# Push a tag like v0.1.0 → GitHub builds filed on a Mac with Xcode and attaches it to a release.
 # Users never need Xcode: they download this binary (scripts/install.sh or Homebrew).
 name: release
 on:
@@ -12,17 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: swift build -c release --product namer --arch arm64
+        run: swift build -c release --product filed --arch arm64
       - name: Self-checks
         run: swift run checks
       - name: Package
         run: |
           mkdir dist
-          cp "$(swift build -c release --product namer --arch arm64 --show-bin-path)/namer" dist/namer
-          codesign --force --sign - dist/namer          # ad-hoc signature: required to run on Apple silicon
-          tar -czf namer-macos-arm64.tar.gz -C dist namer
-          shasum -a 256 namer-macos-arm64.tar.gz | tee namer-macos-arm64.tar.gz.sha256
+          cp "$(swift build -c release --product filed --arch arm64 --show-bin-path)/filed" dist/filed
+          codesign --force --sign - dist/filed          # ad-hoc signature: required to run on Apple silicon
+          tar -czf filed-macos-arm64.tar.gz -C dist filed
+          shasum -a 256 filed-macos-arm64.tar.gz | tee filed-macos-arm64.tar.gz.sha256
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" namer-macos-arm64.tar.gz namer-macos-arm64.tar.gz.sha256 --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" filed-macos-arm64.tar.gz filed-macos-arm64.tar.gz.sha256 --generate-notes

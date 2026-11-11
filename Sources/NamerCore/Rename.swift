@@ -3,8 +3,8 @@ import Foundation
 /// Renaming with an undo trail: the original name is kept in an extended attribute on the file itself,
 /// so undo works even after the app restarts or the file moves.
 public enum Rename {
-    static let attr = "dev.namer.original-name"
-    static let folderAttr = "dev.namer.original-folder"
+    static let attr = "dev.filed.original-name"
+    static let folderAttr = "dev.filed.original-folder"
 
     /// Rename (and optionally move to `folder`). Never overwrites: adds -2, -3… instead.
     @discardableResult
@@ -28,7 +28,7 @@ public enum Rename {
         return target
     }
 
-    public static func originalName(_ url: URL) -> String? { read(url, attr) }
+    public static func originalName(_ url: URL) -> String? { read(url, attr) ?? read(url, "dev.namer.original-name") }   // old name
 
     static func read(_ url: URL, _ name: String) -> String? {
         let len = getxattr(url.path, name, nil, 0, 0, 0)
@@ -41,7 +41,7 @@ public enum Rename {
     @discardableResult
     public static func undo(_ url: URL) throws -> URL? {
         guard let name = originalName(url) else { return nil }
-        let folder = read(url, folderAttr).map { URL(fileURLWithPath: $0) } ?? url.deletingLastPathComponent()
+        let folder = (read(url, folderAttr) ?? read(url, "dev.namer.original-folder")).map { URL(fileURLWithPath: $0) } ?? url.deletingLastPathComponent()
         let target = folder.appending(path: name)
         guard !FileManager.default.fileExists(atPath: target.path) else {
             throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: target.path])
@@ -49,6 +49,26 @@ public enum Rename {
         try FileManager.default.moveItem(at: url, to: target)
         removexattr(target.path, attr, 0)
         removexattr(target.path, folderAttr, 0)
+        for old in ["dev.namer.original-name", "dev.namer.original-folder"] { removexattr(target.path, old, 0) }
         return target
     }
+}
+
+/// The project was called "namer" before 0.1.0: move its settings and corrections to the new folder once.
+public func migrateFromOldName() {
+    let fm = FileManager.default
+    let support = fm.homeDirectoryForCurrentUser.appending(path: "Library/Application Support")
+    let old = support.appending(path: "namer"), new = support.appending(path: "filed")
+    guard fm.fileExists(atPath: old.path) else { return }
+    if !fm.fileExists(atPath: new.path) { try? fm.moveItem(at: old, to: new); return }
+    // Both exist (the old service wrote while we moved): append old corrections, then drop the old folder.
+    let oldLog = old.appending(path: "corrections.jsonl"), newLog = new.appending(path: "corrections.jsonl")
+    if let extra = try? Data(contentsOf: oldLog) {
+        if let h = try? FileHandle(forWritingTo: newLog) { h.seekToEndOfFile(); h.write(extra); try? h.close() }
+        else { try? extra.write(to: newLog) }
+    }
+    if !fm.fileExists(atPath: new.appending(path: "style.json").path) {
+        try? fm.moveItem(at: old.appending(path: "style.json"), to: new.appending(path: "style.json"))
+    }
+    try? fm.removeItem(at: old)
 }
