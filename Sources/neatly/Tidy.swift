@@ -26,6 +26,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
     let renameButton = NSButton(title: "Rename", target: nil, action: nil)
     let undoButton = NSButton(title: "Undo All", target: nil, action: nil)
     let doneButton = NSButton(title: "Done", target: nil, action: nil)
+    let closeButton = NSButton(title: "Close", target: nil, action: nil)
 
     init(folder: URL, namer: Namer) {
         self.folder = folder
@@ -108,7 +109,8 @@ final class TidyWindow: NSObject, NSWindowDelegate {
         renameButton.isEnabled = false
         undoButton.target = self; undoButton.action = #selector(undoAll); undoButton.isHidden = true
         doneButton.target = self; doneButton.action = #selector(done)
-        let close = NSButton(title: "Close", target: self, action: #selector(done))
+        closeButton.target = self; closeButton.action = #selector(done)
+        let close = closeButton
         doneButton.isHidden = true
         let bottom = NSStackView(views: [hint, NSView(), undoButton, close, renameButton, doneButton])
 
@@ -167,6 +169,26 @@ final class TidyWindow: NSObject, NSWindowDelegate {
             updateButton()
         }
         header.stringValue = "Named \(items.filter { $0.suggestion != nil }.count) of \(items.count). Check the names, then Rename."
+        uiTest()
+    }
+
+    /// NEATLY_UI_TEST="edit0:name,untick1,rename,undoall,done": press the buttons by code, to test the whole path.
+    func uiTest() {
+        guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"] else { return }
+        var delay = 1.0
+        for step in t.split(separator: ",").map(String.init) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if step.hasPrefix("edit"), let colon = step.firstIndex(of: ":"), let i = Int(step.dropFirst(4).prefix(while: \.isNumber)),
+                   self.items.indices.contains(i) { self.items[i].field.stringValue = String(step[step.index(after: colon)...]) }
+                if step.hasPrefix("untick"), let i = Int(step.dropFirst(6)), self.items.indices.contains(i) {
+                    self.items[i].check.state = .off; self.updateButton()
+                }
+                if step == "rename" { self.renameAll() }
+                if step == "undoall" { self.undoAll() }
+                if step == "done" { self.done() }
+            }
+            delay += 1.5
+        }
     }
 
     var chosen: [Int] {
@@ -194,9 +216,10 @@ final class TidyWindow: NSObject, NSWindowDelegate {
             Correction(original: items[i].url.lastPathComponent, suggested: items[i].suggestion ?? "", chosen: typed,
                        via: "tidy", source: nil, title: nil).save()
         }
-        Tidy.saveLast(items.compactMap(\.renamed))
+        if done > 0 { Tidy.saveLast(items.compactMap(\.renamed)) }   // an empty run must not forget the last real one
         header.stringValue = "Renamed \(done) file\(done == 1 ? "" : "s")."
         renameButton.isHidden = true
+        closeButton.isHidden = true
         undoButton.isHidden = false
         doneButton.isHidden = false
     }
