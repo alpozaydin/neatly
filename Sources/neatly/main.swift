@@ -18,7 +18,7 @@ usage: neatly [options] <file or folder>...
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
   tidy [folder]  review window: name every badly named file in a folder (Desktop by default), then Rename
-  undo <file>  restore a file's original name  (undo --last: the last Tidy Up)
+  undo <file>  restore a file's original name  (undo --last: the last tidy)
   keep <file>  mark a name as yours: never suggest for it again
   learn <folder>...  learn your naming style from names you already chose (reads names only)
   style        show or set the naming style: --length short|standard|detailed, --case lower|title,
