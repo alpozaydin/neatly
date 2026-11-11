@@ -19,12 +19,15 @@ usage: namer [options] <file or folder>...
   keep <file>  mark a name as yours: never suggest for it again
   learn <folder>...  learn your naming style from names you already chose (reads names only)
   style        show the saved style  (style --reset to delete it)
+  --version    print the version
   stats        how often you saved the suggestion unchanged, and your recent edits
 """
 
 setvbuf(stdout, nil, _IOLBF, 0)   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst())
+let version = "0.1.0"
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
+if args.first == "--version" { print("namer \(version)"); exit(0) }
 
 if args.first == "dialog" { runDialog(Array(args.dropFirst())) }   // the popup, started by the watcher
 

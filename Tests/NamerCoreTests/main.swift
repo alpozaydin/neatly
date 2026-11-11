@@ -103,6 +103,8 @@ func destinations() {
 /// Few-shot retrieval: a new photo of people from LinkedIn should recall the names you gave similar photos,
 /// not your invoices. Auto-saves and "Leave as is" never count as examples.
 func examples() {
+    // Build machines may not have Apple's embedding model downloaded: nothing to check then.
+    guard Embedder.shared.vector("test") != nil else { print("skipped: examples (no embedding model)"); return }
     func c(_ about: String, _ chosen: String, auto: Bool? = nil) -> Correction {
         Correction(original: "x.jpg", suggested: "x", chosen: chosen, via: "model", source: nil, title: nil,
                    auto: auto, context: about)
