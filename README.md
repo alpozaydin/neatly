@@ -35,18 +35,20 @@ lowercase-kebab, most distinctive word first, qualifier last, as short as possib
 ## What it does
 
 - **Downloads** get a small dialog with a suggested name **and folder** (below).
-- **Screenshots** are named the moment you take them, in place, with a small Undo pill under the menu bar.
-  It never takes focus, so you can keep typing.
-- **Tidy a folder**: name a whole folder at once in a review window: `neatly tidy` (Desktop) or `neatly tidy ~/Downloads`.
-  Edit any name, untick what to keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
-- Works on PDFs, Word, PowerPoint, notebooks, zips, images and screenshots, not just images.
+- **Screenshots** are named the moment you take them, in place. A small pill under the menu bar shows the
+  new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
+- **Menu-bar icon**: Tidy Desktop, Tidy a Folder, name length, date, Title Case, app name, copy screenshots to
+  the clipboard, Pause. **Drop files or a folder on the icon** to name them.
+- **Tidy a folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
+  keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
+- Works on PDFs, Word, PowerPoint, notebooks, zips, images and screenshots.
 
 ## Live mode
 
 ```sh
-neatly service install             # watch Downloads + screenshots in the background, starting at login
+neatly service install             # menu-bar icon + Downloads + screenshots, starting at login
 neatly service uninstall           # stop it
-neatly --watch ~/Downloads --ask --screenshots   # the same, in this terminal
+neatly --watch ~/Downloads --ask --screenshots --menubar   # the same, in this terminal
 ```
 
 Every new download gets a dialog with a suggested folder and name:
@@ -90,6 +92,7 @@ neatly style --length detailed     # short (default) · standard · detailed
 neatly style --case title --sep space   # Hot Honey Cornbread  (lower|title, dash|underscore|space)
 neatly style --date prefix         # 2026-11-11-hot-honey-cornbread  (none|prefix|suffix)
 neatly style --app on              # screenshots end with the app: …-in-safari
+neatly style --copy on             # new screenshots also go to the clipboard
 ```
 
 It learns per folder and skips code repos. If your folders disagree, it saves nothing and tells you.
