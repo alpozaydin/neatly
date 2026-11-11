@@ -2,7 +2,7 @@ import AppKit
 import QuickLookThumbnailing
 import NamerCore
 
-/// `filed tidy [folder]`: name a whole folder at once (Desktop by default) in a review window.
+/// `neatly tidy [folder]`: name a whole folder at once (Desktop by default) in a review window.
 /// Names appear as they are found; edit any of them, untick what you want to keep, then Rename.
 /// Nothing changes until you click Rename, and Undo All puts every name back.
 @MainActor
@@ -41,7 +41,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
     }
 
     func build() {
-        window.title = "Tidy Up — \(folder.lastPathComponent)"
+        window.title = "neatly — \(folder.lastPathComponent)"
         window.delegate = self
         window.isReleasedWhenClosed = false
 
@@ -224,7 +224,7 @@ final class FlippedView: NSView { override var isFlipped: Bool { true } }
 enum Tidy {
     static var lastURL: URL { Correction.fileURL.deletingLastPathComponent().appending(path: "last-tidy.json") }
 
-    /// Remember the last batch so `filed undo --last` works after the window is closed.
+    /// Remember the last batch so `neatly undo --last` works after the window is closed.
     static func saveLast(_ urls: [URL]) {
         try? JSONEncoder().encode(urls.map(\.path)).write(to: lastURL)
     }

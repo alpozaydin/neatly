@@ -3,7 +3,7 @@ import AppKit
 import NamerCore
 
 let usage = """
-usage: filed [options] <file or folder>...
+usage: neatly [options] <file or folder>...
   Suggests short names for badly named files. Changes nothing unless --apply is given.
 
   --apply      rename the files
@@ -32,14 +32,14 @@ migrateFromOldName()   // write log lines immediately, even when not in a termin
 var args = Array(CommandLine.arguments.dropFirst())
 let version = "0.2.0"
 if args.isEmpty || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
-if args.first == "--version" { print("filed \(version)"); exit(0) }
+if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
 if args.first == "dialog" { runDialog(Array(args.dropFirst())) }   // the popup, started by the watcher
 if args.first == "toast" { runToast(Array(args.dropFirst())) }     // the screenshot pill
 
 if args.first == "learn" {
     let roots = args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
-    guard !roots.isEmpty else { print("usage: filed learn <folder>..."); exit(1) }
+    guard !roots.isEmpty else { print("usage: neatly learn <folder>..."); exit(1) }
     let (overall, agreement, folders) = StyleProfile.learn(roots: roots)
     func describe(_ p: StyleProfile) -> String {
         let sep = p.separator == " " ? "spaces" : "'\(p.separator)'"
@@ -56,7 +56,7 @@ if args.first == "learn" {
     if args.contains("--dry-run") { exit(0) }
     if agreement < 0.6 {
         print("\nYour folders use different styles, so nothing was saved.")
-        print("Run it on the folders whose style you want for downloads, e.g.: filed learn ~/courses-fall26")
+        print("Run it on the folders whose style you want for downloads, e.g.: neatly learn ~/courses-fall26")
         exit(0)
     }
     try saved.save()
@@ -103,7 +103,7 @@ if args.first == "style" {
 }
 
 if args.first == "service" {
-    let label = "dev.filed.watch"
+    let label = "dev.neatly.watch"
     let plist = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/\(label).plist")
     let uid = getuid()
     func launchctl(_ a: [String]) {
@@ -115,7 +115,7 @@ if args.first == "service" {
         // Run a stable copy, not the build output: macOS asks for folder access again whenever the
         // program file changes, so developer rebuilds must not touch the one the service runs.
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let installed = home.appending(path: ".local/bin/filed")
+        let installed = home.appending(path: ".local/bin/neatly")
         let built = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
         if built.path != installed.path {
             try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -123,7 +123,7 @@ if args.first == "service" {
             try FileManager.default.copyItem(at: built, to: installed)
         }
         let exe = installed.path
-        let log = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/filed.log").path
+        let log = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/neatly.log").path
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -138,21 +138,22 @@ if args.first == "service" {
         </dict></plist>
         """
         try xml.write(to: plist, atomically: true, encoding: .utf8)
-        // Before 0.1.0 this was "namer": stop and remove the old service and binary.
-        launchctl(["bootout", "gui/\(uid)/dev.namer.watch"])
-        try? FileManager.default.removeItem(at: plist.deletingLastPathComponent().appending(path: "dev.namer.watch.plist"))
-        try? FileManager.default.removeItem(at: home.appending(path: ".local/bin/namer"))
+                for oldName in ["namer", "filed"] {   // earlier names of this project: stop and remove their service and binary
+            launchctl(["bootout", "gui/\(uid)/dev.\(oldName).watch"])
+            try? FileManager.default.removeItem(at: plist.deletingLastPathComponent().appending(path: "dev.\(oldName).watch.plist"))
+            try? FileManager.default.removeItem(at: home.appending(path: ".local/bin/\(oldName)"))
+        }
         migrateFromOldName()   // again: the old service may have written while it was still running
         launchctl(["bootout", "gui/\(uid)/\(label)"])
         launchctl(["bootstrap", "gui/\(uid)", plist.path])
-        print("filed now watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/filed.log")
-        print("Installed at ~/.local/bin/filed. After updating filed, run 'filed service install' again.")
-        print("Stop it any time: filed service uninstall")
+        print("neatly now watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/neatly.log")
+        print("Installed at ~/.local/bin/neatly. After updating neatly, run 'neatly service install' again.")
+        print("Stop it any time: neatly service uninstall")
     case "uninstall":
         launchctl(["bootout", "gui/\(uid)/\(label)"])
         try? FileManager.default.removeItem(at: plist)
         print("stopped and removed")
-    default: print("usage: filed service install|uninstall")
+    default: print("usage: neatly service install|uninstall")
     }
     exit(0)
 }
@@ -197,7 +198,7 @@ if args.first == "keep" {
 }
 
 if args.first == "undo", args.dropFirst().first == "--last" {
-    print("put back \(Tidy.undoLast()) name(s) from the last Tidy Up"); exit(0)
+    print("put back \(Tidy.undoLast()) name(s) from the last tidy"); exit(0)
 }
 
 if args.first == "undo" {
@@ -271,7 +272,7 @@ if args.first == "tidy" {
     TidyWindow(folder: target, namer: namer).run()
 }
 
-/// Run `filed <args>` (popup, pill) without blocking the watchers; returns what it printed.
+/// Run `neatly <args>` (popup, pill) without blocking the watchers; returns what it printed.
 func helper(_ a: [String]) async -> String {
     await withCheckedContinuation { (done: CheckedContinuation<String, Never>) in
         let p = Process()
@@ -322,7 +323,7 @@ func isScreenshot(_ name: String) -> Bool {
             guard let p = pending[name], p.size == size else {
                 // First sight: the app in front is the one being captured (not the screenshot tool itself).
                 let front = NSWorkspace.shared.frontmostApplication?.localizedName
-                let app = ["screencaptureui", "Screenshot", "filed", "loginwindow"].contains(front ?? "") ? nil : front
+                let app = ["screencaptureui", "Screenshot", "neatly", "loginwindow"].contains(front ?? "") ? nil : front
                 pending[name] = (size, pending[name]?.app ?? app)
                 continue
             }
@@ -423,7 +424,7 @@ if watch {
                 if let twin = Destination.duplicate(of: url, in: target) {
                     let r = osascript("""
                     display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(target)) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))\(timeout > 0 ? "\\n\\nMoves to Trash in \(timeout) s if you don’t answer." : "")" ¬
-                      with title "filed" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after \(timeout > 0 ? timeout : 300)
+                      with title "neatly" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after \(timeout > 0 ? timeout : 300)
                     """)
                     // No answer: an exact copy already exists, so trashing this one loses nothing (and it's in the Trash).
                     if r.ok, r.out.contains("Move to Trash") || (timeout > 0 && r.out.contains("gave up:true")) {

@@ -11,7 +11,7 @@ public struct Namer: Sendable {
     public var useModel = true
     /// The person's naming style. Names are built as lowercase-kebab, then rendered in this style.
     public var profile = StyleProfile.standard
-    /// Experimental: ask the model to double-check names made by rules. Measured in filed-eval --verify.
+    /// Experimental: ask the model to double-check names made by rules. Measured in neatly-eval --verify.
     public var verifyRules = false
     /// Wall-clock budgets. Past these we give up rather than make the user wait.
     /// Images get more: looking at a picture is the expensive, high-value step.

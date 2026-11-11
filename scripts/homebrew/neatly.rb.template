@@ -1,7 +1,7 @@
-class Filed < Formula
+class Neatly < Formula
   desc "Suggests short names and folders for your downloads, on-device"
-  homepage "https://github.com/alpozaydin/filed"
-  url "https://github.com/alpozaydin/filed/releases/download/v__VERSION__/filed-macos-arm64.tar.gz"
+  homepage "https://github.com/alpozaydin/neatly"
+  url "https://github.com/alpozaydin/neatly/releases/download/v__VERSION__/neatly-macos-arm64.tar.gz"
   version "__VERSION__"
   sha256 "__SHA256__"
   license "MIT"
@@ -10,17 +10,17 @@ class Filed < Formula
   depends_on macos: :tahoe
 
   def install
-    bin.install "filed"
+    bin.install "neatly"
   end
 
   def caveats
     <<~EOS
       Start watching ~/Downloads (also after every upgrade):
-        filed service install
+        neatly service install
     EOS
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/filed --version")
+    assert_match version.to_s, shell_output("#{bin}/neatly --version")
   end
 end
