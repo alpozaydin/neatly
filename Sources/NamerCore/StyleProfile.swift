@@ -7,7 +7,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var suffix: String?       // e.g. initials: "MAO" in "CivCore AI Model - MAO"
     public var learnedFrom = 0       // how many names this is based on
     public var examples: [String] = []
-    // Settings you choose (filed style --length … --date … --app …). Optional so older style.json files still load.
+    // Settings you choose (neatly style --length … --date … --app …). Optional so older style.json files still load.
     public var length: Length?       // nil = short
     public var date: DatePosition?   // nil = no date
     public var appName: Bool?        // screenshots: add the app they were taken in ("… in Safari")
@@ -150,7 +150,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
 
     public static var fileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Application Support/filed/style.json")
+            .appending(path: "Library/Application Support/neatly/style.json")
     }
 
     public static func load() -> StyleProfile? {

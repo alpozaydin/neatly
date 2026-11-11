@@ -4,7 +4,7 @@ import AppKit
 /// Agents and scripts that download files never get stuck waiting for a click.
 /// Typing in the name field or moving the mouse over the window stops the countdown.
 ///
-/// Runs as its own process (`filed dialog …`) so the watcher keeps its simple loop.
+/// Runs as its own process (`neatly dialog …`) so the watcher keeps its simple loop.
 /// Prints one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user>", "keep", or "none".
 @MainActor
 final class CountdownDialog: NSObject, NSTextFieldDelegate {
@@ -49,7 +49,7 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         stack.setCustomSpacing(14, after: folderLabel)
         stack.setCustomSpacing(14, after: field)
 
-        panel.title = "filed"
+        panel.title = "neatly"
         panel.contentView = stack
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -136,7 +136,7 @@ func shortFolder(_ url: URL?) -> String {
     return url.pathComponents.suffix(2).joined(separator: " › ")
 }
 
-/// filed dialog <seconds> <file> <name> [folder path]
+/// neatly dialog <seconds> <file> <name> [folder path]
 @MainActor func runDialog(_ a: [String]) -> Never {
     guard a.count >= 3, let seconds = Int(a[0]) else { print("none"); exit(1) }
     let folder = a.count > 3 && !a[3].isEmpty ? URL(fileURLWithPath: a[3]) : nil
@@ -225,7 +225,7 @@ final class Toast: NSObject {
     }
 }
 
-/// filed toast <seconds> <new name> <file path>
+/// neatly toast <seconds> <new name> <file path>
 @MainActor func runToast(_ a: [String]) -> Never {
     guard a.count >= 3, let seconds = Int(a[0]) else { print("ok"); exit(1) }
     Toast(name: a[1], file: URL(fileURLWithPath: a[2]), seconds: max(seconds, 3)).run()
