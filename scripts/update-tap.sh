@@ -8,7 +8,10 @@ tap=$(mktemp -d)
 gh repo clone alpozaydin/homebrew-tap "$tap" -- -q
 mkdir -p "$tap/Formula"
 sed -e "s/__VERSION__/$v/g" -e "s/__SHA256__/$sha/" "$(dirname "$0")/homebrew/neatly.rb.template" > "$tap/Formula/neatly.rb"
-git -C "$tap" add Formula/neatly.rb
+# Earlier names of this formula: Homebrew moves people who installed them to the new one.
+rm -f "$tap/Formula/filed.rb"
+printf '{\n  "filed": "neatly"\n}\n' > "$tap/formula_renames.json"
+git -C "$tap" add -A
 git -C "$tap" commit -qm "neatly $v"
 git -C "$tap" push -q
 echo "brew install alpozaydin/tap/neatly now installs $v"
