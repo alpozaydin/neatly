@@ -62,7 +62,10 @@ enum Model {
     static let banned: Set<String> = ["img", "image", "images", "photo", "picture", "pic", "heic", "jpg", "jpeg",
                                        "png", "svg", "pdf", "gif", "webp", "file", "document", "tbn", "download",
                                        "unknown", "untitled", "name", "none", "scan", "handwriting", "handwritten",
-                                       "writing", "text", "screenshot"]
+                                       "writing", "text", "screenshot",
+                                       // words from our own instructions, which a small model likes to echo
+                                       "title", "species", "style", "era", "detail", "details", "subject", "description",
+                                       "fragment", "main", "specific"]
 
     /// Load the model into memory now, so the first real request doesn't pay for it.
     static func prewarm() {
@@ -115,10 +118,45 @@ enum Model {
             if let summary { prompt = shots + "Summary: \(summary)\n" + (e.sourceDescription.map { "Downloaded from: \($0)\n" } ?? "") + "Name:" }
         }
 
+        // Images: caption first, then name from the caption — two small steps beat one big one (as for foreign text).
+        // Asked for 1–3 words straight from the pixels, a small model collapses a whole scene to "landscape".
+        // Only for real photos (little text): for screenshots and notes the text is the topic, and the
+        // caption step adds noise there (tested: 57 → 54 on the screenshot cases when used for everything).
+        var captioned = false
+        if lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.url) {
+            let c = LanguageModelSession(instructions: """
+            You describe an image so it can be given a filename. Write one specific sentence: what the main subject is \
+            (as specific as you can: the landmark, building, species, artwork style and era, vehicle, product, or kind of \
+            document), the setting, and any clearly visible title, brand or name. Do not guess who a person is.
+            """)
+            var ask = "Describe this image."
+            if let b = e.bodySnippet, !b.isEmpty { ask += "\nText read from the image (may be partial): \(String(withoutLetterhead(b).prefix(400)))" }
+            let q = ask
+            if let caption = try? await c.respond(options: GenerationOptions(temperature: 0), prompt: { q; Attachment(img) }).content {
+                if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
+                    FileHandle.standardError.write(Data("--- caption\n\(caption)\n".utf8))
+                }
+                prompt = shots + "Image description: \(caption)\n"
+                    + (e.headline.map { "Biggest text in the image: \($0)\n" } ?? "")
+                    + (avoid.isEmpty ? "" : "The owner rejected these names: \(avoid.joined(separator: ", ")). Give a different name that is still specific to this file.\n")
+                    + """
+                    Name the MAIN SUBJECT first (a child, a painting, a map, a castle, a ship), then its most specific \
+                    detail: a title, place, species, style or era. Ignore the background, clothing and small objects.
+                    Examples:
+                    - "A toddler laughing on a playground slide" -> toddler portrait
+                    - "An oil painting in Renaissance style of a woman reading by a window" -> renaissance painting
+                    - "A historical map titled 'Nova Hispania' showing Mexico" -> nova hispania map
+                    - "A man speaking at a podium in front of a 'TechConf 2024' banner" -> techconf speaker
+                    Name:
+                    """
+                captioned = true
+            }
+        }
+
         let session = LanguageModelSession(instructions: instructions(words: words))
         let options = GenerationOptions(temperature: avoid.isEmpty ? 0 : 0.7)   // a retry needs some variety
         let text: String
-        if lookAtImage, #available(macOS 27.0, *), let img = thumbnail(e.url) {
+        if lookAtImage, !captioned, #available(macOS 27.0, *), let img = thumbnail(e.url) {
             let p = prompt
             guard let out = try? await session.respond(options: options, prompt: {
                 p
@@ -140,7 +178,9 @@ enum Model {
             line2 = await translate(line, from: lang) ?? line
         }
         // Small models misspell names they copy ("Aselsan" → "aseslan"): use the document's own spelling.
-        let source = Set(Style.words([e.metadataTitle, e.headline, e.bodySnippet, e.linkHint].compactMap { $0 }.joined(separator: " ")))
+        // What the model saw: the file's text, plus its own caption for photos ("German Shepherd" → fixes "shepard").
+        let source = Set(Style.words(([e.metadataTitle, e.headline, e.bodySnippet, e.linkHint].compactMap { $0 }
+                                      + (captioned ? [prompt] : [])).joined(separator: " ")))
         line2 = Style.words(line2).map { w in
             guard w.count >= 5, !source.contains(w) else { return w }
             return source.first { $0.first == w.first && abs($0.count - w.count) <= 2 && editDistance($0, w) <= 2 } ?? w
@@ -149,6 +189,15 @@ enum Model {
         if let vocab = NLEmbedding.wordEmbedding(for: .english) {
             line2 = Style.words(line2).filter { source.contains($0) || vocab.contains($0) || $0.contains(where: \.isNumber) }
                 .joined(separator: " ")
+        }
+        // Images: every word must come from what the model saw (its caption or the text it read) or be a real word,
+        // and letter salad from bad OCR ("cotrffjsol") never makes it into a name.
+        if captioned, let vocab = NLEmbedding.wordEmbedding(for: .english) {
+            let seen = Set(Style.words(prompt))
+            let salad = try! Regex("[bcdfghjklmnpqrstvwxz]{4,}")
+            line2 = Style.words(line2).filter { w in
+                (vocab.contains(w) || seen.contains(w)) && w.firstMatch(of: salad) == nil
+            }.joined(separator: " ")
         }
         let stemWords = Set(Style.words(e.stem))
         let w = Style.words(line2).filter { $0.count >= 2 && !banned.contains($0) && !stemWords.contains($0) && $0 != e.ext }
