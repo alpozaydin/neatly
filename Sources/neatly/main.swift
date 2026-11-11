@@ -12,6 +12,7 @@ usage: neatly [options] <file or folder>...
   --watch      wait for new files in the folder and suggest names as they arrive
   --where      also suggest a folder to move each file to
   --ask        with --watch: show a dialog for each file (Save / Select place… / Leave as is)
+  --menubar    with --watch: show the menu-bar icon (Tidy, options, Pause; drop files or folders on it)
   --screenshots  with --watch: also name new screenshots where macOS saves them, with an Undo pill
   --timeout N  with --ask: save the suggestion after N seconds without an answer (default 5, 0 = wait)
   service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
@@ -132,7 +133,7 @@ if args.first == "service" {
         <plist version="1.0"><dict>
           <key>Label</key><string>\(label)</string>
           <key>ProgramArguments</key><array><string>\(exe)</string><string>--watch</string>
-            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string><string>--screenshots</string></array>
+            <string>\(FileManager.default.homeDirectoryForCurrentUser.path)/Downloads</string><string>--ask</string><string>--screenshots</string><string>--menubar</string></array>
           <key>RunAtLoad</key><true/>
           <key>KeepAlive</key><true/>
           <key>StandardOutPath</key><string>\(log)</string>
@@ -219,6 +220,7 @@ if args.first == "undo" {
     args.remove(at: i); return true
 }
 let screenshots = flag("--screenshots")
+let menuBar = flag("--menubar")
 let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask"), whereTo = flag("--where")
 var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
@@ -243,14 +245,9 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 
 /// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Select place… = pick a folder.
 /// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
-@MainActor func askUser(file: String, suggestion: String, folder: URL?) -> Answer {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
-    p.arguments = ["dialog", String(timeout), file, suggestion, folder?.path ?? ""]
-    let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return .noAnswer }
-    let reply = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-    p.waitUntilExit()
+@MainActor func askUser(file: String, suggestion: String, folder: URL?) async -> Answer {
+    // Runs as its own process and is awaited, so the menu-bar icon stays responsive while it's open.
+    let reply = await helper(["dialog", String(timeout), file, suggestion, folder?.path ?? ""])
     let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
     if parts.first == "keep" { return .keep }
     guard parts.first == "save", parts.count >= 3 else { return .noAnswer }
@@ -270,8 +267,9 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 }
 
 if args.first == "tidy" {
-    let target = args.count > 1 ? URL(fileURLWithPath: (args[1] as NSString).expandingTildeInPath) : screenshotFolder()
-    TidyWindow(folder: target, namer: namer).run()
+    let targets = args.count > 1 ? args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+                                 : [screenshotFolder()]
+    TidyWindow(paths: targets, namer: namer).run()
 }
 
 /// Run `neatly <args>` (popup, pill) without blocking the watchers; returns what it printed.
@@ -331,6 +329,7 @@ func isScreenshot(_ name: String) -> Bool {
                 continue
             }
             seen.insert(name); pending[name] = nil
+            if paused { continue }
             let url = dir.appending(path: name)
             guard case .suggested(let s) = await namer.suggest(for: url, app: p.app),
                   let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
@@ -381,7 +380,10 @@ func isScreenshot(_ name: String) -> Bool {
 }
 
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
-if watch {
+/// Menu bar → Pause: new files are noticed but left alone until you resume.
+var paused = false
+
+@MainActor func watchDownloads() async {
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
     let skip: Set<String> = ["crdownload", "download", "part", "partial"]
     let installers: Set<String> = ["dmg", "pkg", "app", "iso"]   // nothing to file
@@ -415,6 +417,7 @@ if watch {
         for (name, size) in now where !seen.contains(name) {
             if pending[name] == size {           // same size two checks in a row: finished
                 seen.insert(name); pending[name] = nil
+                if paused { print("\(name)  skip (paused)"); continue }
                 let url = dir.appending(path: name)
                 let original = url.deletingPathExtension().lastPathComponent
                 // Every new download gets a name and a folder — except installers and files already handled.
@@ -473,7 +476,7 @@ if watch {
                                suggestedFolder: target?.path, chosenFolder: folder?.path,
                                auto: auto ? true : nil, context: String(gist(ev).prefix(300))).save()
                 }
-                switch askUser(file: name, suggestion: nameIdea, folder: target) {
+                switch await askUser(file: name, suggestion: nameIdea, folder: target) {
                 case .save(let chosen, let folder, let auto):
                     let done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
                     if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
@@ -491,6 +494,14 @@ if watch {
         seen.formIntersection(now.keys)          // forget deleted files
         if apply { seen.formUnion(listing().keys) }
     }
+}
+
+if watch {
+    // One process: the menu-bar icon, the Downloads watcher and the screenshot watcher, all on the main run loop.
+    NSApplication.shared.setActivationPolicy(.accessory)
+    if menuBar { MenuBar.shared.start() }
+    Task { await watchDownloads() }
+    NSApp.run()
 }
 
 // Expand folders one level (Downloads, Desktop) — skip hidden and in-progress downloads.
