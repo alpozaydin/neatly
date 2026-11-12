@@ -135,6 +135,55 @@ if want dl-burst; then setup dl-burst; start "dialog:save"
     # or the next tests wait behind them (a real burst finishes normally — nobody kills neatly halfway).
     sleep 25; fi
 
+# ─── How browsers really download ───
+if want dl-firefox; then setup dl-firefox; start "dialog:save"
+    # Firefox: an EMPTY file with the final name + a .part it writes into, then the .part replaces the empty one.
+    : > "$T/dl/EAF2026000123456.pdf"; f=$(make turkcell-invoice); cp "$f" "$T/dl/EAF2026000123456.pdf.part"; rm "$f"
+    sleep 4
+    check "Firefox: the empty placeholder is not touched" '! grep -q "→" "$T/log" && [ -f "$T/dl/EAF2026000123456.pdf" ]'
+    mv -f "$T/dl/EAF2026000123456.pdf.part" "$T/dl/EAF2026000123456.pdf"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "Firefox: the real file is handled when it lands" 'ls "$T/home/finance" "$T/dl" 2>/dev/null | grep -q invoice-turkcell'
+    stop; fi
+
+if want dl-safari; then setup dl-safari; start "dialog:save"
+    # Safari: downloads into "x.pdf.download/" (a folder), then renames it to the finished file.
+    mkdir "$T/dl/EAF2026000123456.pdf.download"; f=$(make turkcell-invoice); cp "$f" "$T/dl/EAF2026000123456.pdf.download/data"; sleep 3
+    mv "$f" "$T/stage/real.pdf"; rm -rf "$T/dl/EAF2026000123456.pdf.download"; mv "$T/stage/real.pdf" "$T/dl/EAF2026000123456.pdf"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "Safari: handled once, after it finished" '[ "$(grep -c "→\|name ok" "$T/log")" = "1" ]'
+    stop; fi
+
+if want dl-vanished; then setup dl-vanished; start "dialog:wait" 4
+    arrive "$(make ceng-syllabus)"; sleep 2; rm -f "$T/dl/8812_4471.pdf"     # you deleted it while the popup was open
+    sleep 8
+    check "file gone while the popup is open: no crash, watcher keeps going" 'kill -0 $PID 2>/dev/null'
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "EAF2026000123456" "$T/log"' 60
+    check "…and the next download still works" 'grep -q "EAF2026000123456" "$T/log"'
+    stop; fi
+
+if want dl-typed-odd; then setup dl-typed-odd; start "dialog:edit:.Q3: report"
+    arrive "$(make ceng-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "typed name starting with a dot doesn't hide the file" '! find "$T/home" "$T/dl" -name ".*.pdf" | grep -q .'
+    check "a colon in a typed name becomes a dash" 'find "$T/home" "$T/dl" -name "*Q3- report*" | grep -q .'
+    stop; fi
+
+if want dl-locked; then setup dl-locked; start "dialog:save"
+    f=$(make ceng-syllabus); arrive "$f"; chflags uchg "$T/dl/8812_4471.pdf"    # locked after it arrived
+    waitfor 'grep -q -E "saved as|couldn|left as is" "$T/log"' 90; sleep 2
+    check "locked file: says it couldn't rename, file untouched" 'grep -q "couldn.t rename" "$T/log" && [ -f "$T/dl/8812_4471.pdf" ]'
+    check "locked file: no crash, watcher keeps going" 'kill -0 $PID 2>/dev/null'
+    chflags -R nouchg "$T" 2>/dev/null
+    stop; fi
+
+if want dl-no-access; then setup dl-no-access
+    chmod 000 "$T/dl"
+    "$B" --watch "$T/dl" --ask > "$T/log" 2>&1 & PID=$!; sleep 4
+    check "no permission for Downloads: says so (not silent)" 'grep -q -i "can.t see\|no access\|permission" "$T/log"'
+    chmod 755 "$T/dl"; stop; fi
+
 # ─── Screenshots ────────────────────────────────────────────────────────────
 shot() { "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1; mv "$T/stage/Screenshot 2026-10-09 at 11.26.48.png" "$T/shots/"; }
 
@@ -170,6 +219,21 @@ if want shot-app; then setup shot-app; NEATLY_DATA_DIR=$T/data "$B" style --app 
 if want shot-paused; then setup shot-paused; NEATLY_UI_TEST="menu:Pause" "$B" --watch "$T/dl" --screenshots --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
     shot; sleep 8
     check "menu Pause: screenshot left alone" '[ -f "$T/shots/Screenshot 2026-10-09 at 11.26.48.png" ]'
+    stop; fi
+
+if want shot-cleanshot; then setup shot-cleanshot; start "none"
+    "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
+    mv "$T/stage/Screenshot 2026-10-09 at 11.26.48.png" "$T/shots/CleanShot 2026-11-12 at 10.04.11@2x.png"
+    waitfor 'ls "$T/shots" | grep -qv "^CleanShot"' 90
+    check "CleanShot screenshots are named too" 'ls "$T/shots" | grep -qv "^CleanShot"'
+    stop; fi
+
+if want shot-two; then setup shot-two; start "none"
+    "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1; "$E" --make shot-weather "$T/stage" >/dev/null 2>&1
+    mv "$T/stage/Screenshot 2026-10-09 at 11.26.48.png" "$T/shots/"; sleep 1
+    mv "$T/stage/Screenshot 2026-10-11 at 09.20.03.png" "$T/shots/"      # second one while the first pill shows
+    waitfor '[ "$(ls "$T/shots" | grep -c "^Screenshot")" = "0" ]' 120
+    check "two screenshots in a row: both named" '[ "$(ls "$T/shots" | grep -c "^Screenshot")" = "0" ]'
     stop; fi
 
 # ─── Tidy ───────────────────────────────────────────────────────────────────
