@@ -203,6 +203,11 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let shared = AppDelegate()
+    /// Files or folders dropped on neatly's icon in Finder or the Dock → the review window for them.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MenuBar.shared.dropped(urls)
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         HomeWindow.shared.show()
         return true

@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import NaturalLanguage
 
 public enum Outcome: Sendable {
@@ -34,6 +35,39 @@ public struct Namer: Sendable {
     }
 
     public static var modelStatus: String { Model.status }
+    /// Wait until the on-device model answers (at most `limit`), e.g. before naming a batch.
+    /// Every first-use cost happens here, not on your files: on a fresh install the text reader (OCR), the photo
+    /// classifier, the embedding model and the language model each set themselves up (measured: >20 s together).
+    public static func warmUp(limit: Duration = .seconds(90)) async {
+        _ = await withTimeout(limit) {
+            Embedder.shared.warm()
+            if let img = Self.testImage() {
+                Extract.warmOCR(img)
+                _ = Extract.labels(image: img)
+                try? FileManager.default.removeItem(at: img)
+            }
+            await Model.warmUp()
+        }
+    }
+
+    /// A small picture with a few words on it, to wake the text reader and the classifier.
+    static func testImage() -> URL? {
+        let w = 1600, h = 1000
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+        for i in 0..<5 { ctx.fill(CGRect(x: 20, y: 30 + i * 30, width: 200 + i * 20, height: 14)) }   // text-like bars
+        guard let img = ctx.makeImage() else { return nil }
+        let url = FileManager.default.temporaryDirectory.appending(path: "neatly-warmup-\(UUID().uuidString).png")
+        guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, img, nil)
+        return CGImageDestinationFinalize(dest) ? url : nil
+    }
+
+    /// Is Apple Intelligence on and its on-device model ready? (Off: names come from text only, simpler.)
+    public static var modelAvailable: Bool { Model.isAvailable }
 
     public static let pdfLike: Set<String> = ["pdf"]
     public static let imageLike: Set<String> = ["png", "jpg", "jpeg", "heic", "tiff", "webp"]
@@ -66,6 +100,12 @@ public struct Namer: Sendable {
             return .suggested(Suggestion(name: profile.render(stem, date: e.date, app: app), via: via, millis: ms, evidence: e))
         }
         var trail: String { e.steps.joined(separator: "+") }
+        let debugTimes = ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil
+        func mark(_ what: String) {
+            guard debugTimes else { return }
+            let c = (clock.now - start).components
+            FileHandle.standardError.write(Data("  [\(Int(Double(c.seconds) * 1000 + Double(c.attoseconds) / 1e15)) ms] \(what)\n".utf8))
+        }
 
         // 1. Where it came from + date
         e.sourceURLs = Extract.sourceURLs(url)
@@ -115,10 +155,13 @@ public struct Namer: Sendable {
             }
         } else if isImage {
             // 5. Cheap image signals first: text in the image, and Apple's label classifier.
+            mark("image: start")
             let (text, headline) = Extract.ocrWithHeadline(image: url)
+            mark("image: ocr done")
             if let text { e.bodySnippet = text; e.steps.append("ocr") }
             e.headline = headline
             e.labels = Extract.labels(image: url)
+            mark("image: labels done")
             if !e.labels.isEmpty { e.steps.append("labels") }
         }
 
@@ -138,7 +181,9 @@ public struct Namer: Sendable {
             let snapshot = e
             let look = isImage && Model.canSeeImages
             if look { e.steps.append("vision") }
+            mark("model: start")
             let examples = learnFromCorrections ? Examples.similar(to: snapshot, history: history ?? Correction.all()) : []
+            mark("model: examples done")
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
             if let w = await withTimeout(remaining, { [words = profile.len.modelWords, avoid] in
                 await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil {

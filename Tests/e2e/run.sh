@@ -181,6 +181,13 @@ if want tidy; then setup tidy
     check "Undo All in the window restores all" '[ "$(ls "$T/shots" | grep -c "^Screenshot")" = "3" ]'
 fi
 
+# A file neatly can't read stays editable: type a name, Rename works (v0.3.0 locked the field — dead end).
+if want tidy-noidea; then setup tidy-noidea
+    echo "x" > "$T/stage/certificate_of_attendance.doc"
+    NEATLY_UI_TEST="edit0:attendance-certificate,rename,done" "$B" tidy "$T/stage/certificate_of_attendance.doc" > "$T/log" 2>&1
+    check "no suggestion, but typing a name and Rename works" '[ -f "$T/stage/attendance-certificate.doc" ]'
+fi
+
 # ─── Menu bar ───────────────────────────────────────────────────────────────
 if want menu; then setup menu
     NEATLY_UI_TEST="menu:Name Length>Detailed,menu:Date>Date First,menu:Title Case,menu:Copy Screenshots to Clipboard" \

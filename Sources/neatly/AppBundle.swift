@@ -57,6 +57,14 @@ enum AppBundle {
             "NSHumanReadableCopyright": "MIT License",
             "NSDesktopFolderUsageDescription": "neatly names your new screenshots, which macOS saves on the Desktop.",
             "NSDownloadsFolderUsageDescription": "neatly suggests a name and a folder for each new download.",
+            // Accept any file or folder dropped on the app's icon (Finder, Dock) — "Alternate" so neatly never
+            // becomes the app that opens your files by default.
+            "CFBundleDocumentTypes": [[
+                "CFBundleTypeName": "Any file or folder",
+                "CFBundleTypeRole": "Viewer",
+                "LSHandlerRank": "Alternate",
+                "LSItemContentTypes": ["public.item", "public.folder"],
+            ]],
         ]
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try data.write(to: staging.appending(path: "Contents/Info.plist"))
