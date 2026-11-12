@@ -126,7 +126,8 @@ public struct Namer: Sendable {
            let paper = await Papers.arxiv(id) {
             e.paper = paper
             e.steps.append("arxiv")
-            return done(Style.paperName(title: paper.title, year: paper.year), "arxiv")
+            let extra = profile.len == .short ? 0 : profile.len == .standard ? 1 : 3
+            return done(Style.paperName(title: paper.title, year: paper.year, topicWords: extra), "arxiv")
         }
 
         var isImage = Self.imageLike.contains(e.ext)

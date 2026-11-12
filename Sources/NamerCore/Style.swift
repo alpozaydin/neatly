@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 /// The naming convention: lowercase kebab-case, most distinctive word first,
 /// qualifier (term / year / month) last, as few words as possible.
@@ -158,15 +159,46 @@ public enum Style {
 
     // MARK: Papers
 
-    /// "UniDepth: Universal Monocular Metric Depth Estimation" → unidepth-2024.
-    /// Without a short name before the colon, keep the first few meaningful words.
-    public static func paperName(title: String, year: Int?) -> String {
+    /// Papers: the short name, then what it's about, then the year — an acronym alone says nothing a week later.
+    /// "DINOv2: Learning Robust Visual Features without Supervision" → dinov2-visual-features-2023
+    /// "UniDepth: Universal Monocular Metric Depth Estimation"      → unidepth-depth-estimation-2024
+    /// Paper subtitles are noun phrases whose meaning sits at the END of the first phrase, so: cut the subtitle at
+    /// small words (of, for, from…), take the first chunk with content, keep its last words ("low-rank" stays one).
+    public static func paperName(title: String, year: Int?, topicWords extra: Int = 0) -> String {
         let y = year.map(String.init)
+        let k = 2 + extra
         if let colon = title.firstIndex(of: ":") {
             let head = words(String(title[..<colon]))
-            if (1...2).contains(head.count) { return join(head + [y].compactMap { $0 }) }
+            if (1...2).contains(head.count) {
+                let about = topic(of: String(title[title.index(after: colon)...]), count: k)
+                return join(head + about + [y].compactMap { $0 }, maxWords: head.count + about.count + 1, maxLength: 64 + 12 * extra)
+            }
         }
-        return join(Array(words(title).prefix(3)) + [y].compactMap { $0 })
+        // No short name ("Attention Is All You Need"): the title's own first words.
+        return join(Array(words(title).prefix(3 + extra)) + [y].compactMap { $0 }, maxWords: 4 + extra)
+    }
+
+    /// The core of a noun phrase: "Learning Robust Visual Features without Supervision" → [visual, features].
+    static func topic(of phrase: String, count k: Int) -> [String] {
+        let small: Set<String> = ["of", "for", "from", "without", "with", "in", "on", "via", "using", "at", "by", "to",
+                                  "and", "the", "a", "an", "into", "through", "towards", "toward", "is", "are"]
+        let filler: Set<String> = ["learning", "approach", "method", "methods", "framework", "new", "novel", "efficient",
+            "simple", "robust", "scalable", "general", "universal", "large", "scale", "deep", "improving", "rethinking",
+            "revisiting", "beyond", "power", "unleashing", "need", "study", "analysis", "towards", "toward", "better",
+            "fast", "faster", "strong", "stronger", "unified", "generalizable"]
+        // Units: words, with hyphenated terms kept whole ("low-rank", "large-scale").
+        let units = phrase.lowercased().split { !($0.isLetter || $0.isNumber || $0 == "-") }.map(String.init)
+        var chunks: [[String]] = [[]]
+        for u in units {
+            if small.contains(u) { chunks.append([]) } else { chunks[chunks.count - 1].append(u) }
+        }
+        for c in chunks {
+            let content = c.filter { u in !u.split(separator: "-").allSatisfy { filler.contains(String($0)) } }
+            if !content.isEmpty {
+                return content.suffix(k).flatMap { words($0) }   // "low-rank" → low, rank (two kebab words, one idea)
+            }
+        }
+        return []
     }
 
     // MARK: Courses (students' most common files)
