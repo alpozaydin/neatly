@@ -207,6 +207,19 @@ if want home; then setup home
     check "opening the app while it runs shows the window (no second copy)" '[ "$(grep -c "home: shown" "$T/log")" -gt "$n" ]'
     stop; fi
 
+# ─── Run by name, the way Homebrew installs it (v0.2.0 crashed here: it looked for ./neatly) ───
+if want by-name; then setup by-name
+    mkdir -p "$T/Cellar/neatly/9.9/bin" "$T/bin" "$T/elsewhere" "$T/apps"
+    cp "$B" "$T/Cellar/neatly/9.9/bin/neatly"; ln -s "$T/Cellar/neatly/9.9/bin/neatly" "$T/bin/neatly"
+    out=$(cd "$T/elsewhere" && PATH="$T/bin:$PATH" NEATLY_APP_DIR="$T/apps" neatly app-bundle 2>&1)
+    check "\`neatly\` from PATH, in another folder: builds the app (no crash)" '[ -x "$T/apps/neatly.app/Contents/MacOS/neatly" ]'
+    (cd "$T/elsewhere" && PATH="$T/bin:$PATH" NEATLY_UI_TEST="dialog:save" neatly --watch "$T/dl" --ask --timeout 3 > "$T/log" 2>&1) & PID=$!; sleep 3
+    arrive "$(make ceng-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "…and its download popup works too" '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]'
+    stop; pkill -f "$T/bin/neatly" 2>/dev/null
+fi
+
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
 if want app; then setup app; mkdir -p "$T/apps"
     NEATLY_APP_DIR=$T/apps "$B" app-bundle > /dev/null

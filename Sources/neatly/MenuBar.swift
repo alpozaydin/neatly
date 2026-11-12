@@ -97,7 +97,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
     /// Tidy runs as its own window/process, so the watchers keep going.
     func tidy(_ paths: [String]) {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        p.executableURL = selfExecutable
         p.arguments = ["tidy"] + paths
         try? p.run()
     }

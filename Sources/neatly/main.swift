@@ -120,7 +120,7 @@ func launchctl(_ a: [String]) {
 @MainActor func installService() throws {
     let home = FileManager.default.homeDirectoryForCurrentUser
     let uid = getuid()
-    let me = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let me = selfExecutable
     let exe = try AppBundle.build(from: me, version: version)
     // The command line: ~/.local/bin/neatly → the app's binary (replaces an older copied binary).
     let link = home.appending(path: ".local/bin/neatly")
@@ -174,7 +174,7 @@ if args.isEmpty && AppBundle.isRunningInside {
 
 // Tests: build the app into NEATLY_APP_DIR without touching the login item.
 if args.first == "app-bundle" {
-    let me = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let me = selfExecutable
     print(try AppBundle.build(from: me, version: version).path)
     exit(0)
 }
@@ -316,7 +316,7 @@ if args.first == "tidy" {
 func helper(_ a: [String]) async -> String {
     await withCheckedContinuation { (done: CheckedContinuation<String, Never>) in
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        p.executableURL = selfExecutable
         p.arguments = a
         let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
         p.terminationHandler = { _ in

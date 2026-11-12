@@ -1,5 +1,15 @@
 import AppKit
 
+/// This program's real file, however it was started: "neatly" found through PATH (Homebrew), a symlink,
+/// or the app. Asks the system (proc_pidpath) instead of trusting argv[0], which can be just "neatly".
+let selfExecutable: URL = {
+    var buf = [CChar](repeating: 0, count: 4096)
+    if proc_pidpath(getpid(), &buf, UInt32(buf.count)) > 0 {
+        return URL(fileURLWithPath: String(cString: buf)).resolvingSymlinksInPath()
+    }
+    return (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])).resolvingSymlinksInPath()
+}()
+
 /// neatly.app: a real Mac app (Applications, Spotlight, Launchpad, its own icon and name in permission
 /// prompts), built on your Mac from the neatly binary itself — so no Xcode, and the curl and Homebrew
 /// installs end up with the same app. It's a menu-bar app: no Dock icon.
@@ -19,7 +29,7 @@ enum AppBundle {
 
     /// Are we running from inside neatly.app (opened from Finder/Spotlight, or the service)?
     static var isRunningInside: Bool {
-        URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path.contains(".app/Contents/MacOS/")
+        selfExecutable.path.contains(".app/Contents/MacOS/")
     }
 
     /// Build (or rebuild) the app around `binary`. Returns the app's executable.
