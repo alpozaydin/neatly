@@ -181,6 +181,11 @@ if args.first == "decide" {
     exit(0)
 }
 
+// Do the one-time setup now (the app does this by itself after installing or updating; tests call it first).
+if args.first == "warmup" {
+    let t = Date(); await Namer.warmUp(); print("ready after \(Int(Date().timeIntervalSince(t))) s"); exit(0)
+}
+
 // Check for an update now (also used by tests with a fake release): neatly update
 if args.first == "update" {
     if let v = await Updater.checkOnce() { print("updated to neatly \(v)") } else { print("neatly \(Updater.current) is up to date") }
