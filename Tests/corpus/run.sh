@@ -8,6 +8,8 @@ B=${NEATLY_BIN:-$(swift build -c release --product neatly --show-bin-path --pack
 W=$(mktemp -d /tmp/neatly-corpus.XXXXXX); mkdir -p "$W/data"
 export NEATLY_DATA_DIR=$W/data NEATLY_HEADLESS=1
 n=0; ok=0; fine=0; unsure=0; slow=0; out=$W/report.txt
+# Like the app after installing or updating: do the one-time setup first, so the first files don't pay for it.
+"$B" warmup
 for dir in "$@"; do
   find "$dir" -maxdepth 1 -type f ! -name ".*" -print0 | while IFS= read -r -d '' f; do
     c="$W/files/$(basename "$dir")"; mkdir -p "$c"; cp -p "$f" "$c/" 2>/dev/null || continue
