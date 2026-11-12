@@ -67,6 +67,7 @@ final class HomeWindow: NSObject, NSWindowDelegate {
                 case "downloads": model.downloads = kv[1] == "on"
                 case "screenshots": model.screenshots = kv[1] == "on"
                 case "countdown": model.countdown = Int(kv[1]) ?? 5
+                case "autoupdate": model.autoUpdate = kv[1] == "on"
                 case "drop": MenuBar.shared.dropped(kv[1].split(separator: "|").map { URL(fileURLWithPath: String($0)) })
                 case "snapshot": HomeWindow.snapshot(model, to: kv[1])
                 default: break
@@ -113,6 +114,7 @@ final class HomeModel: ObservableObject {
     @Published var appName = false { didSet { save() } }
     @Published var copyShots = false { didSet { save() } }
     @Published var countdown = 5 { didSet { save() } }
+    @Published var autoUpdate: Bool? = nil { didSet { save() } }   // nil = not asked yet
     @Published var named = 0
     @Published var moreOpen = false      // view state lives here: SwiftUI's @State needs Xcode's macro plugin
     @Published var dropping = false
@@ -131,6 +133,7 @@ final class HomeModel: ObservableObject {
         appName = p.appName == true
         copyShots = p.copyScreenshots == true
         countdown = timeout
+        autoUpdate = p.autoUpdate
         named = Correction.all().filter { !$0.chosen.isEmpty }.count
         loading = false
     }
@@ -150,6 +153,7 @@ final class HomeModel: ObservableObject {
             p.appName = appName
             p.copyScreenshots = copyShots
             p.countdown = countdown
+            p.autoUpdate = autoUpdate
         }
         timeout = countdown
         objectWillChange.send()   // the preview name follows
@@ -176,6 +180,21 @@ struct HomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
+            if model.autoUpdate == nil {
+                // Asked once, at first install: after that neatly keeps itself current with nothing to do.
+                HStack(spacing: 12) {
+                    IconBadge(icon: "arrow.triangle.2.circlepath", color: .teal)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep neatly up to date by itself?").font(.callout.weight(.semibold))
+                        Text("New versions install quietly in the background. You won't need to do anything.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("No thanks") { model.autoUpdate = false }.buttonStyle(.plain).font(.callout).foregroundStyle(.secondary)
+                    Chip(text: "Yes, keep it updated", selected: true) { model.autoUpdate = true }
+                }
+                .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(brand.opacity(0.10)))
+            }
             if !noAccess.isEmpty {
                 HStack(spacing: 10) {
                     Image(systemName: "lock.trianglebadge.exclamationmark").foregroundStyle(.orange)
@@ -259,6 +278,10 @@ struct HomeView: View {
                         Divider().padding(.leading, 44)
                         SwitchRow(icon: "doc.on.clipboard", color: .teal, title: "Copy new screenshots",
                                   subtitle: "So you can paste them right away", isOn: $model.copyShots)
+                        Divider().padding(.leading, 44)
+                        SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
+                                  subtitle: "Checks GitHub for new versions now and then — nothing about you or your files is sent",
+                                  isOn: Binding(get: { model.autoUpdate == true }, set: { model.autoUpdate = $0 }))
                         Divider().padding(.leading, 44)
                         HStack(spacing: 12) {
                             IconBadge(icon: "timer", color: .gray)

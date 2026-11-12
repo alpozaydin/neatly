@@ -296,6 +296,38 @@ if want by-name; then setup by-name
     stop; pkill -f "$T/bin/neatly" 2>/dev/null
 fi
 
+# ─── Auto-update, against a fake release (never the real app or GitHub) ───
+if want update; then setup update; mkdir -p "$T/apps" "$T/rel"
+    cp "$B" "$T/rel/neatly"; codesign --force --sign - "$T/rel/neatly" 2>/dev/null
+    tar -czf "$T/rel/neatly-macos-arm64.tar.gz" -C "$T/rel" neatly
+    shasum -a 256 "$T/rel/neatly-macos-arm64.tar.gz" > "$T/rel/neatly-macos-arm64.tar.gz.sha256"
+    v=$("$B" --version | awk '{print $2}')
+    feed() { printf '{"tag_name":"v%s","assets":[{"name":"neatly-macos-arm64.tar.gz","browser_download_url":"file://%s"},{"name":"neatly-macos-arm64.tar.gz.sha256","browser_download_url":"file://%s"}]}' "$v" "$T/rel/neatly-macos-arm64.tar.gz" "$1" > "$T/rel/latest.json"; }
+    NEATLY_APP_DIR=$T/apps "$B" app-bundle >/dev/null; ino=$(stat -f %i "$T/apps/neatly.app")
+    export NEATLY_APP_DIR=$T/apps NEATLY_UPDATE_URL=file://$T/rel/latest.json
+    echo "0000000000000000000000000000000000000000000000000000000000000000  x" > "$T/rel/bad.sha256"; feed "$T/rel/bad.sha256"
+    out=$(NEATLY_VERSION_OVERRIDE=0.0.1 "$B" update 2>&1)
+    check "wrong fingerprint: update refused, app untouched" 'echo "$out" | grep -q "checksum" && [ "$(stat -f %i "$T/apps/neatly.app")" = "$ino" ]'
+    feed "$T/rel/neatly-macos-arm64.tar.gz.sha256"
+    out=$(NEATLY_VERSION_OVERRIDE=9.9.9 "$B" update 2>&1)
+    check "already newest: nothing happens" 'echo "$out" | grep -q "up to date"'
+    out=$(NEATLY_UPDATE_URL=http://127.0.0.1:9/none NEATLY_VERSION_OVERRIDE=0.0.1 "$B" update 2>&1)
+    check "offline: no error, nothing happens" 'echo "$out" | grep -q "up to date"'
+    out=$(NEATLY_VERSION_OVERRIDE=0.0.1 "$B" update 2>&1)
+    check "newer version: downloaded, checked and installed" 'echo "$out" | grep -q "updated to neatly $v"'
+    check "…in place (Launchpad keeps it), signed, runs" '[ "$(stat -f %i "$T/apps/neatly.app")" = "$ino" ] && codesign --verify --deep "$T/apps/neatly.app" 2>/dev/null && "$T/apps/neatly.app/Contents/MacOS/neatly" --version | grep -q "$v"'
+    # The background service does it by itself — only after the person said yes.
+    NEATLY_DATA_DIR=$T/data "$B" style --length short >/dev/null
+    NEATLY_VERSION_OVERRIDE=0.0.1 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 6
+    check "not asked yet / said no: never updates" '! grep -q "updated to" "$T/log"'
+    stop
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['autoUpdate']=True;json.dump(d,open(p,'w'))"
+    NEATLY_VERSION_OVERRIDE=0.0.1 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!
+    waitfor 'grep -q "updated to" "$T/log"' 40
+    check "said yes once: the service updates by itself" 'grep -q "updated to neatly $v" "$T/log"'
+    stop; unset NEATLY_APP_DIR NEATLY_UPDATE_URL
+fi
+
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
 if want app; then setup app; mkdir -p "$T/apps"
     NEATLY_APP_DIR=$T/apps "$B" app-bundle > /dev/null

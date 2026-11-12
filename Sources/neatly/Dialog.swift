@@ -317,6 +317,8 @@ final class Toast: NSObject, NSTextFieldDelegate {
 @MainActor
 enum InApp {
     private static var open: [NSObject] = []   // keep each window alive until it answers
+    /// Something is on screen (a popup or a pill): don't restart for an update now.
+    static var busy: Bool { !open.isEmpty }
 
     static func ask(file: String, suggestion: String, folder: URL?, seconds: Int) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in

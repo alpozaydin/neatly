@@ -15,6 +15,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var countdown: Int?        // download popup: seconds before it saves by itself (0 = wait)
     public var watchDownloads: Bool?  // nil/true = suggest names for new downloads
     public var watchScreenshots: Bool? // nil/true = name new screenshots
+    public var autoUpdate: Bool?      // asked once in the welcome window; nil = not asked yet
 
     public enum Length: String, Codable, Sendable, CaseIterable {
         case short, standard, detailed
