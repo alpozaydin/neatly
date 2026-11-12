@@ -442,7 +442,7 @@ var paused = false
     var seen = Set(listing().keys)
     var pending: [String: Int] = [:]
     var warmed = Date.distantPast
-    if namer.useModel { Task.detached { Namer.prewarm() } }
+    if namer.useModel { Task.detached { await Namer.warmUp() } }   // fresh install: model ready before the first download
     let shotDir = screenshotFolder()
     if screenshots { Task { await watchScreenshots(shotDir) } }
     print("watching \(dir.path) — download something (Ctrl-C to stop)")

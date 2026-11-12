@@ -111,6 +111,19 @@ enum Extract {
         return (text.isEmpty ? nil : String(text.prefix(snippetBudget)), headline)
     }
 
+    /// Load both text readers fully, with no time cap: the accurate one sets up its model on first use (~20 s on a
+    /// fresh install), and cancelling during that setup doesn't stop it — so it must happen here, not on a real file.
+    static func warmOCR(_ url: URL) {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
+        for level in [VNRequestTextRecognitionLevel.fast, .accurate] {
+            let req = VNRecognizeTextRequest()
+            req.recognitionLevel = level
+            req.usesLanguageCorrection = level == .accurate
+            try? VNImageRequestHandler(cgImage: img).perform([req])
+        }
+    }
+
     private static func ocrLines(_ img: CGImage, accurate: Bool) -> [(text: String, height: CGFloat)] {
         let req = VNRecognizeTextRequest()
         req.recognitionLevel = accurate ? .accurate : .fast

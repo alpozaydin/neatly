@@ -68,6 +68,26 @@ enum Model {
                                        "fragment", "main", "specific"]
 
     /// Load the model into memory now, so the first real request doesn't pay for it.
+    /// Wake the model up and wait until it answers. On a fresh install macOS sets it up first (~45 s);
+    /// a window that waits for this once beats one where every file times out.
+    static func warmUp() async {
+        guard isAvailable else { return }
+        _ = try? await LanguageModelSession().respond(to: "Reply with: ok", options: GenerationOptions(temperature: 0))
+        // Images use a separate vision part with its own cold start: wake that too, with a tiny blank picture.
+        if canSeeImages, #available(macOS 27.0, *),
+           // Real size: images reach the model at ~1024 px, and a tiny picture doesn't warm that path.
+           let ctx = CGContext(data: nil, width: 1024, height: 768, bitsPerComponent: 8, bytesPerRow: 0,
+                               space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            ctx.setFillColor(.white); ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 768))
+            if let img = ctx.makeImage() {
+                _ = try? await LanguageModelSession().respond(options: GenerationOptions(temperature: 0)) {
+                    "What color is this? One word."
+                    Attachment(img)
+                }
+            }
+        }
+    }
+
     static func prewarm() {
         guard isAvailable else { return }
         LanguageModelSession(instructions: instructions(words: 1...3)).prewarm()
