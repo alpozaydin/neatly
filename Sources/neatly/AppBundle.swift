@@ -56,10 +56,13 @@ enum AppBundle {
         // Swap in place, so a running copy is never half-written.
         try? fm.removeItem(at: app)
         try fm.moveItem(at: staging, to: app)
-        // Tell Launch Services and Spotlight about it right away.
-        run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
-            ["-f", app.path])
-        run("/usr/bin/mdimport", [app.path])
+        // Tell Launch Services and Spotlight about it right away — but never for test copies, or macOS would
+        // find several "neatly" apps and might open the wrong one.
+        if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] == nil {
+            run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                ["-f", app.path])
+            run("/usr/bin/mdimport", [app.path])
+        }
         return executable
     }
 

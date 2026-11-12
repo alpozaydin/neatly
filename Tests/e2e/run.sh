@@ -13,6 +13,8 @@ W=$(mktemp -d /tmp/neatly-e2e.XXXXXX)
 export NEATLY_HEADLESS=1   # never show a window or take focus while testing
 export NEATLY_NOTIFY=".test$$"   # our own "show window" signal: never reaches the neatly you actually run
 FILTER=${1:-}
+# Whatever happens, stop everything this run started (watchers, Tidy windows) when it ends.
+trap 'pkill -f "$W" 2>/dev/null; pkill -f "neatly-e2e" 2>/dev/null' EXIT
 pass=0; fail=0; failed=()
 
 check() {   # check "what" 'shell condition'
