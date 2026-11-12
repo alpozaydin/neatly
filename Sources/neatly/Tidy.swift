@@ -262,7 +262,7 @@ struct TidyView: View {
                 if model.working, !model.items.isEmpty {
                     HStack(spacing: 8) {
                         Bar(fraction: Double(model.done) / Double(max(model.items.count, 1))).frame(width: 140, height: 6)
-                        Text(model.warming ? "Getting ready… (only the very first time takes a minute)"
+                        Text(model.warming ? "Getting ready… (this takes about a minute after installing or updating)"
                                            : "Reading \(model.done + 1) of \(model.items.count)…")
                             .font(.callout).foregroundStyle(.secondary)
                     }
