@@ -12,6 +12,9 @@ sed -e "s/__VERSION__/$v/g" -e "s/__SHA256__/$sha/" "$(dirname "$0")/homebrew/ne
 rm -f "$tap/Formula/filed.rb"
 printf '{\n  "filed": "neatly"\n}\n' > "$tap/formula_renames.json"
 git -C "$tap" add -A
-git -C "$tap" commit -qm "neatly $v"
+# Commit as whoever commits to this repo (the temp clone has no identity of its own).
+name=$(git config user.name || git log -1 --format=%an); email=$(git config user.email || git log -1 --format=%ae)
+[ -n "$name" ] || name=$(git log -1 --format=%an)
+git -C "$tap" -c user.name="$name" -c user.email="$email" commit -qm "neatly $v"
 git -C "$tap" push -q
 echo "brew install alpozaydin/tap/neatly now installs $v"
