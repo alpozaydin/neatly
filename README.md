@@ -15,6 +15,9 @@ Needs a Mac with Apple silicon and macOS 26 or newer. Turn on Apple Intelligence
 everything except the last step below works without it. No Xcode needed.
 
 This installs **neatly.app** (in Applications, Spotlight and your menu bar) and starts it at login.
+The first time it opens, neatly asks once whether to **keep itself up to date**. If you say yes, new versions
+install quietly in the background whenever you're online (each download's SHA-256 is checked first; a mismatch
+changes nothing). The only network request is that check to GitHub — nothing about you or your files is sent.
 Uninstall: `neatly service uninstall` removes the app, the login item and the command (then `brew uninstall neatly`
 if you used Homebrew).
 

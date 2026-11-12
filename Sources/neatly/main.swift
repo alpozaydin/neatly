@@ -181,6 +181,12 @@ if args.first == "decide" {
     exit(0)
 }
 
+// Check for an update now (also used by tests with a fake release): neatly update
+if args.first == "update" {
+    if let v = await Updater.checkOnce() { print("updated to neatly \(v)") } else { print("neatly \(Updater.current) is up to date") }
+    exit(0)
+}
+
 // Tests: build the app into NEATLY_APP_DIR without touching the login item.
 if args.first == "app-bundle" {
     let me = selfExecutable
@@ -590,12 +596,12 @@ if watch {
     NSApplication.shared.setActivationPolicy(.accessory)
     NSApplication.shared.delegate = AppDelegate.shared   // opening the app again → show its window
     if menuBar { MenuBar.shared.start() }
+    Updater.start()
     Task { await watchDownloads() }
     NSApp.run()
 }
 
-// Naming files from the command line. Runs with a live main event loop, like the app does: without one,
-// Apple's text reader and photo classifier stalled until their time limits (8 s + 3 s per image, measured).
+// Naming files from the command line.
 @MainActor func runFiles() async {
     // Expand folders one level (Downloads, Desktop) — skip hidden and in-progress downloads.
     let partial: Set<String> = ["crdownload", "download", "part", "partial"]
@@ -669,5 +675,4 @@ if watch {
     print("\n\(files.count) file(s): \(suggested) suggested, \(kept) kept as is, \(unsure) unsure"
           + (apply ? " — \(renamed) renamed" : " — nothing changed (use --apply)"))
 }
-Task { @MainActor in await runFiles(); exit(0) }
-RunLoop.main.run()
+await runFiles()
