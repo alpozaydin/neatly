@@ -124,11 +124,16 @@ if want dl-weird-names; then setup dl-weird-names; start "dialog:save"
     stop; fi
 
 if want dl-burst; then setup dl-burst; start "dialog:save"
-    for id in ceng-syllabus turkcell-invoice garanti-receipt payslip boarding-pass; do arrive "$(make $id)"; done
-    waitfor '[ "$(grep -c "saved as" "$T/log")" -ge 5 ]' 180
-    check "5 downloads at once: all 5 handled" '[ "$(grep -c "saved as" "$T/log")" -ge 5 ]'
+    for id in ceng-syllabus turkcell-invoice garanti-receipt payslip boarding-pass metu-transcript homework lab-manual exam-schedule; do
+        arrive "$(make $id)"; done
+    waitfor '[ "$(grep -c "saved as" "$T/log")" -ge 9 ]' 300
+    check "9 downloads at once: all 9 handled, none lost" '[ "$(grep -c "saved as" "$T/log")" -ge 9 ]'
+    check "every file still exists (renamed or with its downloaded name)" '[ "$(find "$T/dl" "$T/home" -type f | wc -l | tr -d " ")" -ge 9 ]'
     check "Downloads is empty or only renamed files" '! ls "$T/dl" | grep -q -E "^(8812_4471|EAF2026)"'
-    stop; fi
+    stop
+    # Stopping the watcher mid-burst leaves its requests running in macOS's shared AI service; let them drain,
+    # or the next tests wait behind them (a real burst finishes normally — nobody kills neatly halfway).
+    sleep 25; fi
 
 # ─── Screenshots ────────────────────────────────────────────────────────────
 shot() { "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1; mv "$T/stage/Screenshot 2026-10-09 at 11.26.48.png" "$T/shots/"; }

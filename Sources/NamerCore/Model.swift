@@ -143,6 +143,8 @@ enum Model {
         // Only for real photos (little text): for screenshots and notes the text is the topic, and the
         // caption step adds noise there (tested: 57 → 54 on the screenshot cases when used for everything).
         var captioned = false
+        var direct: String?        // one-call mode: the name came with the description
+        let oneCall = true   // measured: photos 2.6 → 2.2 s, same names on both test sets
         if lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.url) {
             let c = LanguageModelSession(instructions: """
             You describe an image so it can be given a filename. Write one specific sentence: what the main subject is \
@@ -151,8 +153,28 @@ enum Model {
             """)
             var ask = "Describe this image."
             if let b = e.bodySnippet, !b.isEmpty { ask += "\nText read from the image (may be partial): \(String(withoutLetterhead(b).prefix(400)))" }
+            if oneCall {
+                // One model call instead of two: the description and the name in the same answer.
+                ask += """
+
+                Answer in exactly two lines:
+                Description: <one specific sentence>
+                Name: <1 to 3 lowercase words: the MAIN SUBJECT first (a child, a painting, a map, a castle, a ship), \
+                then its most specific detail — a title, place, species, style or era; not background, clothing or small objects>
+                """
+                if !avoid.isEmpty { ask += "\nThe owner rejected these names: \(avoid.joined(separator: ", ")). Give a different one." }
+            }
             let q = ask
-            if let caption = try? await c.respond(options: GenerationOptions(temperature: 0), prompt: { q; Attachment(img) }).content {
+            if var caption = try? await c.respond(options: GenerationOptions(temperature: avoid.isEmpty ? 0 : 0.7,
+                                                                             maximumResponseTokens: oneCall ? 90 : 70),
+                                                  prompt: { q; Attachment(img) }).content {
+                if oneCall {
+                    let lines = caption.split(whereSeparator: \.isNewline).map(String.init)
+                    if let n = lines.first(where: { $0.lowercased().hasPrefix("name:") }) {
+                        direct = String(n.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                    }
+                    caption = lines.first(where: { $0.lowercased().hasPrefix("description:") }).map { String($0.dropFirst(12)) } ?? caption
+                }
                 if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
                     FileHandle.standardError.write(Data("--- caption\n\(caption)\n".utf8))
                 }
@@ -176,7 +198,9 @@ enum Model {
         let session = LanguageModelSession(instructions: instructions(words: words))
         let options = GenerationOptions(temperature: avoid.isEmpty ? 0 : 0.7)   // a retry needs some variety
         let text: String
-        if lookAtImage, !captioned, #available(macOS 27.0, *), let img = thumbnail(e.url) {
+        if let direct {
+            text = direct
+        } else if lookAtImage, !captioned, #available(macOS 27.0, *), let img = thumbnail(e.url) {
             let p = prompt
             guard let out = try? await session.respond(options: options, prompt: {
                 p
@@ -230,7 +254,7 @@ enum Model {
         return CGImageSourceCreateThumbnailAtIndex(src, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,   // respect EXIF rotation
-            kCGImageSourceThumbnailMaxPixelSize: 1024,
+            kCGImageSourceThumbnailMaxPixelSize: 1024,   // 768 measured only ~2% faster and slightly worse
         ] as CFDictionary)
     }
 

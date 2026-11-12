@@ -28,6 +28,13 @@ public struct Namer: Sendable {
 
     public init() {}
 
+    /// `suggest`, but never longer than `limit` — a stuck step (a busy system service) can't stall the queue.
+    public func suggest(for url: URL, explicit: Bool = false, app: String? = nil, within limit: Duration) async -> Outcome {
+        let me = self
+        return await withTimeout(limit) { await me.suggest(for: url, explicit: explicit, app: app) }
+            ?? .unsure(why: "took too long")
+    }
+
     /// Load the model and the embedder ahead of time (e.g. while a download is still running): the first call is the slow one.
     public static func prewarm() {
         Model.prewarm()
@@ -156,11 +163,13 @@ public struct Namer: Sendable {
         } else if isImage {
             // 5. Cheap image signals first: text in the image, and Apple's label classifier.
             mark("image: start")
-            let (text, headline) = Extract.ocrWithHeadline(image: url)
+            // Under the time budget too: if the system's text reader is busy, don't wait forever.
+            let read = await withTimeout(imageBudget) { Extract.ocrWithHeadline(image: url) }
+            let (text, headline) = read ?? (nil, nil)
             mark("image: ocr done")
             if let text { e.bodySnippet = text; e.steps.append("ocr") }
             e.headline = headline
-            e.labels = Extract.labels(image: url)
+            e.labels = await withTimeout(.seconds(3)) { Extract.labels(image: url) } ?? []
             mark("image: labels done")
             if !e.labels.isEmpty { e.steps.append("labels") }
         }
@@ -185,8 +194,11 @@ public struct Namer: Sendable {
             let examples = learnFromCorrections ? Examples.similar(to: snapshot, history: history ?? Correction.all()) : []
             mark("model: examples done")
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
-            if let w = await withTimeout(remaining, { [words = profile.len.modelWords, avoid] in
-                await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil {
+            mark("model: calling")
+            let answer = await withTimeout(remaining, { [words = profile.len.modelWords, avoid] in
+                await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil
+            mark("model: answered")
+            if let w = answer {
                 let (mw, ml) = (profile.len.maxWords, profile.len.maxLength)
                 // The model picked part of the page's own title ("cornbread" from "Hot Honey Cornbread"):
                 // the whole title is more specific, if it fits.

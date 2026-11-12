@@ -285,8 +285,8 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 /// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Select place… = pick a folder.
 /// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
 @MainActor func askUser(file: String, suggestion: String, folder: URL?) async -> Answer {
-    // Runs as its own process and is awaited, so the menu-bar icon stays responsive while it's open.
-    let reply = await helper(["dialog", String(timeout), file, suggestion, folder?.path ?? ""])
+    // Shown inside neatly and awaited, so the menu-bar icon stays responsive while it's open.
+    let reply = await InApp.ask(file: file, suggestion: suggestion, folder: folder, seconds: timeout)
     let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
     if parts.first == "keep" { return .keep }
     guard parts.first == "save", parts.count >= 3 else { return .noAnswer }
@@ -310,6 +310,15 @@ if args.first == "tidy" {
     let targets = args.count > 1 ? args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
                                  : [screenshotFolder()]
     TidyWindow(paths: targets, namer: namer).run()
+}
+
+/// The one-time setup (text reader, classifier, embeddings, model: ~50 s on a fresh install). Files that arrive
+/// meanwhile wait for it instead of racing it — racing made the first screenshot after installing time out.
+@MainActor
+enum Warm {
+    private static var task: Task<Void, Never>?
+    static func start() { if task == nil { task = Task.detached { await Namer.warmUp() } } }
+    static func ready() async { await task?.value }
 }
 
 /// Run `neatly <args>` (popup, pill) without blocking the watchers; returns what it printed.
@@ -356,9 +365,10 @@ func isScreenshot(_ name: String) -> Bool {
     }
     var seen = Set(listing().keys)
     var pending: [String: (size: Int, app: String?)] = [:]
+    let changes = DirWatcher(dir)
     print("watching \(dir.path) for screenshots")
     while true {
-        try? await Task.sleep(for: .seconds(1))
+        await changes.next(timeout: pending.isEmpty ? .seconds(3) : .milliseconds(300))   // instant on change; 0.3 s while a file settles
         let now = listing()
         for (name, size) in now where !seen.contains(name) {
             guard let p = pending[name], p.size == size else {
@@ -372,7 +382,8 @@ func isScreenshot(_ name: String) -> Bool {
             seen.insert(name); pending[name] = nil
             if paused || namer.profile.watchScreenshots == false { continue }
             let url = dir.appending(path: name)
-            guard case .suggested(let s) = await namer.suggest(for: url, app: p.app),
+            await Warm.ready()
+            guard case .suggested(let s) = await namer.suggest(for: url, app: p.app, within: .seconds(20)),
                   let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
             seen.insert(renamed.lastPathComponent)
             print("\(name)  →  \(renamed.lastPathComponent)   [screenshot, \(s.via)]")
@@ -384,7 +395,7 @@ func isScreenshot(_ name: String) -> Bool {
             var file = renamed, shown = s.name, rejected: [String] = []
             var chosen: String? = s.name, byYou = false
             pill: while true {
-                let reply = await helper(["toast", String(max(timeout, 4)), shown, file.path])
+                let reply = await InApp.pill(name: shown, file: file, seconds: max(timeout, 4))
                 switch reply {
                 case "undo":
                     if let back = try? Rename.undo(file) { Decision.markKeep(back); seen.insert(back.lastPathComponent) }
@@ -441,13 +452,15 @@ var paused = false
     }
     var seen = Set(listing().keys)
     var pending: [String: Int] = [:]
+    var sizeSince: [String: Date] = [:]
+    let changes = DirWatcher(dir)
     var warmed = Date.distantPast
-    if namer.useModel { Task.detached { await Namer.warmUp() } }   // fresh install: model ready before the first download
+    if namer.useModel { Warm.start() }   // fresh install: everything set up before the first download
     let shotDir = screenshotFolder()
     if screenshots { Task { await watchScreenshots(shotDir) } }
     print("watching \(dir.path) — download something (Ctrl-C to stop)")
     while true {
-        try? await Task.sleep(for: .seconds(1))
+        await changes.next(timeout: pending.isEmpty ? .seconds(3) : .milliseconds(150))
         // A download in progress: load the model now, so it's ready when the file lands.
         if namer.useModel, Date().timeIntervalSince(warmed) > 120,
            ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).contains(where: {
@@ -456,14 +469,19 @@ var paused = false
         }
         let now = listing()
         for (name, size) in now where !seen.contains(name) {
-            if pending[name] == size {           // same size two checks in a row: finished
-                seen.insert(name); pending[name] = nil
+            // Finished = same size for 0.6 s (a download that pauses briefly isn't mistaken for a finished one).
+            // Browsers download under a temporary name and stamp the finished file with where it came from:
+            // with that stamp, one unchanged check is enough.
+            let fromBrowser = getxattr(dir.appending(path: name).path, "com.apple.metadata:kMDItemWhereFroms", nil, 0, 0, 0) > 0
+            if pending[name] == size, Date().timeIntervalSince(sizeSince[name] ?? Date()) >= (fromBrowser ? 0.1 : 0.6) {
+                seen.insert(name); pending[name] = nil; sizeSince[name] = nil
                 if paused || namer.profile.watchDownloads == false { print("\(name)  skip (paused)"); continue }
                 let url = dir.appending(path: name)
                 let original = url.deletingPathExtension().lastPathComponent
                 // Every new download gets a name and a folder — except installers and files already handled.
                 var nameIdea = original, via = "kept", evidence: Evidence
-                switch await namer.suggest(for: url, explicit: force) {
+                await Warm.ready()
+                switch await namer.suggest(for: url, explicit: force, within: .seconds(20)) {
                 case .suggested(let s):
                     nameIdea = s.name; via = s.via; evidence = s.evidence
                     print("\(name)  →  \(s.name)   [\(s.via), \(Int(s.millis.rounded())) ms]")
@@ -532,7 +550,7 @@ var paused = false
                     print("   left as is")
                 case .noAnswer: print("   no answer, left as is")
                 }
-            } else { pending[name] = size }
+            } else if pending[name] != size { pending[name] = size; sizeSince[name] = Date() }
         }
         seen.formIntersection(now.keys)          // forget deleted files
         if apply { seen.formUnion(listing().keys) }

@@ -64,8 +64,19 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         folderLabel.stringValue = "Suggested folder:  " + shortFolder(folder)
     }
 
+    /// Inside neatly: the answer goes here (no extra process). On its own (`neatly dialog`): print it and exit.
+    var onFinish: (String) -> Void = { print($0); fflush(stdout); exit(0) }
+    private var finished = false
+
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(.accessory)
+        present()
+        NSApp.run()
+        exit(0)
+    }
+
+    /// Show it, start the countdown — without taking over the app (neatly's own run loop keeps going).
+    func present() {
         panel.center()
         if !headless {
             panel.makeKeyAndOrderFront(nil)
@@ -78,8 +89,6 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
             }
         }
         uiTest()
-        NSApp.run()
-        exit(0)
     }
 
     /// NEATLY_UI_TEST="dialog:save" | "dialog:edit:<name>" | "dialog:place:<folder>" | "dialog:keep" | "dialog:wait" (let the countdown run).
@@ -111,18 +120,21 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
     @objc func mouseEntered(_ event: NSEvent) { pause() }
     func controlTextDidChange(_ obj: Notification) { pause() }
 
-    func finish(_ line: String) -> Never {
-        print(line)
-        fflush(stdout)
-        exit(0)
+    func finish(_ line: String) {
+        guard !finished else { return }
+        finished = true
+        timer?.invalidate(); timer = nil
+        NotificationCenter.default.removeObserver(self)
+        panel.orderOut(nil)
+        onFinish(line)
     }
 
     @objc func save() { saveNow(auto: false) }
 
     /// auto = the countdown ran out: nobody looked, so this mustn't be read as "the person agreed".
-    func saveNow(auto: Bool) -> Never {
+    func saveNow(auto: Bool) {
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { finish("none") }
+        guard !name.isEmpty else { finish("none"); return }
         finish("save\t\(name)\t\(folder?.path ?? "")\t\(auto ? "auto" : "user")")
     }
 
@@ -239,14 +251,21 @@ final class Toast: NSObject, NSTextFieldDelegate {
                                           owner: self, userInfo: nil))
     }
 
+    var onFinish: (String) -> Void = { print($0); fflush(stdout); exit(0) }
+    private var finished = false
+
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(.accessory)
+        present()
+        NSApp.run()
+        exit(0)
+    }
+
+    func present() {
         if !headless { panel.orderFrontRegardless() }
         panel.makeFirstResponder(nil)   // nothing selected, no keyboard focus until you click the name
         startTimer()
         uiTest()
-        NSApp.run()
-        exit(0)
     }
 
     func startTimer() {
@@ -269,8 +288,12 @@ final class Toast: NSObject, NSTextFieldDelegate {
     @objc func another() { finish("redo") }
     @objc func undoRename() { finish("undo") }
 
-    func finish(_ line: String) -> Never {
-        print(line); fflush(stdout); exit(0)
+    func finish(_ line: String) {
+        guard !finished else { return }
+        finished = true
+        timer?.invalidate(); timer = nil
+        panel.orderOut(nil)
+        onFinish(line)
     }
 
     /// NEATLY_UI_TEST="edit:new name" | "redo" | "undo": press the buttons by code, to test the whole path.
@@ -288,4 +311,28 @@ final class Toast: NSObject, NSTextFieldDelegate {
 @MainActor func runToast(_ a: [String]) -> Never {
     guard a.count >= 3, let seconds = Int(a[0]) else { print("ok"); exit(1) }
     Toast(name: a[1], file: URL(fileURLWithPath: a[2]), seconds: max(seconds, 3)).run()
+}
+
+/// Popups and pills shown inside neatly itself: no extra program to start (that cost ~235 ms each time).
+@MainActor
+enum InApp {
+    private static var open: [NSObject] = []   // keep each window alive until it answers
+
+    static func ask(file: String, suggestion: String, folder: URL?, seconds: Int) async -> String {
+        await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
+            let d = CountdownDialog(file: file, name: suggestion, folder: folder, seconds: seconds)
+            open.append(d)
+            d.onFinish = { line in open.removeAll { $0 === d }; c.resume(returning: line) }
+            d.present()
+        }
+    }
+
+    static func pill(name: String, file: URL, seconds: Int) async -> String {
+        await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
+            let t = Toast(name: name, file: file, seconds: max(seconds, 3))
+            open.append(t)
+            t.onFinish = { line in open.removeAll { $0 === t }; c.resume(returning: line) }
+            t.present()
+        }
+    }
 }

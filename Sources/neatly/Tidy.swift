@@ -151,7 +151,7 @@ final class TidyModel: ObservableObject {
             n.documentBudget = .seconds(15)
             n.imageBudget = .seconds(20)
             let t1 = Date()
-            let outcome = await n.suggest(for: items[i].url, explicit: true)
+            let outcome = await n.suggest(for: items[i].url, explicit: true, within: .seconds(30))
             print("tidy: \(items[i].url.lastPathComponent) → \(outcome) in \(Int(Date().timeIntervalSince(t1) * 1000)) ms")
             switch outcome {
             case .suggested(let s):
