@@ -172,6 +172,15 @@ if args.isEmpty && AppBundle.isRunningInside {
     exit(0)
 }
 
+// Tests: the rename-or-keep decision for bare names (no file is read or touched).
+if args.first == "decide" {
+    for n in args.dropFirst() {
+        let d = Decision.make(for: URL(fileURLWithPath: "/nonexistent-neatly/" + n))
+        print("\(d.shouldRename ? "rename" : "keep  ")  \(n)   (\(d))")
+    }
+    exit(0)
+}
+
 // Tests: build the app into NEATLY_APP_DIR without touching the login item.
 if args.first == "app-bundle" {
     let me = selfExecutable
@@ -432,6 +441,9 @@ func isScreenshot(_ name: String) -> Bool {
 }
 
 // Watch mode: poll once a second; a file is "done" when its size stops changing.
+/// Folders neatly isn't allowed to read (shown in the neatly window with a button to Settings).
+var noAccess = Set<String>()
+
 /// Menu bar → Pause: new files are noticed but left alone until you resume.
 var paused = false
 
@@ -440,13 +452,28 @@ var paused = false
     let skip: Set<String> = ["crdownload", "download", "part", "partial"]
     let installers: Set<String> = ["dmg", "pkg", "app", "iso"]   // nothing to file
     func listing() -> [String: Int] {
-        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
-                                                                   options: [.skipsHiddenFiles])) ?? []
+        // No permission (you clicked "Don't Allow"): say so, and keep checking — it starts working once allowed.
+        let items: [URL]
+        do {
+            items = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
+                                                                options: [.skipsHiddenFiles])
+            if noAccess.contains(dir.path) { noAccess.remove(dir.path); print("access to \(dir.path) is back") }
+        } catch {
+            if !noAccess.contains(dir.path) {
+                noAccess.insert(dir.path)
+                print("neatly can't see \(dir.path): no permission. Allow it in System Settings → Privacy & Security → Files and Folders → neatly.")
+            }
+            return [:]
+        }
+        let names = Set(items.map(\.lastPathComponent))
         var out: [String: Int] = [:]
         for u in items where !skip.contains(u.pathExtension.lowercased())
             && !(screenshots && isScreenshot(u.lastPathComponent) && dir.standardizedFileURL == screenshotFolder().standardizedFileURL)
             && (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {   // files only
-            out[u.lastPathComponent] = (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+            let size = (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+            // Not real yet: an empty placeholder (Firefox), or the browser is still writing next to it.
+            if size == 0 || skip.contains(where: { names.contains(u.lastPathComponent + "." + $0) }) { continue }
+            out[u.lastPathComponent] = size
         }
         return out
     }
@@ -544,6 +571,7 @@ var paused = false
                     let edited = chosen != nameIdea || folder?.path != target?.path
                     log(chosen, folder, auto)                 // every answer teaches names and folders (auto ones don't)
                     if let done { Decision.markKeep(done) }   // handled: never ask again
+                    if done == nil { print("   couldn't rename \(name) (locked, in use, or gone) — left as it was"); continue }
                     print("   saved as \(Destination.short(folder))/\(done?.lastPathComponent ?? chosen)\(auto ? " (no answer, auto-saved)" : edited ? " (your edit)" : "")")
                 case .keep:
                     Decision.markKeep(url); log("", nil, false)

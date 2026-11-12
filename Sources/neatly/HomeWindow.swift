@@ -176,6 +176,31 @@ struct HomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
+            if !noAccess.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.trianglebadge.exclamationmark").foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("neatly isn't allowed to see your \(noAccess.map { URL(fileURLWithPath: $0).lastPathComponent }.sorted().joined(separator: " and ")) folder").font(.callout.weight(.semibold))
+                        Text("Allow it, and neatly starts right away.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Open Settings") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
+                    }.buttonStyle(.plain).foregroundStyle(brand).font(.callout.weight(.semibold))
+                }
+                .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.12)))
+            }
+            if !Namer.modelAvailable {
+                HStack(spacing: 10) {
+                    Image(systemName: "apple.intelligence").foregroundStyle(.orange)
+                    Text("Apple Intelligence is off, so names are simpler.").font(.callout)
+                    Spacer()
+                    Button("Turn it on") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!)
+                    }.buttonStyle(.plain).foregroundStyle(brand).font(.callout.weight(.semibold))
+                }
+                .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.12)))
+            }
             dropZone
             HStack(spacing: 12) {
                 Tile(icon: "menubar.dock.rectangle", color: .blue, title: "Tidy Desktop", subtitle: "Name what's on it") {

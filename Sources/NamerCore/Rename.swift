@@ -8,7 +8,19 @@ public enum Rename {
 
     /// Rename (and optionally move to `folder`). Never overwrites: adds -2, -3… instead.
     @discardableResult
-    public static func apply(_ url: URL, to stem: String, in folder: URL? = nil) throws -> URL {
+    /// A name that's safe to use: ":" shows up as "/" in Finder, a leading "." hides the file, and "/" would be
+    /// read as a folder. Everything typed by a person (popup, pill, review window) passes through here.
+    public static func clean(_ stem: String) -> String {
+        var s = stem.replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: "/", with: "-")
+        s = s.components(separatedBy: .newlines).joined(separator: " ")
+        while let f = s.first, f == "." || f == " " || f == "-" { s.removeFirst() }
+        s = s.trimmingCharacters(in: .whitespaces)
+        return String(s.prefix(200))   // file names max out at 255 bytes; leave room for "-2" and the extension
+    }
+
+    public static func apply(_ url: URL, to rawStem: String, in folder: URL? = nil) throws -> URL {
+        let stem = clean(rawStem)
+        guard !stem.isEmpty else { throw CocoaError(.fileWriteInvalidFileName) }
         let ext = url.pathExtension
         let dir = folder ?? url.deletingLastPathComponent()
         if folder != nil { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }

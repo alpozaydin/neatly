@@ -5,7 +5,8 @@ import AppKit
 let selfExecutable: URL = {
     var buf = [CChar](repeating: 0, count: 4096)
     if proc_pidpath(getpid(), &buf, UInt32(buf.count)) > 0 {
-        return URL(fileURLWithPath: String(cString: buf)).resolvingSymlinksInPath()
+        let bytes = buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return URL(fileURLWithPath: String(decoding: bytes, as: UTF8.self)).resolvingSymlinksInPath()
     }
     return (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])).resolvingSymlinksInPath()
 }()
