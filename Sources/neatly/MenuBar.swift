@@ -197,3 +197,14 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         }
     }
 }
+
+/// macOS sends "reopen" to the running copy when you open neatly from Spotlight, Finder or the Dock
+/// (it never starts a second copy of an app that's already running): show the window then.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    static let shared = AppDelegate()
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        HomeWindow.shared.show()
+        return true
+    }
+}

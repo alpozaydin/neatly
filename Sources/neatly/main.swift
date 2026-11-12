@@ -542,6 +542,7 @@ var paused = false
 if watch {
     // One process: the menu-bar icon, the Downloads watcher and the screenshot watcher, all on the main run loop.
     NSApplication.shared.setActivationPolicy(.accessory)
+    NSApplication.shared.delegate = AppDelegate.shared   // opening the app again → show its window
     if menuBar { MenuBar.shared.start() }
     Task { await watchDownloads() }
     NSApp.run()

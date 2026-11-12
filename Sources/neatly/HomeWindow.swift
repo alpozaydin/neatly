@@ -26,17 +26,30 @@ final class HomeWindow: NSObject, NSWindowDelegate {
             w.titleVisibility = .hidden
             w.isMovableByWindowBackground = true
             w.isReleasedWhenClosed = false
-            w.contentView = NSHostingView(rootView: HomeView(model: model))
-            w.setContentSize(w.contentView!.fittingSize)
+            w.delegate = self
+            w.collectionBehavior = [.moveToActiveSpace]          // open on the desktop you're looking at
+            w.contentView = NSHostingView(rootView: ScrollView { HomeView(model: model) }.scrollIndicators(.automatic))
             window = w
         }
         print("home: shown")
         if !headless, let window {
-            NSApp.activate(ignoringOtherApps: true)
+            // Never taller than the screen (the content scrolls instead).
+            let fit = NSHostingView(rootView: HomeView(model: model)).fittingSize
+            let screen = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            window.setContentSize(NSSize(width: fit.width, height: min(fit.height, screen.height - 40)))
+            // A menu-bar-only app can't reliably come to the front on recent macOS: act like a normal app
+            // (Dock icon, ⌘-Tab) while the window is open, then go back to the menu bar when it closes.
+            NSApp.setActivationPolicy(.regular)
             window.center()
             window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            NSApp.activate()
         }
         uiTest()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if !headless { NSApp.setActivationPolicy(.accessory) }
     }
 
     /// NEATLY_UI_TEST="home:length=standard,home:style=title,home:date=on,home:downloads=off,home:screenshots=off,
