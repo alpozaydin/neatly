@@ -171,9 +171,9 @@ final class TidyModel: ObservableObject {
     static func plain(_ why: String, url: URL) -> String {
         if why.contains("no better name") || why.contains("meaningful") { return "This name already looks fine" }
         if why.contains("you chose") { return "You named this one yourself" }
-        let ext = url.pathExtension.lowercased()
-        if !["pdf", "docx", "pptx", "ipynb", "zip", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"].contains(ext) {
-            return "neatly can't read .\(ext) files yet — type a name if you like"
+        if why.contains("too long") { return "Took too long — type a name if you like" }
+        if ["zip", "dmg", "pkg", "iso", "exe", "app"].contains(url.pathExtension.lowercased()) {
+            return "neatly doesn't look inside .\(url.pathExtension.lowercased()) files — type a name if you like"
         }
         return "Couldn't tell what's inside — type a name if you like"
     }
@@ -257,7 +257,7 @@ struct TidyView: View {
             Image(systemName: "sparkles").font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
                 .frame(width: 46, height: 46).background(RoundedRectangle(cornerRadius: 12).fill(brandGradient))
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.finished != nil ? "Done!" : "Rename \(model.title)")
+                Text(model.finished != nil ? "Done!" : "Review \(model.title)")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                 if model.working, !model.items.isEmpty {
                     HStack(spacing: 8) {
@@ -292,11 +292,18 @@ struct TidyView: View {
         HStack(spacing: 12) {
             Image(systemName: "arrow.uturn.backward.circle").foregroundStyle(.secondary)
             Text(model.finished != nil ? "Changed your mind? Undo puts every name back."
-                                       : "Nothing changes until you click Rename.")
+                 : (!model.working && model.toRename.isEmpty && !model.items.isEmpty)
+                   ? (model.items.allSatisfy { if case .noIdea(let w) = $0.state { w.contains("looks fine") } else { false } }
+                      ? "These names already look fine. Type a new name in a box to change one."
+                      : "To rename a file, type a new name in its box.")
+                   : "Nothing changes until you click Rename.")
                 .font(.callout).foregroundStyle(.secondary)
             Spacer()
             if model.finished != nil {
                 Pill(title: "Undo", primary: false) { model.undoAll() }
+                Pill(title: "Done", primary: true) { NSApp.terminate(nil) }
+            } else if model.toRename.isEmpty && !model.working {
+                // Nothing to rename: never show a button that can't be pressed.
                 Pill(title: "Done", primary: true) { NSApp.terminate(nil) }
             } else {
                 Pill(title: "Cancel", primary: false) { NSApp.terminate(nil) }
@@ -315,7 +322,7 @@ struct Row: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CheckCircle(on: item.checked, enabled: item.renamedTo == nil) { item.checked.toggle() }
+            leading.frame(width: 24)
             Group {
                 if let t = item.thumbnail { Image(nsImage: t).resizable().aspectRatio(contentMode: .fill) }
                 else { Image(systemName: "doc").font(.title2).foregroundStyle(.secondary) }
@@ -332,6 +339,23 @@ struct Row: View {
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(item.checked ? 0.05 : 0.025)))
+    }
+
+    /// A circle only where there's a rename to approve; otherwise a status icon that clearly isn't a button.
+    @ViewBuilder var leading: some View {
+        if item.renamedTo != nil {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 20)).foregroundStyle(.green).help("Renamed")
+        } else if item.name.trimmingCharacters(in: .whitespaces) != item.stem {
+            CheckCircle(on: item.checked, enabled: true) { item.checked.toggle() }.help(item.checked ? "Will be renamed" : "Will be skipped")
+        } else {
+            switch item.state {
+            case .reading, .waiting: ProgressDots()
+            case .noIdea(let why) where why.contains("already looks fine") || why.contains("named this one"):
+                Image(systemName: "checkmark.seal").font(.system(size: 18)).foregroundStyle(.secondary).help("Name already looks fine")
+            default:
+                Image(systemName: "pencil.line").font(.system(size: 16)).foregroundStyle(.secondary).help("Type a name to rename it")
+            }
+        }
     }
 
     @ViewBuilder var nameField: some View {
@@ -417,5 +441,12 @@ enum Tidy {
         let n = paths.filter { (try? Rename.undo(URL(fileURLWithPath: $0))) != nil }.count
         saveLast([])
         return n
+    }
+}
+
+/// "Reading…" in a row, before a name arrives.
+struct ProgressDots: View {
+    var body: some View {
+        Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold)).foregroundStyle(brand)
     }
 }

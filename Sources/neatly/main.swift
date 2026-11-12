@@ -594,74 +594,80 @@ if watch {
     NSApp.run()
 }
 
-// Expand folders one level (Downloads, Desktop) — skip hidden and in-progress downloads.
-let partial: Set<String> = ["crdownload", "download", "part", "partial"]
-var files: [URL] = []
-for p in args {
-    let url = URL(fileURLWithPath: (p as NSString).expandingTildeInPath)
-    var isDir: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else {
-        print("not found: \(p)"); continue
+// Naming files from the command line. Runs with a live main event loop, like the app does: without one,
+// Apple's text reader and photo classifier stalled until their time limits (8 s + 3 s per image, measured).
+@MainActor func runFiles() async {
+    // Expand folders one level (Downloads, Desktop) — skip hidden and in-progress downloads.
+    let partial: Set<String> = ["crdownload", "download", "part", "partial"]
+    var files: [URL] = []
+    for p in args {
+        let url = URL(fileURLWithPath: (p as NSString).expandingTildeInPath)
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else {
+            print("not found: \(p)"); continue
+        }
+        if isDir.boolValue {
+            let items = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey],
+                                                                       options: [.skipsHiddenFiles])) ?? []
+            files += items.filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        } else { files.append(url) }
     }
-    if isDir.boolValue {
-        let items = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey],
-                                                                   options: [.skipsHiddenFiles])) ?? []
-        files += items.filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-    } else { files.append(url) }
-}
-files.removeAll { partial.contains($0.pathExtension.lowercased()) }
+    files.removeAll { partial.contains($0.pathExtension.lowercased()) }
 
-if namer.useModel { print("model: \(Namer.modelStatus)\n") }
+    if namer.useModel { print("model: \(Namer.modelStatus)\n") }
 
-let pad = min(48, files.map(\.lastPathComponent.count).max() ?? 0)
-let folderIndex = whereTo ? Destination.cachedIndex() : []
-/// --where --why: the folders the model chose from, closest first.
-func showShortlist(_ name: String, _ e: Evidence) {
-    guard why else { return }
-    let t0 = Date()
-    let list = Destination.shortlist(name: name, evidence: e, folders: folderIndex, k: 5)
-    print("      closest: \(list.map { Destination.short($0.url) }.joined(separator: " | "))  (\(Int(Date().timeIntervalSince(t0) * 1000)) ms)")
-}
-var renamed = 0, suggested = 0, kept = 0, unsure = 0
-for url in files {
-    let old = url.lastPathComponent
-    let shown = old.count > pad ? String(old.prefix(pad - 1)) + "…" : old.padding(toLength: pad, withPad: " ", startingAt: 0)
-    switch await namer.suggest(for: url, explicit: force) {
-    case .kept(let r):
-        kept += 1
-        if why || whereTo { print("\(shown)     keep   (\(r))") }
-        if whereTo {
-            let (ev, kebab) = Destination.keptEvidence(url)
-            let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: namer.useModel)
-            print("      folder:  \(Destination.short(f))")
-            showShortlist(kebab, ev)
-        }
-    case .unsure(let r):
-        unsure += 1
-        if why { print("\(shown)     ?      (\(r))") }
-    case .suggested(let s):
-        suggested += 1
-        let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
-        print("\(shown)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
-        if whereTo {
-            let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: namer.useModel)
-            print("      folder:  \(Destination.short(f))")
-            showShortlist(s.name, s.evidence)
-        }
-        if why {
-            let e = s.evidence
-            if let h = e.sourceDescription { print("      source:  \(h)") }
-            if let t = e.metadataTitle { print("      title:   \(t)") }
-            if let h = e.headline { print("      heading: \(h)") }
-            if !e.labels.isEmpty { print("      labels:  \(e.labels.joined(separator: ", "))") }
-            if let p = e.paper { print("      paper:   \(p.title) (\(p.year.map(String.init) ?? "?"))") }
-        }
-        if apply {
-            do { try Rename.apply(url, to: s.name); renamed += 1 }
-            catch { print("      rename failed: \(error.localizedDescription)") }
+    let pad = min(48, files.map(\.lastPathComponent.count).max() ?? 0)
+    let folderIndex = whereTo ? Destination.cachedIndex() : []
+    /// --where --why: the folders the model chose from, closest first.
+    func showShortlist(_ name: String, _ e: Evidence) {
+        guard why else { return }
+        let t0 = Date()
+        let list = Destination.shortlist(name: name, evidence: e, folders: folderIndex, k: 5)
+        print("      closest: \(list.map { Destination.short($0.url) }.joined(separator: " | "))  (\(Int(Date().timeIntervalSince(t0) * 1000)) ms)")
+    }
+    var renamed = 0, suggested = 0, kept = 0, unsure = 0
+    for url in files {
+        let old = url.lastPathComponent
+        let shown = old.count > pad ? String(old.prefix(pad - 1)) + "…" : old.padding(toLength: pad, withPad: " ", startingAt: 0)
+        switch await namer.suggest(for: url, explicit: force) {
+        case .kept(let r):
+            kept += 1
+            if why || whereTo { print("\(shown)     keep   (\(r))") }
+            if whereTo {
+                let (ev, kebab) = Destination.keptEvidence(url)
+                let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: namer.useModel)
+                print("      folder:  \(Destination.short(f))")
+                showShortlist(kebab, ev)
+            }
+        case .unsure(let r):
+            unsure += 1
+            if why { print("\(shown)     ?      (\(r))") }
+        case .suggested(let s):
+            suggested += 1
+            let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
+            print("\(shown)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
+            if whereTo {
+                let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: namer.useModel)
+                print("      folder:  \(Destination.short(f))")
+                showShortlist(s.name, s.evidence)
+            }
+            if why {
+                let e = s.evidence
+                if let h = e.sourceDescription { print("      source:  \(h)") }
+                if let t = e.metadataTitle { print("      title:   \(t)") }
+                if let h = e.headline { print("      heading: \(h)") }
+                if !e.labels.isEmpty { print("      labels:  \(e.labels.joined(separator: ", "))") }
+                if let p = e.paper { print("      paper:   \(p.title) (\(p.year.map(String.init) ?? "?"))") }
+            }
+            if apply {
+                do { try Rename.apply(url, to: s.name); renamed += 1 }
+                catch { print("      rename failed: \(error.localizedDescription)") }
+            }
         }
     }
+    print("\n\(files.count) file(s): \(suggested) suggested, \(kept) kept as is, \(unsure) unsure"
+          + (apply ? " — \(renamed) renamed" : " — nothing changed (use --apply)"))
 }
-print("\n\(files.count) file(s): \(suggested) suggested, \(kept) kept as is, \(unsure) unsure"
-      + (apply ? " — \(renamed) renamed" : " — nothing changed (use --apply)"))
+Task { @MainActor in await runFiles(); exit(0) }
+RunLoop.main.run()

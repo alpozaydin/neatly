@@ -145,7 +145,7 @@ enum Model {
         var captioned = false
         var direct: String?        // one-call mode: the name came with the description
         let oneCall = true   // measured: photos 2.6 → 2.2 s, same names on both test sets
-        if lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.url) {
+        if lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.imageURL ?? e.url) {
             let c = LanguageModelSession(instructions: """
             You describe an image so it can be given a filename. Write one specific sentence: what the main subject is \
             (as specific as you can: the landmark, building, species, artwork style and era, vehicle, product, or kind of \
@@ -200,7 +200,7 @@ enum Model {
         let text: String
         if let direct {
             text = direct
-        } else if lookAtImage, !captioned, #available(macOS 27.0, *), let img = thumbnail(e.url) {
+        } else if lookAtImage, !captioned, #available(macOS 27.0, *), let img = thumbnail(e.imageURL ?? e.url) {
             let p = prompt
             guard let out = try? await session.respond(options: options, prompt: {
                 p
@@ -244,7 +244,10 @@ enum Model {
             }.joined(separator: " ")
         }
         let stemWords = Set(Style.words(e.stem))
-        let w = Style.words(line2).filter { $0.count >= 2 && !banned.contains($0) && !stemWords.contains($0) && $0 != e.ext }
+        // Dropping the filename's own words stops junk coming back ("img" from IMG_4821) — but when the current name
+        // is a real one ("egg-club"), the model agreeing with it is the answer: the file's name is already fine.
+        let junkStem = Decision.junkReason(e.stem) != nil
+        let w = Style.words(line2).filter { $0.count >= 2 && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
         return w.isEmpty ? nil : Array(w.prefix(words.upperBound))
     }
 

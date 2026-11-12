@@ -77,7 +77,9 @@ public struct Namer: Sendable {
     public static var modelAvailable: Bool { Model.isAvailable }
 
     public static let pdfLike: Set<String> = ["pdf"]
-    public static let imageLike: Set<String> = ["png", "jpg", "jpeg", "heic", "tiff", "webp"]
+    public static let imageLike: Set<String> = ["png", "jpg", "jpeg", "heic", "heif", "tiff", "tif", "webp", "gif", "bmp"]
+    /// Read as text by macOS's document reader.
+    public static let textLike: Set<String> = ["doc", "rtf", "rtfd", "odt", "html", "htm", "webarchive", "txt", "md", "markdown"]
 
     /// `explicit`: the user pointed at this file (Finder hotkey, CLI --force), so skip the
     /// "name already meaningful" check — but never override a name they chose themselves.
@@ -127,7 +129,9 @@ public struct Namer: Sendable {
             return done(Style.paperName(title: paper.title, year: paper.year), "arxiv")
         }
 
-        let isImage = Self.imageLike.contains(e.ext)
+        var isImage = Self.imageLike.contains(e.ext)
+        var preview: URL?                   // a Quick Look rendering we made; deleted when we're done
+        defer { if let preview { try? FileManager.default.removeItem(at: preview) } }
         e.linkHint = Extract.linkHint(e.sourceURLs)
         let office: Extract.PDFInfo? = switch e.ext {
             case "docx": Extract.docx(url)
@@ -160,16 +164,26 @@ public struct Namer: Sendable {
             if !info.hasText, e.metadataTitle == nil, let text = Extract.ocr(pdfFirstPage: url) {
                 e.bodySnippet = text; e.steps.append("ocr")
             }
-        } else if isImage {
+        } else if Self.textLike.contains(e.ext), let info = Extract.textDocument(url) {
+            e.headline = info.headline
+            e.bodySnippet = info.snippet
+            e.steps.append("text")
+        } else if !isImage, !["zip", "dmg", "pkg", "app", "iso", "exe"].contains(e.ext),
+                  let rendered = await withTimeout(.seconds(4), { await Extract.quickLook(url) }) ?? nil {
+            preview = rendered; isImage = true; e.steps.append("preview")
+        }
+        if isImage {
+            let imageFile = preview ?? url
+            e.imageURL = imageFile
             // 5. Cheap image signals first: text in the image, and Apple's label classifier.
             mark("image: start")
             // Under the time budget too: if the system's text reader is busy, don't wait forever.
-            let read = await withTimeout(imageBudget) { Extract.ocrWithHeadline(image: url) }
+            let read = await withTimeout(imageBudget) { Extract.ocrWithHeadline(image: imageFile) }
             let (text, headline) = read ?? (nil, nil)
             mark("image: ocr done")
             if let text { e.bodySnippet = text; e.steps.append("ocr") }
             e.headline = headline
-            e.labels = await withTimeout(.seconds(3)) { Extract.labels(image: url) } ?? []
+            e.labels = await withTimeout(.seconds(3)) { Extract.labels(image: imageFile) } ?? []
             mark("image: labels done")
             if !e.labels.isEmpty { e.steps.append("labels") }
         }
@@ -352,7 +366,8 @@ public struct Namer: Sendable {
 func withTimeout<T: Sendable>(_ d: Duration, _ op: @escaping @Sendable () async -> T) async -> T? {
     let once = Once()
     return await withCheckedContinuation { (c: CheckedContinuation<T?, Never>) in
-        let work = Task { let v = await op(); if once.claim() { c.resume(returning: v) } }
+        // Detached: never inherit the caller's thread. On the main thread Vision's text reader stalls (measured: 8 s → limit).
+        let work = Task.detached { let v = await op(); if once.claim() { c.resume(returning: v) } }
         Task { try? await Task.sleep(for: d); if once.claim() { work.cancel(); c.resume(returning: nil) } }
     }
 }

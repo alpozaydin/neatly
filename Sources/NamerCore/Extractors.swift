@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import QuickLookThumbnailing
 import PDFKit
 @preconcurrency import Vision
 import ImageIO
@@ -236,6 +238,38 @@ extension Extract {
     }
 
     /// Jupyter / Colab: the first markdown heading, else the first cells.
+    /// Word, RTF, OpenDocument, web pages and plain text — macOS's own document reader handles all of them.
+    static func textDocument(_ url: URL) -> PDFInfo? {
+        let ext = url.pathExtension.lowercased()
+        let text: String
+        if ["txt", "md", "markdown", "csv", "log", "json", "yaml", "yml"].contains(ext) {
+            guard let h = try? FileHandle(forReadingFrom: url), let d = try? h.read(upToCount: 16_000) else { return nil }
+            text = String(decoding: d, as: UTF8.self)
+        } else {
+            guard let a = try? NSAttributedString(url: url, options: [:], documentAttributes: nil) else { return nil }
+            text = String(a.string.prefix(16_000))
+        }
+        let lines = text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return nil }
+        let head = lines.first { $0.count <= 120 && $0.filter(\.isLetter).count >= 3 }
+        return PDFInfo(title: nil, headline: head.map { String($0.prefix(headlineMax)) },
+                       snippet: String(lines.joined(separator: "\n").prefix(snippetBudget)), hasText: true)
+    }
+
+    /// Anything macOS can preview (SVG, GIF, Keynote, Pages, Numbers, videos, Photoshop…): let Quick Look draw it,
+    /// then name that picture like a screenshot. Returns a temporary PNG (the caller deletes it).
+    static func quickLook(_ url: URL) async -> URL? {
+        let req = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 1600, height: 1600), scale: 1,
+                                               representationTypes: .thumbnail)
+        guard let rep = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: req) else { return nil }
+        let cg = rep.cgImage
+        guard cg.width >= 64, cg.height >= 64 else { return nil }   // a generic file icon says nothing
+        let out = FileManager.default.temporaryDirectory.appending(path: "neatly-preview-\(UUID().uuidString).png")
+        guard let dest = CGImageDestinationCreateWithURL(out as CFURL, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, nil)
+        return CGImageDestinationFinalize(dest) ? out : nil
+    }
+
     static func notebook(_ url: URL) -> PDFInfo? {
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
