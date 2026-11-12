@@ -305,6 +305,8 @@ if want app; then setup app; mkdir -p "$T/apps"
     check "has an icon" '[ -s "$A/Contents/Resources/AppIcon.icns" ]'
     check "signature valid" 'codesign --verify --deep "$A" 2>/dev/null'
     check "app binary runs" '"$A/Contents/MacOS/neatly" --version | grep -q "^neatly "'
+    before=$(stat -f %i "$A"); NEATLY_APP_DIR=$T/apps "$B" app-bundle > /dev/null
+    check "updating keeps the same app (Launchpad/Dock don't lose it)" '[ "$(stat -f %i "$A")" = "$before" ] && codesign --verify --deep "$A" 2>/dev/null && "$A/Contents/MacOS/neatly" --version | grep -q "^neatly "'
 fi
 
 echo

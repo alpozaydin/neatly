@@ -15,6 +15,7 @@ public struct Evidence: Sendable {
     public var labels: [String] = []      // what a photo shows (on-device classifier)
     public var paper: Paper?              // arXiv/DOI lookup result
     public var steps: [String] = []       // which stages contributed, for debugging
+    public var imageURL: URL?             // the picture to read and look at: the file itself, or a Quick Look rendering
 
     public struct Paper: Sendable {
         public var title: String

@@ -72,9 +72,21 @@ enum AppBundle {
         try? writeIcon(to: staging.appending(path: "Contents/Resources/AppIcon.icns"))
         run("/usr/bin/codesign", ["--force", "--sign", "-", staging.path])   // ad-hoc: required on Apple silicon
 
-        // Swap in place, so a running copy is never half-written.
-        try? fm.removeItem(at: app)
-        try fm.moveItem(at: staging, to: app)
+        if fm.fileExists(atPath: app.path) {
+            // Update the files INSIDE the existing app: replacing the whole app made Launchpad and the Apps view
+            // lose it until the Dock restarted. Each file is swapped atomically, so a running copy keeps working.
+            for rel in ["Contents/MacOS/neatly", "Contents/Info.plist", "Contents/Resources/AppIcon.icns"] {
+                let new = staging.appending(path: rel), old = app.appending(path: rel)
+                guard fm.fileExists(atPath: new.path) else { continue }
+                try fm.createDirectory(at: old.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if fm.fileExists(atPath: old.path) { _ = try fm.replaceItemAt(old, withItemAt: new) }
+                else { try fm.moveItem(at: new, to: old) }
+            }
+            try? fm.removeItem(at: staging)
+            run("/usr/bin/codesign", ["--force", "--sign", "-", app.path])   // contents changed: sign again
+        } else {
+            try fm.moveItem(at: staging, to: app)
+        }
         // Tell Launch Services and Spotlight about it right away — but never for test copies, or macOS would
         // find several "neatly" apps and might open the wrong one.
         if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] == nil {
