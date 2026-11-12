@@ -34,7 +34,7 @@ func issuer() {
 }
 
 func papers() {
-    expect(Style.paperName(title: "UniDepth: Universal Monocular Metric Depth Estimation", year: 2024) == "unidepth-2024")
+    expect(Style.paperName(title: "UniDepth: Universal Monocular Metric Depth Estimation", year: 2024) == "unidepth-depth-estimation-2024")
     expect(Style.paperName(title: "Attention Is All You Need", year: 2017) == "attention-is-all-2017")
 }
 
@@ -125,6 +125,15 @@ func examples() {
     expect(!got.contains("invoice-hetzner-oct26"))
 }
 
-for t in [examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+
+/// Papers keep their short name AND what they're about (a friend found "dinov2-2023" too bare).
+func paperTopics() {
+    expect(Style.paperName(title: "DINOv2: Learning Robust Visual Features without Supervision", year: 2023) == "dinov2-visual-features-2023")
+    expect(Style.paperName(title: "UniDepth: Universal Monocular Metric Depth Estimation", year: 2024) == "unidepth-depth-estimation-2024")
+    expect(Style.paperName(title: "LoRA: Low-Rank Adaptation of Large Language Models", year: 2021) == "lora-low-rank-adaptation-2021")
+    expect(Style.paperName(title: "CLIP: Learning Transferable Visual Models From Natural Language Supervision", year: 2021) == "clip-visual-models-2021")
+}
+
+for t in [paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
