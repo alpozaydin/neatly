@@ -49,7 +49,9 @@ final class HomeWindow: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        if !headless { NSApp.setActivationPolicy(.accessory) }
+        Welcome.finish()   // closed without clicking Continue: start anyway (macOS asks for the folders now)
+        model.welcomed = true
+        if !headless, HistoryWindow.shared.window?.isVisible != true { NSApp.setActivationPolicy(.accessory) }
     }
 
     /// NEATLY_UI_TEST="home:length=standard,home:style=title,home:date=on,home:downloads=off,home:screenshots=off,
@@ -68,6 +70,9 @@ final class HomeWindow: NSObject, NSWindowDelegate {
                 case "screenshots": model.screenshots = kv[1] == "on"
                 case "countdown": model.countdown = Int(kv[1]) ?? 5
                 case "autoupdate": model.autoUpdate = kv[1] == "on"
+                case "online": model.online = kv[1] == "on"
+                case "continue": model.welcome()
+                case "forget": model.forget(confirm: false)
                 case "drop": MenuBar.shared.dropped(kv[1].split(separator: "|").map { URL(fileURLWithPath: String($0)) })
                 case "snapshot": HomeWindow.snapshot(model, to: kv[1])
                 default: break
@@ -115,6 +120,8 @@ final class HomeModel: ObservableObject {
     @Published var copyShots = false { didSet { save() } }
     @Published var countdown = 5 { didSet { save() } }
     @Published var autoUpdate: Bool? = nil { didSet { save() } }   // nil = not asked yet
+    @Published var online = true { didSet { save() } }
+    @Published var welcomed = true
     @Published var named = 0
     @Published var moreOpen = false      // view state lives here: SwiftUI's @State needs Xcode's macro plugin
     @Published var dropping = false
@@ -134,6 +141,8 @@ final class HomeModel: ObservableObject {
         copyShots = p.copyScreenshots == true
         countdown = timeout
         autoUpdate = p.autoUpdate
+        online = p.onlineLookups != false
+        welcomed = Welcome.done
         named = Correction.all().filter { !$0.chosen.isEmpty }.count
         loading = false
     }
@@ -154,9 +163,33 @@ final class HomeModel: ObservableObject {
             p.copyScreenshots = copyShots
             p.countdown = countdown
             p.autoUpdate = autoUpdate
+            p.onlineLookups = online ? nil : false
         }
+        namer.useNetwork = online && !offline
         timeout = countdown
         objectWillChange.send()   // the preview name follows
+    }
+
+    func welcome() {
+        Welcome.finish()
+        welcomed = true
+    }
+
+    /// Delete what neatly remembers about past files (learning log, history, last tidy, activity log).
+    func forget(confirm: Bool = true) {
+        if confirm, !headless {
+            let a = NSAlert()
+            a.messageText = "Forget your history?"
+            a.informativeText = "neatly forgets the names you chose and the files it handled, so it can't undo them from History any more. "
+                + "Your files and settings stay as they are."
+            a.addButton(withTitle: "Forget")
+            a.addButton(withTitle: "Cancel")
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
+        History.forgetAll()
+        Log.clear()
+        named = 0
+        Notice.show("Forgot your history.")
     }
 
     /// What a name looks like with the current choices — shown live in the window.
@@ -180,7 +213,21 @@ struct HomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
-            if model.autoUpdate == nil {
+            if !model.welcomed {
+                // Explain the permission prompts before macOS shows them: neatly waits for this click.
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        IconBadge(icon: "hand.raised.fill", color: .blue)
+                        Text("One step before neatly starts").font(.headline)
+                    }
+                    Text("Next, macOS asks if neatly may use your **Downloads** and **Desktop** folders. Click **Allow**: "
+                         + "neatly only looks at new files there, and everything stays on your Mac.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack { Spacer(); Chip(text: "Continue", selected: true) { model.welcome() } }
+                }
+                .padding(14).background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(0.10)))
+            }
+            if model.welcomed && model.autoUpdate == nil {
                 // Asked once, at first install: after that neatly keeps itself current with nothing to do.
                 HStack(spacing: 12) {
                     IconBadge(icon: "arrow.triangle.2.circlepath", color: .teal)
@@ -250,7 +297,7 @@ struct HomeView: View {
                 HStack(spacing: 8) {
                     Text("Length").foregroundStyle(.secondary).frame(width: 60, alignment: .leading)
                     ForEach(StyleProfile.Length.allCases, id: \.self) { l in
-                        Chip(text: l == .short ? "Short" : l == .standard ? "Medium" : "Long", selected: model.length == l) { model.length = l }
+                        Chip(text: l.label, selected: model.length == l) { model.length = l }
                     }
                     Spacer()
                 }
@@ -280,14 +327,18 @@ struct HomeView: View {
                                   subtitle: "So you can paste them right away", isOn: $model.copyShots)
                         Divider().padding(.leading, 44)
                         SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
-                                  subtitle: "Checks GitHub for new versions now and then — nothing about you or your files is sent",
+                                  subtitle: "Nothing about you or your files is sent",
                                   isOn: Binding(get: { model.autoUpdate == true }, set: { model.autoUpdate = $0 }))
+                        Divider().padding(.leading, 44)
+                        SwitchRow(icon: "globe", color: .blue, title: "Look up research papers online",
+                                  subtitle: "Gets a paper's real title from arXiv — only its paper number is sent",
+                                  isOn: $model.online)
                         Divider().padding(.leading, 44)
                         HStack(spacing: 12) {
                             IconBadge(icon: "timer", color: .gray)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("If I don't answer a download suggestion")
-                                Text("neatly saves it as suggested after:").font(.caption).foregroundStyle(.secondary)
+                                Text("neatly keeps the new name, in Downloads, after:").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
@@ -296,14 +347,27 @@ struct HomeView: View {
                                 Chip(text: s == 0 ? "Wait for me" : "\(s) sec", selected: model.countdown == s) { model.countdown = s }
                             }
                         }.padding(.leading, 44)
+                        Divider().padding(.leading, 44)
+                        HStack(spacing: 12) {
+                            IconBadge(icon: "trash", color: .gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Forget my history")
+                                Text("What neatly remembers about past files. Settings stay.").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Pill(title: "Forget", primary: false) { model.forget() }
+                                .accessibilityLabel("Forget my history")
+                        }
                     }
                 }
             }
 
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill").font(.caption)
-                Text("Everything stays on your Mac. neatly lives in your menu bar ✦").font(.caption)
+                Text("Your files stay on your Mac. neatly lives in your menu bar ✦").font(.caption)
                 Spacer()
+                Button("History") { HistoryWindow.shared.show() }.buttonStyle(.plain).font(.caption).foregroundStyle(brand)
+                Text("·").font(.caption)
                 Button("Quit neatly") { MenuBar.shared.quit() }.buttonStyle(.plain).font(.caption).foregroundStyle(brand)
             }.foregroundStyle(.secondary)
         }
@@ -323,7 +387,7 @@ struct HomeView: View {
             }
             Spacer()
             VStack(spacing: 4) {
-                Switch(isOn: $model.on)
+                Switch(isOn: $model.on, label: "neatly on")
                 Text(model.on ? "On" : "Paused").font(.caption.weight(.medium)).foregroundStyle(model.on ? brand : .secondary)
             }
         }
@@ -403,13 +467,15 @@ struct SwitchRow: View {
                 if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
             }
             Spacer()
-            Switch(isOn: $isOn)
+            Switch(isOn: $isOn, label: title)
         }
+        .accessibilityElement(children: .contain)
     }
 }
 
 struct Switch: View {
     @Binding var isOn: Bool
+    var label = "neatly"
     var body: some View {
         Button { withAnimation(.easeOut(duration: 0.15)) { isOn.toggle() } } label: {
             ZStack(alignment: isOn ? .trailing : .leading) {
@@ -417,7 +483,10 @@ struct Switch: View {
                     .frame(width: 42, height: 24)
                 Circle().fill(.white).shadow(color: .black.opacity(0.2), radius: 1, y: 1).frame(width: 20, height: 20).padding(2)
             }
-        }.buttonStyle(.plain).accessibilityValue(isOn ? "on" : "off")
+        }.buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityAddTraits(.isToggle)
     }
 }
 
@@ -431,6 +500,8 @@ struct Chip: View {
                 .foregroundStyle(selected ? .white : .primary)
                 .background(Capsule().fill(selected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.primary.opacity(0.06))))
         }.buttonStyle(.plain)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -460,5 +531,43 @@ struct Tile: View {
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.7 : 1).scaleEffect(configuration.isPressed ? 0.98 : 1)
+    }
+}
+
+/// First start: neatly waits until you've read why macOS is about to ask for your folders (the Continue button
+/// in the welcome window). Tests, the command line and people who already used neatly never wait.
+@MainActor
+enum Welcome {
+    static var url: URL { Correction.fileURL.deletingLastPathComponent().appending(path: ".welcomed") }
+    static var done: Bool { headless || !menuBar || FileManager.default.fileExists(atPath: url.path) }
+    static func finish() {
+        guard !FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        print("welcome: continue")
+    }
+    /// At most 10 minutes: if the window was never seen, neatly still starts (macOS then asks on its own).
+    static func wait() async {
+        let start = Date()
+        while !done && Date().timeIntervalSince(start) < 600 { try? await Task.sleep(for: .milliseconds(300)) }
+    }
+}
+
+/// ~/Library/Logs/neatly.log: what neatly did, for "Open Activity Log". Kept under a few MB.
+enum Log {
+    static var url: URL { FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/neatly.log") }
+    /// Over 4 MB: keep the last 1 MB. Rewritten in place, so the service keeps writing to the same file.
+    static func trim(max: Int = 4 << 20, keep: Int = 1 << 20) {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int), size > max,
+              let h = try? FileHandle(forUpdating: url) else { return }
+        defer { try? h.close() }
+        try? h.seek(toOffset: UInt64(size - keep))
+        guard let tail = try? h.readToEnd() else { return }
+        try? h.truncate(atOffset: 0)
+        try? h.write(contentsOf: tail)
+    }
+    static func clear() {
+        guard let h = try? FileHandle(forUpdating: url) else { return }
+        try? h.truncate(atOffset: 0); try? h.close()
     }
 }

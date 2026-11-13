@@ -1,7 +1,8 @@
 # neatly
 
 Suggests short, meaningful names for badly named files — `1234567_2026-11-04_124701.pdf` → `transcript-fall26.pdf`.
-It also suggests **which folder** each download belongs in. Runs entirely on your Mac, with Apple's on-device model.
+It also suggests **which folder** each download belongs in. Reading and naming happen on your Mac, with Apple's
+on-device model; see [Privacy](#privacy) for the two things that go online.
 
 ## Install
 
@@ -17,9 +18,22 @@ everything except the last step below works without it. No Xcode needed.
 This installs **neatly.app** (in Applications, Spotlight and your menu bar) and starts it at login.
 The first time it opens, neatly asks once whether to **keep itself up to date**. If you say yes, new versions
 install quietly in the background whenever you're online (each download's SHA-256 is checked first; a mismatch
-changes nothing). The only network request is that check to GitHub — nothing about you or your files is sent.
+changes nothing). If a new version keeps crashing, neatly goes back to the previous one by itself.
 Uninstall: `neatly service uninstall` removes the app, the login item and the command (then `brew uninstall neatly`
 if you used Homebrew).
+
+## Privacy
+
+Your files are read and named on your Mac. Two things go online:
+
+- **Update check** (only if you said yes): asks GitHub for the latest release. Nothing about you or your files is sent.
+- **Paper lookup**: for a research paper with an arXiv number (e.g. `2405.12345.pdf`), neatly asks
+  export.arxiv.org for its real title. Only that number is sent. Turn it off in **More options → Look up research
+  papers online**, or run with `--offline`.
+
+neatly keeps, in `~/Library/Application Support/neatly/`: your settings, the names you chose (to learn your style;
+the last 2,000), and the History of what it renamed (the last 500, for Revert). **More options → Forget my history**
+deletes them. Activity is logged to `~/Library/Logs/neatly.log` (kept under 4 MB).
 
 ## How it decides (cheapest first, stops as soon as it's sure)
 
@@ -42,11 +56,13 @@ lowercase-kebab, most distinctive word first, qualifier last, as short as possib
 Open **neatly** from Spotlight or Applications: a window with a drop zone (drop files or folders to name them),
 one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No Terminal needed.
 
-- **Downloads** get a small dialog with a suggested name **and folder** (below).
+- **Downloads** get a small popup with a suggested name **and folder** (below).
 - **Screenshots** are named the moment you take them, in place. A small pill under the menu bar shows the
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
-- **Menu-bar icon**: Tidy Desktop, Tidy a Folder, name length, date, Title Case, app name, copy screenshots to
-  the clipboard, Pause. **Drop files or a folder on the icon** to name them.
+- **History** (menu bar or the window): everything neatly renamed or moved, each with **Revert**. For a download,
+  **Always do this** makes a rule: files from that site always go to that folder.
+- **Menu-bar icon**: Tidy Desktop, Tidy a Folder, History, Undo Last Download, name length, date, Title Case,
+  app name, copy screenshots to the clipboard, Pause. **Drop files or a folder on the icon** to name them.
 - **Tidy a folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
   keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
 - Works on PDFs, Word, PowerPoint, notebooks, zips, images and screenshots.
@@ -59,21 +75,27 @@ neatly service uninstall           # stop it
 neatly --watch ~/Downloads --ask --screenshots --menubar   # the same, in this terminal
 ```
 
-Every new download gets a dialog with a suggested folder and name:
+Every new download gets a popup in the top-right corner with a suggested name and folder:
 
 ```
-Suggested folder:  courses-fall26 › ceng315
-Suggested name:    [ceng315-syllabus]      Saves automatically  [Leave as is]  [Select place…]  [Save (5)]
+New download  8812_4471.pdf
+Name    [ceng315-syllabus]
+📁 courses-fall26 › ceng315                  Choose Folder…
+Away? In 5 s it's renamed and stays in Downloads.   [Leave as Is]  [Save]
 ```
 
 **Save** puts it in that folder with that name. Edit the name to choose your own.
-**Select place…** picks another folder. **Leave as is** changes nothing and won't ask again.
-Installers (.dmg, .pkg) are skipped.
+**Choose Folder…** picks another folder. **Leave as Is** changes nothing and won't ask again.
+Installers (.dmg, .pkg) are skipped. The popup never takes the keyboard from the app you're typing in.
 
-**No answer in 5 seconds = Save**, so downloads made by agents or scripts never wait for a click.
-Moving the mouse over the dialog or typing stops the countdown. Change the time with
-`--timeout N` (`--timeout 0` waits for you). A second copy of a file you already have goes to the Trash
-the same way.
+**No answer in 5 seconds = the new name is kept, in Downloads**, so downloads made by agents or scripts never wait
+for a click, and nothing moves to another folder while nobody's looking (unless you made a rule for that site with
+**Always do this**). A pill then shows the new name with **Undo**. Moving the mouse over the popup or typing stops
+the countdown. Change the time with `--timeout N` (`--timeout 0` waits for you).
+A second copy of a file you already have is flagged in the popup with **Move to Trash**; with no answer, both are kept.
+
+Before renaming or moving, neatly checks the file is still the one it looked at: if it was still being written or
+was replaced meanwhile, it's looked at again. Files that don't come from a browser must sit unchanged for 3 seconds first.
 
 Folders are suggested only if they already exist: a course code goes to that course's folder,
 a file goes where you put the same kind of file last time, or to a folder whose name it mentions.

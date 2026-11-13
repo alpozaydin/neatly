@@ -15,6 +15,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         item.button?.image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: "neatly")
         item.button?.toolTip = "neatly — drop files or a folder here to name them"
         menu.delegate = self
+        menu.autoenablesItems = false   // items are enabled/disabled by hand (Undo greys out when there's nothing)
         item.menu = menu
         // Drops on the icon: the window forwards dragging messages to its delegate.
         item.button?.window?.registerForDraggedTypes([.fileURL])
@@ -23,13 +24,9 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         DistributedNotificationCenter.default().addObserver(forName: HomeWindow.showNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { HomeWindow.shared.show() }
         }
-        // First run after installing: show the window once, so nobody wonders where the app went.
-        let welcomed = Correction.fileURL.deletingLastPathComponent().appending(path: ".welcomed")
-        if !headless, !FileManager.default.fileExists(atPath: welcomed.path) {
-            try? FileManager.default.createDirectory(at: welcomed.deletingLastPathComponent(), withIntermediateDirectories: true)
-            FileManager.default.createFile(atPath: welcomed.path, contents: nil)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { HomeWindow.shared.show() }
-        }
+        // First run after installing: show the window, which explains the folder permission prompts before
+        // macOS shows them (the watchers wait for its Continue button).
+        if !Welcome.done { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { HomeWindow.shared.show() } }
         uiTest()
         if ProcessInfo.processInfo.environment["NEATLY_UI_TEST"]?.contains("home:") == true { HomeWindow.shared.show() }
     }
@@ -46,12 +43,22 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         menu.addItem(.separator())
         menu.addItem(entry("Tidy Desktop…", #selector(tidyDesktop)))
         menu.addItem(entry("Tidy a Folder…", #selector(tidyFolder)))
-        menu.addItem(entry("Undo Last Tidy", #selector(undoLastTidy)))
+        menu.addItem(entry("History…", #selector(openHistory)))
+        // Greyed out (with nothing to say) when there's nothing to undo.
+        let lastDownload = History.lastDownload()
+        let undoDownload = entry(lastDownload.map { "Undo “\(URL(fileURLWithPath: $0.to).lastPathComponent)”" } ?? "Undo Last Download",
+                                 #selector(undoLastDownload))
+        undoDownload.isEnabled = lastDownload != nil
+        menu.addItem(undoDownload)
+        let n = Tidy.lastCount
+        let undoTidy = entry(n > 0 ? "Undo Last Tidy (\(n) file\(n == 1 ? "" : "s"))" : "Undo Last Tidy", #selector(undoLastTidy))
+        undoTidy.isEnabled = n > 0
+        menu.addItem(undoTidy)
         menu.addItem(.separator())
 
         let length = NSMenu()
         for l in StyleProfile.Length.allCases {
-            let i = entry(l.rawValue.capitalized, #selector(setLength(_:)))
+            let i = entry(l.label, #selector(setLength(_:)))
             i.representedObject = l.rawValue
             i.state = p.len == l ? .on : .off
             length.addItem(i)
@@ -76,7 +83,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         menu.addItem(toggle("Copy Screenshots to Clipboard", p.copyScreenshots == true, #selector(toggleCopy)))
         menu.addItem(.separator())
         menu.addItem(toggle("Pause", paused, #selector(togglePause)))
-        menu.addItem(entry("Open Log", #selector(openLog)))
+        menu.addItem(entry("Open Activity Log", #selector(openLog)))
         menu.addItem(entry("Quit neatly", #selector(quit)))
     }
 
@@ -116,9 +123,23 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         if open.runModal() == .OK, let url = open.url { tidy([url.path]) }
     }
 
+    @objc func openHistory() { HistoryWindow.shared.show() }
+
     @objc func undoLastTidy() {
         let n = Tidy.undoLast()
         print("menu: put back \(n) name(s) from the last tidy")
+        Notice.show(n == 0 ? "Nothing to put back." : "Put back \(n) name\(n == 1 ? "" : "s") from the last tidy.",
+                    icon: n == 0 ? "info.circle.fill" : "arrow.uturn.backward.circle.fill")
+    }
+
+    @objc func undoLastDownload() {
+        guard let e = History.lastDownload() else { Notice.show("Nothing to undo.", icon: "info.circle.fill"); return }
+        if let back = try? History.revert(e.id) {
+            Notice.show("Put back “\(back.lastPathComponent)” in \(shortFolder(back.deletingLastPathComponent())).",
+                        icon: "arrow.uturn.backward.circle.fill")
+        } else {
+            Notice.show("Couldn't put it back — open History for details.", icon: "exclamationmark.circle.fill")
+        }
     }
 
     func change(_ edit: (inout StyleProfile) -> Void) {
@@ -145,8 +166,28 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/neatly.log"))
     }
 
-    /// Stops until the next login (the service is still installed). `neatly service uninstall` removes it.
+    /// Quitting means downloads and screenshots aren't named until the next login: offer Pause instead.
+    /// Quit stops until the next login (the service is still installed). `neatly service uninstall` removes it.
     @objc func quit() {
+        if !headless {
+            NSApp.activate()
+            let a = NSAlert()
+            a.messageText = "Quit neatly?"
+            a.informativeText = "New downloads and screenshots won't be named until you log in again or open neatly. "
+                + "To stop for a while, pause instead."
+            a.addButton(withTitle: "Pause Instead")
+            a.addButton(withTitle: "Quit")
+            a.addButton(withTitle: "Cancel")
+            switch a.runModal() {
+            case .alertFirstButtonReturn: if !paused { togglePause() }; return
+            case .alertSecondButtonReturn: break
+            default: return
+            }
+        }
+        quitNow()
+    }
+
+    func quitNow() {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         p.arguments = ["bootout", "gui/\(getuid())/dev.neatly.watch"]

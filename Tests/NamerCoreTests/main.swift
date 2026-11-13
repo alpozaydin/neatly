@@ -134,6 +134,43 @@ func paperTopics() {
     expect(Style.paperName(title: "CLIP: Learning Transferable Visual Models From Natural Language Supervision", year: 2021) == "clip-visual-models-2021")
 }
 
-for t in [paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+/// Undo goes back one step at a time; all: true goes straight to the first name. Failed moves leave no trace.
+func renameSteps() {
+    let dir = FileManager.default.temporaryDirectory.appending(path: "neatly-checks-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: dir.appending(path: "sub"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let a = dir.appending(path: "IMG_1234.png")
+    FileManager.default.createFile(atPath: a.path, contents: Data("x".utf8))
+    let stamp = FileStamp(a)
+    expect(stamp != nil && FileStamp(a) == stamp)
+    guard let b = try? Rename.apply(a, to: "first"), let c = try? Rename.apply(b, to: "second", in: dir.appending(path: "sub")) else {
+        expect(false); return
+    }
+    expect(FileStamp(c) == stamp)   // renamed and moved, but still the same file
+    let back1 = try? Rename.undo(c)
+    expect(back1?.lastPathComponent == "first.png" && back1?.deletingLastPathComponent().lastPathComponent == dir.lastPathComponent)
+    let back2 = back1.flatMap { try? Rename.undo($0) }
+    expect(back2?.lastPathComponent == "IMG_1234.png")
+    expect(back2.map { Rename.originalName($0) == nil } == true)       // nothing left to undo
+    // The same path with new content (replaced while the popup was open) is NOT the same file.
+    if let x = back2 {
+        let before = FileStamp(x)
+        try? FileManager.default.removeItem(at: x)
+        FileManager.default.createFile(atPath: x.path, contents: Data("other".utf8))
+        expect(FileStamp(x) != before)
+    }
+    // all: true from two steps away
+    if let x = back2, let y = try? Rename.apply(x, to: "one"), let z = try? Rename.apply(y, to: "two") {
+        expect((try? Rename.undo(z, all: true))??.lastPathComponent == "IMG_1234.png")
+    } else { expect(false) }
+    // A failed move (target folder can't be created) leaves the file without undo marks.
+    let d = dir.appending(path: "IMG_1234.png")
+    expect((try? Rename.apply(d, to: "nope", in: URL(fileURLWithPath: "/dev/null/x"))) == nil)
+    expect(Rename.originalName(d) == nil)
+    // Names are capped by bytes, not letters: 150 "ş" = 300 bytes.
+    expect(Rename.clean(String(repeating: "ş", count: 150)).utf8.count <= 200)
+}
+
+for t in [renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

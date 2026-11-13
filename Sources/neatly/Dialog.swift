@@ -1,67 +1,74 @@
 import AppKit
+import SwiftUI
+import QuickLookThumbnailing
 
-/// The popup, as a small native window with a countdown: if nobody answers, the suggestion is saved.
-/// Agents and scripts that download files never get stuck waiting for a click.
-/// Typing in the name field or moving the mouse over the window stops the countdown.
+/// The download popup: a picture of the file, the suggested name (editable), where it goes, and Save.
+/// If nobody answers, the new name is kept but the file stays in Downloads (unless one of your rules says
+/// where it goes), so agents and scripts never wait on a click and nothing disappears into a folder unseen.
+/// It never takes the keyboard: whatever you're typing elsewhere stays there until you click the popup.
+/// Hovering or typing stops the countdown.
 ///
-/// Runs as its own process (`neatly dialog …`) so the watcher keeps its simple loop.
-/// Prints one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user>", "keep", or "none".
+/// Answers with one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user>", "keep", "trash" or "none".
 @MainActor
-final class CountdownDialog: NSObject, NSTextFieldDelegate {
-    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 10),
-                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
-    let field = NSTextField()
-    let folderLabel = NSTextField(labelWithString: "")
-    let status = NSTextField(labelWithString: "")
-    var saveButton: NSButton!
-    var folder: URL?
-    var remaining: Int
+final class DialogModel: ObservableObject {
+    @Published var name: String
+    @Published var folder: URL?
+    @Published var remaining: Int
+    @Published var counting: Bool
+    @Published var thumbnail: NSImage?
+    var forPicture = false   // test pictures: text fields can't be drawn off screen
+    let file: String
+    let duplicate: URL?      // the same file you already have
+    let pinned: Bool         // the folder comes from one of your rules: it's used even when nobody answers
+    init(file: String, name: String, folder: URL?, seconds: Int, duplicate: URL?, pinned: Bool) {
+        self.file = file; self.name = name; self.folder = folder; self.remaining = seconds
+        self.counting = seconds > 0; self.duplicate = duplicate; self.pinned = pinned
+    }
+}
+
+@MainActor
+final class CountdownDialog: NSObject {
+    /// Can take typing once you click it, without bringing neatly (or anything) to the front before that.
+    final class Panel: NSPanel { override var canBecomeKey: Bool { true } }
+
+    let model: DialogModel
+    let panel = Panel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 10),
+                      styleMask: [.titled, .closable, .nonactivatingPanel, .fullSizeContentView], backing: .buffered, defer: false)
     var timer: Timer?
 
-    init(file: String, name: String, folder: URL?, seconds: Int) {
-        self.folder = folder
-        self.remaining = seconds
+    init(file: String, name: String, folder: URL?, seconds: Int, path: URL? = nil, duplicate: URL? = nil, pinned: Bool = false) {
+        model = DialogModel(file: file, name: name, folder: folder, seconds: seconds, duplicate: duplicate, pinned: pinned)
         super.init()
-
-        let title = NSTextField(labelWithString: file)
-        title.font = .boldSystemFont(ofSize: 13)
-        title.lineBreakMode = .byTruncatingMiddle
-        showFolder()
-        field.stringValue = name
-        field.delegate = self
-        status.textColor = .secondaryLabelColor
-        status.font = .systemFont(ofSize: 11)
-
-        let leave = NSButton(title: "Leave as is", target: self, action: #selector(leaveAsIs))
-        leave.keyEquivalent = "\u{1b}"
-        let place = NSButton(title: "Select place…", target: self, action: #selector(selectPlace))
-        saveButton = NSButton(title: "Save", target: self, action: #selector(save))
-        saveButton.keyEquivalent = "\r"
-        let buttons = NSStackView(views: [status, NSView(), leave, place, saveButton])
-        buttons.setHuggingPriority(.defaultLow, for: .horizontal)
-
-        let stack = NSStackView(views: [title, folderLabel, NSTextField(labelWithString: "Suggested name:"), field, buttons])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 18, bottom: 14, right: 18)
-        for v in [field, buttons] { v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36).isActive = true }
-        stack.setCustomSpacing(14, after: folderLabel)
-        stack.setCustomSpacing(14, after: field)
-
-        panel.title = "neatly"
-        panel.contentView = stack
+        let view = DialogView(model: model, save: { [weak self] in self?.saveNow(auto: false) },
+                              keep: { [weak self] in self?.finish("keep") },
+                              trash: { [weak self] in self?.finish("trash") },
+                              choose: { [weak self] in self?.chooseFolder() },
+                              pause: { [weak self] in self?.pause() })
+        let host = NSHostingView(rootView: view)
+        panel.contentView = host
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.isMovableByWindowBackground = true
+        panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
-        panel.setContentSize(stack.fittingSize)
-        stack.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                             owner: self, userInfo: nil))
+        let size = host.fittingSize
+        panel.setContentSize(size)
+        if let screen = NSScreen.main?.visibleFrame {   // top-right, like a notification: out of the way of your work
+            panel.setFrameOrigin(NSPoint(x: screen.maxX - size.width - 16, y: screen.maxY - size.height - 10))
+        }
+        if let path { loadThumbnail(path) }
         NotificationCenter.default.addObserver(self, selector: #selector(closed), name: NSWindow.willCloseNotification, object: panel)
     }
 
-    func showFolder() {
-        folderLabel.stringValue = "Suggested folder:  " + shortFolder(folder)
+    func loadThumbnail(_ url: URL) {
+        let req = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 64, height: 64), scale: 2, representationTypes: .thumbnail)
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: req) { [weak self] rep, _ in
+            guard let img = rep?.nsImage else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.thumbnail = img } }
+        }
     }
 
     /// Inside neatly: the answer goes here (no extra process). On its own (`neatly dialog`): print it and exit.
@@ -75,50 +82,55 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         exit(0)
     }
 
-    /// Show it, start the countdown — without taking over the app (neatly's own run loop keeps going).
+    /// Show it and start the countdown. No activating, no key window: the app you're in keeps the keyboard.
     func present() {
-        panel.center()
-        if !headless {
-            panel.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        if remaining > 0 {
-            tick()
+        if !headless { panel.orderFrontRegardless() }
+        if model.counting {
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                MainActor.assumeIsolated { self.remaining -= 1; self.tick() }
+                MainActor.assumeIsolated {
+                    self.model.remaining -= 1
+                    if self.model.remaining <= 0 { self.saveNow(auto: true) }
+                }
             }
         }
         uiTest()
     }
 
-    /// NEATLY_UI_TEST="dialog:save" | "dialog:edit:<name>" | "dialog:place:<folder>" | "dialog:keep" | "dialog:wait" (let the countdown run).
+    /// NEATLY_UI_TEST="dialog:save" | "dialog:edit:<name>" | "dialog:place:<folder>" | "dialog:keep" | "dialog:trash"
+    /// | "dialog:wait" (let the countdown run) | "dialog:snapshot=<png>" (draw it, then let the countdown run).
     func uiTest() {
         guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"], t.hasPrefix("dialog:") else { return }
         let step = String(t.dropFirst(7))
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            if step == "save" { self.save() }
-            if step == "keep" { self.leaveAsIs() }
-            if step.hasPrefix("edit:") { self.field.stringValue = String(step.dropFirst(5)); self.controlTextDidChange(Notification(name: .init("t"))); self.save() }
-            if step.hasPrefix("place:") { self.folder = URL(fileURLWithPath: String(step.dropFirst(6))); self.saveNow(auto: false) }
+            if step == "save" { self.saveNow(auto: false) }
+            if step == "keep" { self.finish("keep") }
+            if step == "trash" { self.finish(self.model.duplicate != nil ? "trash" : "keep") }
+            if step.hasPrefix("edit:") { self.model.name = String(step.dropFirst(5)); self.pause(); self.saveNow(auto: false) }
+            if step.hasPrefix("place:") { self.model.folder = URL(fileURLWithPath: String(step.dropFirst(6))); self.saveNow(auto: false) }
+            if step.hasPrefix("snapshot=") { self.snapshot(String(step.dropFirst(9))) }
         }
     }
 
-    func tick() {
-        if remaining <= 0 { saveNow(auto: true); return }
-        saveButton.title = "Save (\(remaining))"
-        status.stringValue = "Saves automatically"
+    func snapshot(_ path: String) {
+        model.forPicture = true
+        defer { model.forPicture = false }
+        for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
+            let r = ImageRenderer(content: DialogView(model: model, save: {}, keep: {}, trash: {}, choose: {}, pause: {})
+                .environment(\.colorScheme, scheme).background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.98)))
+            r.scale = 2
+            guard let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { continue }
+            try? rep.representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: suffix.isEmpty ? path : path.replacingOccurrences(of: ".png", with: "\(suffix).png")))
+        }
+        print("dialog: snapshot \(path)")
     }
 
     /// The person is here: let them take their time.
     func pause() {
         guard timer != nil else { return }
         timer?.invalidate(); timer = nil
-        saveButton.title = "Save"
-        status.stringValue = ""
+        model.counting = false
     }
-
-    @objc func mouseEntered(_ event: NSEvent) { pause() }
-    func controlTextDidChange(_ obj: Notification) { pause() }
 
     func finish(_ line: String) {
         guard !finished else { return }
@@ -129,31 +141,99 @@ final class CountdownDialog: NSObject, NSTextFieldDelegate {
         onFinish(line)
     }
 
-    @objc func save() { saveNow(auto: false) }
-
     /// auto = the countdown ran out: nobody looked, so this mustn't be read as "the person agreed".
     func saveNow(auto: Bool) {
-        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = model.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { finish("none"); return }
-        finish("save\t\(name)\t\(folder?.path ?? "")\t\(auto ? "auto" : "user")")
+        finish("save\t\(name)\t\(model.folder?.path ?? "")\t\(auto ? "auto" : "user")")
     }
 
-    @objc func leaveAsIs() { finish("keep") }
     @objc func closed() { finish("none") }
 
-    @objc func selectPlace() {
+    func chooseFolder() {
         pause()
         let open = NSOpenPanel()
         open.canChooseDirectories = true
         open.canChooseFiles = false
         open.canCreateDirectories = true
-        open.prompt = "Save here"
-        open.message = "Save “\(field.stringValue)” in:"
-        open.directoryURL = folder ?? FileManager.default.homeDirectoryForCurrentUser
+        open.prompt = "Save Here"
+        open.message = "Save “\(model.name)” in:"
+        open.directoryURL = model.folder ?? FileManager.default.homeDirectoryForCurrentUser
         open.level = .floating
+        NSApp.activate()   // you clicked "Change…": now it's fine to come forward
         guard open.runModal() == .OK, let url = open.url else { return }
-        folder = url
-        save()
+        model.folder = url
+    }
+}
+
+struct DialogView: View {
+    @ObservedObject var model: DialogModel
+    let save: () -> Void, keep: () -> Void, trash: () -> Void, choose: () -> Void, pause: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Group {
+                    if let t = model.thumbnail { Image(nsImage: t).resizable().aspectRatio(contentMode: .fit) }
+                    else { Image(systemName: "doc.fill").font(.system(size: 26)).foregroundStyle(brandGradient) }
+                }
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("New download").font(.caption.weight(.semibold)).foregroundStyle(brand)
+                    Text(model.file).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Name").font(.caption).foregroundStyle(.secondary)
+                Group {
+                    if model.forPicture { Text(model.name).frame(maxWidth: .infinity, alignment: .leading) }
+                    else { TextField("Type a name", text: $model.name).textFieldStyle(.plain) }
+                }.font(.system(.title3, design: .rounded).weight(.semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.06)))
+                    .onChange(of: model.name) { _, _ in pause() }
+                    .accessibilityLabel("New name")
+            }
+            HStack(spacing: 8) {
+                Image(systemName: "folder.fill").foregroundStyle(brand).accessibilityHidden(true)
+                Text(model.folder.map { shortFolder($0) } ?? "Downloads").lineLimit(1).truncationMode(.head)
+                    .accessibilityLabel("Goes to \(model.folder.map { shortFolder($0) } ?? "Downloads")")
+                if model.pinned { Text("your rule").font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+                Button("Choose Folder…", action: choose).buttonStyle(.plain).foregroundStyle(brand).font(.callout.weight(.medium))
+            }
+            if let twin = model.duplicate {
+                HStack(spacing: 10) {
+                    Image(systemName: "doc.on.doc.fill").foregroundStyle(.orange).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("You already have this file").font(.callout.weight(.semibold))
+                        Text("\(shortFolder(twin.deletingLastPathComponent())) › \(twin.lastPathComponent)")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer()
+                    Button("Move to Trash", action: trash).buttonStyle(.plain).foregroundStyle(.orange).font(.callout.weight(.semibold))
+                }
+                .padding(10).background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
+            }
+            HStack(spacing: 10) {
+                Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Pill(title: "Leave as Is", primary: false, action: keep).keyboardShortcut(.cancelAction)
+                Pill(title: "Save", primary: true, action: save).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(.horizontal, 18).padding(.top, 26).padding(.bottom, 16)
+        .frame(width: 440)
+        .onHover { if $0 { pause() } }
+    }
+
+    var status: String {
+        guard model.counting else { return "" }
+        let s = "\(max(model.remaining, 0)) s"
+        if model.pinned { return "Saves in \(s), by your rule." }
+        return model.duplicate != nil ? "Away? In \(s) both are kept." : "Away? In \(s) it's renamed and stays in Downloads."
     }
 }
 
@@ -190,7 +270,7 @@ final class Toast: NSObject, NSTextFieldDelegate {
     var remaining: Int
     var timer: Timer?
 
-    init(name: String, file: URL, seconds: Int) {
+    init(name: String, file: URL, seconds: Int, redo allowRedo: Bool = true) {
         original = name
         remaining = seconds
         super.init()
@@ -221,7 +301,11 @@ final class Toast: NSObject, NSTextFieldDelegate {
         let redo = NSButton(title: "↻", target: self, action: #selector(another))
         redo.bezelStyle = .rounded
         redo.toolTip = "Another name"
+        redo.setAccessibilityLabel("Suggest another name")
+        redo.isHidden = !allowRedo
         let undo = NSButton(title: "Undo", target: self, action: #selector(undoRename))
+        undo.setAccessibilityLabel("Undo: put the old name back")
+        field.setAccessibilityLabel("New name")
         undo.bezelStyle = .rounded
         undo.bezelColor = .controlAccentColor
 
@@ -320,21 +404,64 @@ enum InApp {
     /// Something is on screen (a popup or a pill): don't restart for an update now.
     static var busy: Bool { !open.isEmpty }
 
-    static func ask(file: String, suggestion: String, folder: URL?, seconds: Int) async -> String {
+    static func ask(file: String, suggestion: String, folder: URL?, seconds: Int, path: URL? = nil,
+                    duplicate: URL? = nil, pinned: Bool = false) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
-            let d = CountdownDialog(file: file, name: suggestion, folder: folder, seconds: seconds)
+            let d = CountdownDialog(file: file, name: suggestion, folder: folder, seconds: seconds, path: path,
+                                    duplicate: duplicate, pinned: pinned)
             open.append(d)
             d.onFinish = { line in open.removeAll { $0 === d }; c.resume(returning: line) }
             d.present()
         }
     }
 
-    static func pill(name: String, file: URL, seconds: Int) async -> String {
+    static func pill(name: String, file: URL, seconds: Int, redo: Bool = true) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
-            let t = Toast(name: name, file: file, seconds: max(seconds, 3))
+            let t = Toast(name: name, file: file, seconds: max(seconds, 3), redo: redo)
             open.append(t)
             t.onFinish = { line in open.removeAll { $0 === t }; c.resume(returning: line) }
             t.present()
         }
+    }
+}
+
+/// Pills that report something already done (a download saved while you were away) wait their turn,
+/// one after another, without holding up the next download.
+@MainActor
+enum Pills {
+    private static var tail: Task<Void, Never>?
+    static func enqueue(_ work: @escaping @MainActor () async -> Void) {
+        let before = tail
+        tail = Task { @MainActor in await before?.value; await work() }
+    }
+}
+
+/// A short message under the menu bar ("Put back 3 names."), gone after a few seconds. Never takes focus.
+@MainActor
+enum Notice {
+    static func show(_ text: String, icon: String = "checkmark.circle.fill") {
+        print("notice: \(text)")
+        guard !headless else { return }
+        let panel = NSPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
+        let view = HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(brand)
+            Text(text).font(.callout.weight(.medium))
+        }
+        .padding(.horizontal, 16).padding(.vertical, 11)
+        .background(Capsule().fill(.regularMaterial))
+        let host = NSHostingView(rootView: view)
+        panel.contentView = host
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.level = .statusBar
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        let size = host.fittingSize
+        panel.setContentSize(size)
+        if let screen = NSScreen.main?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(x: screen.maxX - size.width - 16, y: screen.maxY - size.height - 10))
+        }
+        panel.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { panel.orderOut(nil) }
     }
 }

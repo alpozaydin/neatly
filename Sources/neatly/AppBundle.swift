@@ -70,7 +70,11 @@ enum AppBundle {
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try data.write(to: staging.appending(path: "Contents/Info.plist"))
         try? writeIcon(to: staging.appending(path: "Contents/Resources/AppIcon.icns"))
-        run("/usr/bin/codesign", ["--force", "--sign", "-", staging.path])   // ad-hoc: required on Apple silicon
+        // Ad-hoc signature: required on Apple silicon. If it fails, the app wouldn't start: stop before touching it.
+        guard run("/usr/bin/codesign", ["--force", "--sign", "-", staging.path]) == 0 else {
+            try? fm.removeItem(at: staging)
+            throw CocoaError(.fileWriteUnknown)
+        }
 
         if fm.fileExists(atPath: app.path) {
             // Update the files INSIDE the existing app: replacing the whole app made Launchpad and the Apps view
@@ -83,7 +87,9 @@ enum AppBundle {
                 else { try fm.moveItem(at: new, to: old) }
             }
             try? fm.removeItem(at: staging)
-            run("/usr/bin/codesign", ["--force", "--sign", "-", app.path])   // contents changed: sign again
+            if run("/usr/bin/codesign", ["--force", "--sign", "-", app.path]) != 0 {   // contents changed: sign again
+                print("neatly.app: signing after the update failed")
+            }
         } else {
             try fm.moveItem(at: staging, to: app)
         }

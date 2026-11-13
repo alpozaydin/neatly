@@ -14,12 +14,12 @@ usage: neatly [options] <file or folder>...
   --ask        with --watch: show a dialog for each file (Save / Select place… / Leave as is)
   --menubar    with --watch: show the menu-bar icon (Tidy, options, Pause; drop files or folders on it)
   --screenshots  with --watch: also name new screenshots where macOS saves them, with an Undo pill
-  --timeout N  with --ask: save the suggestion after N seconds without an answer (default 5, 0 = wait)
+  --timeout N  with --ask: no answer after N seconds = keep the new name in Downloads (default 5, 0 = wait)
   service install|uninstall   run "--watch ~/Downloads --ask" in the background, starting at login
   --offline    no network lookups (arXiv)
   --no-model   don't use the on-device model
   tidy [folder]  review window: name every badly named file in a folder (Desktop by default), then Rename
-  undo <file>  restore a file's original name  (undo --last: the last tidy)
+  undo <file>  undo neatly's last rename of a file, one step at a time  (undo --last: the last tidy)
   keep <file>  mark a name as yours: never suggest for it again
   learn <folder>...  learn your naming style from names you already chose (reads names only)
   style        show or set the naming style: --length short|standard|detailed, --case lower|title,
@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
-let version = "0.4.0"
+let version = "0.5.0"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -283,14 +283,15 @@ let menuBar = flag("--menubar")
 let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask"), whereTo = flag("--where")
 var namer = Namer()
 namer.profile = StyleProfile.load() ?? .standard
-namer.useNetwork = !flag("--offline")
+let offline = flag("--offline")
+namer.useNetwork = !offline && namer.profile.onlineLookups != false
 namer.useModel = !flag("--no-model")
 var timeout = namer.profile.countdown ?? 5   // set in the neatly window, or --timeout N
 if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(args[i + 1]) {
     timeout = max(0, n); args.removeSubrange(i...(i + 1))
 }
 
-enum Answer { case save(name: String, folder: URL?, auto: Bool), keep, noAnswer }
+enum Answer { case save(name: String, folder: URL?, auto: Bool), keep, trash, noAnswer }
 
 func osascript(_ script: String) -> (ok: Bool, out: String) {
     let p = Process()
@@ -304,11 +305,14 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 
 /// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Select place… = pick a folder.
 /// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
-@MainActor func askUser(file: String, suggestion: String, folder: URL?) async -> Answer {
+@MainActor func askUser(file: String, suggestion: String, folder: URL?, path: URL? = nil, duplicate: URL? = nil,
+                        pinned: Bool = false) async -> Answer {
     // Shown inside neatly and awaited, so the menu-bar icon stays responsive while it's open.
-    let reply = await InApp.ask(file: file, suggestion: suggestion, folder: folder, seconds: timeout)
+    let reply = await InApp.ask(file: file, suggestion: suggestion, folder: folder, seconds: timeout, path: path,
+                                duplicate: duplicate, pinned: pinned)
     let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
     if parts.first == "keep" { return .keep }
+    if parts.first == "trash" { return .trash }
     guard parts.first == "save", parts.count >= 3 else { return .noAnswer }
     let typed = parts[1].trimmingCharacters(in: .whitespaces)
     let shown: URL? = parts[2].isEmpty ? nil : URL(fileURLWithPath: parts[2])
@@ -418,7 +422,7 @@ func isScreenshot(_ name: String) -> Bool {
                 let reply = await InApp.pill(name: shown, file: file, seconds: max(timeout, 4))
                 switch reply {
                 case "undo":
-                    if let back = try? Rename.undo(file) { Decision.markKeep(back); seen.insert(back.lastPathComponent) }
+                    if let back = try? Rename.undo(file, all: true) { Decision.markKeep(back); seen.insert(back.lastPathComponent) }
                     chosen = nil; byYou = true
                     print("   undone")
                     break pill
@@ -442,6 +446,7 @@ func isScreenshot(_ name: String) -> Bool {
                     break pill
                 }
             }
+            if chosen != nil { History.add(HistoryEntry(kind: .screenshot, from: url, to: file, auto: !byYou)) }
             let ev = s.evidence
             // Your edits (and undos) teach future names; a pill that just timed out doesn't.
             Correction(original: name, suggested: s.name, chosen: chosen ?? "", via: s.via, source: nil, title: ev.headline,
@@ -459,6 +464,7 @@ var noAccess = Set<String>()
 var paused = false
 
 @MainActor func watchDownloads() async {
+    await Welcome.wait()   // first start: not before the welcome window explained the folder prompts
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
     let skip: Set<String> = ["crdownload", "download", "part", "partial"]
     let installers: Set<String> = ["dmg", "pkg", "app", "iso"]   // nothing to file
@@ -511,10 +517,14 @@ var paused = false
             // Browsers download under a temporary name and stamp the finished file with where it came from:
             // with that stamp, one unchanged check is enough.
             let fromBrowser = getxattr(dir.appending(path: name).path, "com.apple.metadata:kMDItemWhereFroms", nil, 0, 0, 0) > 0
-            if pending[name] == size, Date().timeIntervalSince(sizeSince[name] ?? Date()) >= (fromBrowser ? 0.1 : 0.6) {
+            // Anything else (curl, an agent, a copy from a slow disk) may pause mid-write: wait for 3 s of stillness.
+            if pending[name] == size, Date().timeIntervalSince(sizeSince[name] ?? Date()) >= (fromBrowser ? 0.1 : 3) {
                 seen.insert(name); pending[name] = nil; sizeSince[name] = nil
                 if paused || namer.profile.watchDownloads == false { print("\(name)  skip (paused)"); continue }
                 let url = dir.appending(path: name)
+                // What the file is now. Before renaming, moving or trashing it, neatly checks it's still exactly this:
+                // if it grew, or was replaced, while you were deciding, it's looked at again from the start.
+                let stamp = FileStamp(url)
                 let original = url.deletingPathExtension().lastPathComponent
                 // Every new download gets a name and a folder — except installers and files already handled.
                 var nameIdea = original, via = "kept", evidence: Evidence
@@ -544,30 +554,25 @@ var paused = false
                 if installers.contains(url.pathExtension.lowercased()) { continue }
                 let kebab = nameIdea == original ? Destination.keptEvidence(url).1
                     : nameIdea.lowercased().split(whereSeparator: { "-_ ".contains($0) }).joined(separator: "-")
-                let target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.cachedIndex(),
+                // "Always do this": one of your rules says where files from this site go.
+                let host = evidence.sourceHost
+                let rule = host.flatMap { namer.profile.rules?[$0] }.map { URL(fileURLWithPath: $0) }
+                    .flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+                let target: URL?
+                if let rule { target = rule } else {
+                    target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.cachedIndex(),
                                                     useModel: namer.useModel)
-                print("   folder: \(Destination.short(target))")
+                }
+                print("   folder: \(Destination.short(target))\(rule != nil ? " (your rule)" : "")")
                 // Match the neighbours: in a folder of "Lab Report - MAO" files, a new one is styled the same way.
                 if nameIdea != original, var local = Destination.style(of: target) {
                     local.length = namer.profile.length; local.date = namer.profile.date; local.appName = namer.profile.appName
                     let styled = local.render(kebab)
                     if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
                 }
-                // Downloaded the same file twice? Say so instead of making a "-2" copy.
-                // Same bytes already in the suggested folder, or still sitting in Downloads?
-                if let twin = Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir) {
-                    // Headless tests: no AppleScript window; behave as if nobody answered.
-                    let r = headless ? (ok: true, out: "gave up:true") : osascript("""
-                    display dialog "\(name.replacingOccurrences(of: "\"", with: "'"))\\n\\nYou already have this file:\\n\(Destination.short(twin.deletingLastPathComponent())) › \(twin.lastPathComponent.replacingOccurrences(of: "\"", with: "'"))\(timeout > 0 ? "\\n\\nMoves to Trash in \(timeout) s if you don’t answer." : "")" ¬
-                      with title "neatly" buttons {"Keep both", "Move to Trash"} default button "Move to Trash" giving up after \(timeout > 0 ? timeout : 300)
-                    """)
-                    // No answer: an exact copy already exists, so trashing this one loses nothing (and it's in the Trash).
-                    if r.ok, r.out.contains("Move to Trash") || (timeout > 0 && r.out.contains("gave up:true")) {
-                        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
-                        print("   duplicate of \(twin.lastPathComponent) — moved to Trash")
-                        continue
-                    }
-                }
+                // Downloaded the same file twice? Say so in the popup (with a Move to Trash button) instead of
+                // silently making a "-2" copy. Nobody answers → both are kept: neatly never deletes on its own.
+                let twin = Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir)
                 let ev = evidence, suggestedName = nameIdea, how = via
                 let log = { (chosen: String, folder: URL?, auto: Bool) in
                     Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,
@@ -575,15 +580,48 @@ var paused = false
                                suggestedFolder: target?.path, chosenFolder: folder?.path,
                                auto: auto ? true : nil, context: String(gist(ev).prefix(300))).save()
                 }
-                switch await askUser(file: name, suggestion: nameIdea, folder: target) {
-                case .save(let chosen, let folder, let auto):
+                let answer = await askUser(file: name, suggestion: nameIdea, folder: target, path: url, duplicate: twin,
+                                           pinned: rule != nil)
+                // Still the same file neatly looked at? (Not grown, not swapped for another one meanwhile.)
+                if case .noAnswer = answer {} else if let stamp, FileStamp(url) != stamp {
+                    if FileStamp(url) != nil {
+                        print("   \(name) changed while you were deciding — looking at it again")
+                        seen.remove(name)
+                    } else { print("   \(name) is gone — nothing to do") }
+                    continue
+                }
+                switch answer {
+                case .save(let chosen, var folder, let auto):
+                    // Nobody looked: keep the new name, but leave it in Downloads — unless your rule says where it goes.
+                    if auto && rule == nil { folder = nil }
                     let done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
                     if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
                     let edited = chosen != nameIdea || folder?.path != target?.path
                     log(chosen, folder, auto)                 // every answer teaches names and folders (auto ones don't)
                     if let done { Decision.markKeep(done) }   // handled: never ask again
-                    if done == nil { print("   couldn't rename \(name) (locked, in use, or gone) — left as it was"); continue }
-                    print("   saved as \(Destination.short(folder))/\(done?.lastPathComponent ?? chosen)\(auto ? " (no answer, auto-saved)" : edited ? " (your edit)" : "")")
+                    guard let done else { print("   couldn't rename \(name) (locked, in use, or gone) — left as it was"); continue }
+                    print("   saved as \(Destination.short(folder))/\(done.lastPathComponent)\(auto ? " (no answer, auto-saved)" : edited ? " (your edit)" : "")")
+                    guard done != url else { continue }
+                    let entry = HistoryEntry(kind: .download, from: url, to: done, host: host, auto: auto)
+                    History.add(entry)
+                    // Saved while you were away: say so, with Undo, without holding up the next download.
+                    if auto {
+                        Pills.enqueue {
+                            guard FileManager.default.fileExists(atPath: done.path) else { return }
+                            let reply = await InApp.pill(name: done.deletingPathExtension().lastPathComponent, file: done,
+                                                         seconds: max(timeout, 4), redo: false)
+                            if reply == "undo", let back = try? History.revert(entry.id) {
+                                print("   undone: \(back.lastPathComponent)")
+                            } else if reply.hasPrefix("rename\t"), let moved = try? Rename.apply(done, to: String(reply.dropFirst(7))) {
+                                Decision.markKeep(moved)
+                                History.add(HistoryEntry(kind: .download, from: done, to: moved, host: host))
+                                print("   you named it: \(moved.lastPathComponent)")
+                            }
+                        }
+                    }
+                case .trash:
+                    try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                    print("   duplicate of \(twin?.lastPathComponent ?? "a file you have") — moved to Trash")
                 case .keep:
                     Decision.markKeep(url); log("", nil, false)
                     print("   left as is")
@@ -601,6 +639,7 @@ if watch {
     NSApplication.shared.setActivationPolicy(.accessory)
     NSApplication.shared.delegate = AppDelegate.shared   // opening the app again → show its window
     if menuBar { MenuBar.shared.start() }
+    Log.trim()
     Updater.start()
     Task { await watchDownloads() }
     NSApp.run()

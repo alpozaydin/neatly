@@ -16,6 +16,8 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var watchDownloads: Bool?  // nil/true = suggest names for new downloads
     public var watchScreenshots: Bool? // nil/true = name new screenshots
     public var autoUpdate: Bool?      // asked once in the welcome window; nil = not asked yet
+    public var onlineLookups: Bool?   // nil/true = look up paper titles on arXiv (the only lookup that leaves your Mac)
+    public var rules: [String: String]? // "Always do this": downloads from this site → this folder
 
     public enum Length: String, Codable, Sendable, CaseIterable {
         case short, standard, detailed
@@ -23,6 +25,8 @@ public struct StyleProfile: Codable, Sendable, Equatable {
         public var modelWords: ClosedRange<Int> { switch self { case .short: 1...3; case .standard: 2...5; case .detailed: 4...8 } }
         public var maxWords: Int { switch self { case .short: 4; case .standard: 6; case .detailed: 10 } }
         public var maxLength: Int { switch self { case .short: 40; case .standard: 60; case .detailed: 90 } }
+        /// What people see (menu and window say the same thing).
+        public var label: String { switch self { case .short: "Short"; case .standard: "Medium"; case .detailed: "Long" } }
     }
     public enum DatePosition: String, Codable, Sendable, CaseIterable { case prefix, suffix }
 

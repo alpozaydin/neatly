@@ -190,6 +190,7 @@ final class TidyModel: ObservableObject {
             guard let new = try? Rename.apply(items[i].url, to: typed) else { continue }
             items[i].renamedTo = new
             items[i].state = .renamed
+            History.add(HistoryEntry(kind: .tidy, from: items[i].url, to: new))
             count += 1
             // Your edits teach future names, like edits in the download popup.
             Correction(original: items[i].url.lastPathComponent, suggested: items[i].suggestion ?? "", chosen: typed,
@@ -203,6 +204,7 @@ final class TidyModel: ObservableObject {
         var n = 0
         for i in items.indices {
             guard let r = items[i].renamedTo, (try? Rename.undo(r)) != nil else { continue }
+            History.markReverted([r])
             items[i].renamedTo = nil
             items[i].state = .undone
             n += 1
@@ -328,6 +330,7 @@ struct Row: View {
                 else { Image(systemName: "doc").font(.title2).foregroundStyle(.secondary) }
             }
             .frame(width: 56, height: 42).clipShape(RoundedRectangle(cornerRadius: 6))
+            .accessibilityHidden(true)
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.08)))
             VStack(alignment: .leading, spacing: 4) {
                 nameField
@@ -347,6 +350,9 @@ struct Row: View {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 20)).foregroundStyle(.green).help("Renamed")
         } else if item.name.trimmingCharacters(in: .whitespaces) != item.stem {
             CheckCircle(on: item.checked, enabled: true) { item.checked.toggle() }.help(item.checked ? "Will be renamed" : "Will be skipped")
+                .accessibilityLabel("Rename \(item.url.lastPathComponent)")
+                .accessibilityValue(item.checked ? "will be renamed" : "will be skipped")
+                .accessibilityAddTraits(.isToggle)
         } else {
             switch item.state {
             case .reading, .waiting: ProgressDots()
@@ -366,6 +372,7 @@ struct Row: View {
                 .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.05)))
         } else {
             TextField("Type a name", text: $item.name)
+                .accessibilityLabel("New name for \(item.url.lastPathComponent)")
                 .textFieldStyle(.plain).font(.system(.body, design: .rounded).weight(.medium))
                 .padding(.horizontal, 8).padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
@@ -435,10 +442,19 @@ enum Tidy {
         try? JSONEncoder().encode(urls.map(\.path)).write(to: lastURL)
     }
 
+    /// How many files the last tidy renamed that can still be put back (0 = nothing to undo).
+    static var lastCount: Int {
+        guard let data = try? Data(contentsOf: lastURL),
+              let paths = try? JSONDecoder().decode([String].self, from: data) else { return 0 }
+        return paths.filter { FileManager.default.fileExists(atPath: $0) }.count
+    }
+
     static func undoLast() -> Int {
         guard let data = try? Data(contentsOf: lastURL),
               let paths = try? JSONDecoder().decode([String].self, from: data) else { return 0 }
-        let n = paths.filter { (try? Rename.undo(URL(fileURLWithPath: $0))) != nil }.count
+        let back = paths.map { URL(fileURLWithPath: $0) }.filter { (try? Rename.undo($0)) != nil }
+        History.markReverted(back)
+        let n = back.count
         saveLast([])
         return n
     }

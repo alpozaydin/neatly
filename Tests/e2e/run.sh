@@ -84,19 +84,68 @@ if want dl-outside-home; then setup dl-outside-home; start "dialog:place:/privat
 
 if want dl-countdown; then setup dl-countdown; start "dialog:wait" 3
     arrive "$(make ceng-syllabus)"
-    waitfor '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]' 90
-    check "no answer: saved after the countdown" '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]'
-    check "logged as auto (doesn't teach)" '[ "$(corr auto)" = "True" ]'
+    waitfor '[ -f "$T/dl/ceng334-syllabus.pdf" ]' 90
+    check "no answer: renamed, but stays in Downloads (nothing moves unseen)" '[ -f "$T/dl/ceng334-syllabus.pdf" ] && [ -z "$(ls "$T/home/courses-fall26/ceng334")" ]'
+    check "logged as auto (doesn't teach), without what the file said" '[ "$(corr auto)" = "True" ] && [ "$(corr context)" = "None" ]'
+    check "in History, as saved while you were away" 'grep -q "\"auto\":true" "$T/data/history.jsonl" && grep -q "ceng334-syllabus.pdf" "$T/data/history.jsonl"'
     stop; fi
 
-if want dl-duplicate; then setup dl-duplicate; start "dialog:save" 3
+if want dl-look; then setup dl-look; start "dialog:snapshot=$T/dialog.png" 4
+    f=$(make ceng-syllabus); cp "$f" "$T/home/courses-fall26/ceng334/old-copy.pdf"; arrive "$f"
+    waitfor '[ -s "$T/dialog.png" ]' 90
+    check "download popup drawn (light and dark)" '[ -s "$T/dialog.png" ] && [ -s "$T/dialog-dark.png" ]'
+    waitfor 'grep -q "saved as" "$T/log"' 30
+    stop; fi
+
+# A rule ("Always do this") is followed even when nobody answers.
+if want dl-rule; then setup dl-rule
+    NEATLY_DATA_DIR=$T/data "$B" style --length short >/dev/null
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['rules']={'odtuclass.metu.edu.tr':'$T/home/finance'};json.dump(d,open(p,'w'))"
+    start "dialog:wait" 3
+    arrive "$(make ceng-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "your rule: no answer, still goes to the rule's folder" '[ -f "$T/home/finance/ceng334-syllabus.pdf" ]'
+    check "the popup said it was your rule" 'grep -q "(your rule)" "$T/log"'
+    stop; fi
+
+if want dl-duplicate; then setup dl-duplicate; start "dialog:trash" 3
     f=$(make ceng-syllabus); cp "$f" "$T/stage/copy.pdf"
     arrive "$f"
-    waitfor '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]' 90
+    waitfor 'grep -q "left as is" "$T/log"' 90
     mv "$T/stage/copy.pdf" "$T/dl/8812_4471 (1).pdf"
     waitfor 'grep -q "moved to Trash" "$T/log"' 60
-    check "same file again: the copy goes to the Trash after the countdown" '[ ! -e "$T/dl/8812_4471 (1).pdf" ]'
-    check "no -2 copy in the folder" '[ "$(ls "$T/home/courses-fall26/ceng334" | wc -l | tr -d " ")" = "1" ]'
+    check "same file again: Move to Trash in the popup trashes the copy" '[ ! -e "$T/dl/8812_4471 (1).pdf" ] && [ -f "$T/dl/8812_4471.pdf" ]'
+    stop; fi
+
+if want dl-duplicate-wait; then setup dl-duplicate-wait; start "dialog:wait" 3
+    f=$(make ceng-syllabus); cp "$f" "$T/stage/copy.pdf"
+    arrive "$f"
+    waitfor '[ -f "$T/dl/ceng334-syllabus.pdf" ]' 90
+    mv "$T/stage/copy.pdf" "$T/dl/8812_4471 (1).pdf"
+    waitfor '[ "$(grep -c "saved as" "$T/log")" -ge 2 ]' 60
+    check "same file again, no answer: both kept, nothing trashed" '[ "$(ls "$T/dl" | wc -l | tr -d " ")" = "2" ] && ! grep -q "Trash" "$T/log"'
+    stop; fi
+
+# Not from a browser (curl, an agent): written in pieces with pauses. Must wait until it's really done.
+if want dl-slow-writer; then setup dl-slow-writer; start "dialog:save" 3
+    f=$(make ceng-syllabus); xattr -c "$f"; size=$(stat -f %z "$f")
+    half=$((size / 2))
+    head -c $half "$f" > "$T/dl/8812_4471.pdf"; sleep 2
+    tail -c +$((half + 1)) "$f" >> "$T/dl/8812_4471.pdf"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    out=$(find "$T/dl" "$T/home" -name "*.pdf" | head -1)
+    check "a file written with a 2 s pause is handled once, complete" '[ "$(grep -c "→\|name ok" "$T/log")" = "1" ] && [ "$(stat -f %z "$out")" = "$size" ]'
+    stop; fi
+
+# The file changes while the popup is open: neatly doesn't act on what it saw before; it looks again.
+if want dl-changed; then setup dl-changed; start "dialog:wait" 6
+    f=$(make ceng-syllabus); arrive "$f"
+    waitfor 'grep -q "folder:" "$T/log"' 90
+    echo "more" >> "$T/dl/8812_4471.pdf"
+    waitfor 'grep -q "changed while" "$T/log"' 30
+    check "changed while the popup was open: not renamed on old information" 'grep -q "changed while" "$T/log"'
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "…and handled again once it settled" 'grep -q "saved as" "$T/log"'
     stop; fi
 
 if want dl-partial; then setup dl-partial; start "dialog:save"
@@ -257,9 +306,41 @@ if want tidy-noidea; then setup tidy-noidea
     check "no suggestion, but typing a name and Rename works" '[ -f "$T/stage/attendance-certificate.doc" ]'
 fi
 
+# ─── History: Revert, Always do this, Undo Last Download ───────────────────────
+if want history; then setup history; start "dialog:save"
+    arrive "$(make ceng-syllabus)"
+    waitfor '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]' 90
+    stop
+    NEATLY_UI_TEST="menu:History…,history:always0,history:snapshot=$T/history.png,history:revert0" \
+        "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 6; stop
+    check "Revert puts the download back in Downloads with its old name" '[ -f "$T/dl/8812_4471.pdf" ] && [ ! -e "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]'
+    check "…and marks it put back" 'grep -q "\"reverted\":true" "$T/data/history.jsonl"'
+    check "Always do this saves a rule for the site" 'grep -q "odtuclass.metu.edu.tr" "$T/data/style.json"'
+    check "History window drawn (light and dark)" '[ -s "$T/history.png" ] && [ -s "$T/history-dark.png" ]'
+    NEATLY_UI_TEST="menu:Undo Last Download" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 4; stop
+    check "Undo Last Download with nothing left: says so, no crash" 'grep -q -i "no item\|nothing" "$T/log"'
+fi
+
+if want undo-download; then setup undo-download; start "dialog:save"
+    arrive "$(make ceng-syllabus)"
+    waitfor '[ -f "$T/home/courses-fall26/ceng334/ceng334-syllabus.pdf" ]' 90
+    stop
+    NEATLY_UI_TEST="menu:Undo “ceng334-syllabus.pdf”" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 4; stop
+    check "menu Undo Last Download puts it back" '[ -f "$T/dl/8812_4471.pdf" ]'
+    check "…and says so" 'grep -q "notice: Put back" "$T/log"'
+fi
+
+if want forget; then setup forget; start "dialog:save"
+    arrive "$(make ceng-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90; stop
+    NEATLY_UI_TEST="home:forget=1,home:online=off" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 4; stop
+    check "Forget my history deletes the learning log and History" '[ ! -e "$T/data/corrections.jsonl" ] && [ ! -e "$T/data/history.jsonl" ]'
+    check "online lookups can be turned off" 'grep -q "\"onlineLookups\" : false" "$T/data/style.json"'
+fi
+
 # ─── Menu bar ───────────────────────────────────────────────────────────────
 if want menu; then setup menu
-    NEATLY_UI_TEST="menu:Name Length>Detailed,menu:Date>Date First,menu:Title Case,menu:Copy Screenshots to Clipboard" \
+    NEATLY_UI_TEST="menu:Name Length>Long,menu:Date>Date First,menu:Title Case,menu:Copy Screenshots to Clipboard" \
         "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5; stop
     s=$(cat "$T/data/style.json")
     check "length, date, case, clipboard saved" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"lowercase\" : false" && echo "$s" | grep -q "\"copyScreenshots\" : true"'
@@ -325,7 +406,18 @@ if want update; then setup update; mkdir -p "$T/apps" "$T/rel"
     NEATLY_VERSION_OVERRIDE=0.0.1 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!
     waitfor 'grep -q "updated to" "$T/log"' 40
     check "said yes once: the service updates by itself" 'grep -q "updated to neatly $v" "$T/log"'
-    stop; unset NEATLY_APP_DIR NEATLY_UPDATE_URL
+    stop
+    check "the version before is kept, to go back to" '[ -x "$T/data/previous/neatly" ] && [ "$(cat "$T/data/previous/version")" = "0.0.1" ]'
+    # The new version keeps crashing (3 starts without running 2 minutes): the 4th start goes back.
+    printf '{"to":"7.7.7","from":"0.0.1","starts":3}' > "$T/data/update-pending.json"
+    NEATLY_VERSION_OVERRIDE=7.7.7 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5; stop
+    check "a version that keeps stopping is rolled back by itself" 'grep -q "keeps stopping" "$T/log" && [ "$(plutil -extract CFBundleShortVersionString raw "$T/apps/neatly.app/Contents/Info.plist")" = "0.0.1" ]'
+    check "…and not installed again" '[ "$(cat "$T/data/update-skip")" = "7.7.7" ]'
+    printf '{"to":"7.7.8","from":"0.0.1","starts":0}' > "$T/data/update-pending.json"
+    NEATLY_VERSION_OVERRIDE=7.7.8 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!
+    waitfor 'grep -q "running fine" "$T/log"' 20; stop
+    check "a version that runs fine is kept" 'grep -q "running fine" "$T/log" && [ ! -e "$T/data/update-pending.json" ]'
+    unset NEATLY_APP_DIR NEATLY_UPDATE_URL
 fi
 
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
