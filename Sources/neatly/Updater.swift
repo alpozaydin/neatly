@@ -68,12 +68,55 @@ enum Updater {
         let said = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         guard p.terminationStatus == 0, said.contains(r.version) else { throw Failure.wontRun }
 
-        return try AppBundle.build(from: program, version: r.version)   // in place: Launchpad keeps it
+        // Keep the version that works now, so a broken update can be undone by itself (see checkHealth).
+        try? FileManager.default.createDirectory(at: previousDir, withIntermediateDirectories: true)
+        let backup = previousDir.appending(path: "neatly")
+        try? FileManager.default.removeItem(at: backup)
+        try FileManager.default.copyItem(at: selfExecutable, to: backup)
+        try Data(current.utf8).write(to: previousDir.appending(path: "version"))
+        let app = try AppBundle.build(from: program, version: r.version)   // in place: Launchpad keeps it
+        try? JSONEncoder().encode(Pending(to: r.version, from: current, starts: 0)).write(to: pendingURL)
+        return app
+    }
+
+    // MARK: Rolling back a broken update
+
+    static var dataDir: URL { Correction.fileURL.deletingLastPathComponent() }
+    static var previousDir: URL { dataDir.appending(path: "previous") }
+    static var pendingURL: URL { dataDir.appending(path: "update-pending.json") }
+    static var skipURL: URL { dataDir.appending(path: "update-skip") }
+    struct Pending: Codable { var to: String; var from: String; var starts: Int }
+
+    /// Run at every start of the service. Just updated? Count the starts: a version that keeps crashing
+    /// (launchd restarts it each time) is replaced by the previous one after 3 tries, and never installed again.
+    /// One that runs fine for 2 minutes is kept.
+    @MainActor static func checkHealth() {
+        guard var p = (try? Data(contentsOf: pendingURL)).flatMap({ try? JSONDecoder().decode(Pending.self, from: $0) }) else { return }
+        guard p.to == current else { try? FileManager.default.removeItem(at: pendingURL); return }
+        p.starts += 1
+        try? JSONEncoder().encode(p).write(to: pendingURL)
+        if p.starts > 3 {
+            let backup = previousDir.appending(path: "neatly")
+            print("neatly \(p.to) keeps stopping — going back to \(p.from)")
+            try? Data(p.to.utf8).write(to: skipURL)
+            try? FileManager.default.removeItem(at: pendingURL)
+            if FileManager.default.fileExists(atPath: backup.path), (try? AppBundle.build(from: backup, version: p.from)) != nil {
+                if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] == nil { exit(0) }   // launchd starts the old one
+            }
+            return
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(ProcessInfo.processInfo.environment["NEATLY_UPDATE_SOON"] != nil ? 3 : 120))
+            try? FileManager.default.removeItem(at: pendingURL)
+            print("neatly \(current) is running fine")
+        }
     }
 
     /// One check: returns the new version if neatly was updated.
     static func checkOnce() async -> String? {
         guard let r = await latest(), isNewer(r.version, than: current) else { return nil }
+        // A version that had to be rolled back is skipped; the next one is tried again.
+        if let bad = try? String(contentsOf: skipURL, encoding: .utf8), bad == r.version { return nil }
         do {
             _ = try await install(r)
             return r.version
@@ -85,6 +128,7 @@ enum Updater {
 
     /// In the background service: check a little after start, then every 6 hours, only if the person said yes.
     @MainActor static func start() {
+        checkHealth()
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(ProcessInfo.processInfo.environment["NEATLY_UPDATE_SOON"] != nil ? 2 : 120))
             while true {
