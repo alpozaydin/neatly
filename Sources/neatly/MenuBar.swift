@@ -119,8 +119,11 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         open.canChooseFiles = false
         open.prompt = "Tidy"
         open.message = "Choose a folder: neatly suggests names for its badly named files. Nothing changes until you click Rename."
-        NSApp.activate(ignoringOtherApps: true)
-        if open.runModal() == .OK, let url = open.url { tidy([url.path]) }
+        NSApp.activate()
+        open.begin { [weak self] r in   // not modal: neatly keeps working while the picker is open
+            guard r == .OK, let url = open.url else { return }
+            MainActor.assumeIsolated { self?.tidy([url.path]) }
+        }
     }
 
     @objc func openHistory() { HistoryWindow.shared.show() }

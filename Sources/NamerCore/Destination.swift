@@ -168,6 +168,7 @@ public enum Destination {
     /// A file with the same bytes already in `folder`? (Downloaded twice.) Compares size first, then content.
     public static func duplicate(of url: URL, in folder: URL?) -> URL? {
         guard let folder, let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
+              size <= 1 << 30,   // over 1 GB: comparing byte by byte would take too long to be worth it
               let items = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])
         else { return nil }
         for other in items where other.pathExtension.lowercased() == url.pathExtension.lowercased()

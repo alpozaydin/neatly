@@ -336,6 +336,8 @@ if want forget; then setup forget; start "dialog:save"
     NEATLY_UI_TEST="home:forget=1,home:online=off" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 4; stop
     check "Forget my history deletes the learning log and History" '[ ! -e "$T/data/corrections.jsonl" ] && [ ! -e "$T/data/history.jsonl" ]'
     check "online lookups can be turned off" 'grep -q "\"onlineLookups\" : false" "$T/data/style.json"'
+    NEATLY_UI_TEST="home:uninstall=1" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 3; stop
+    check "Uninstall button is wired up (tests never really uninstall)" 'grep -q "home: uninstall" "$T/log"'
 fi
 
 # ─── Menu bar ───────────────────────────────────────────────────────────────
@@ -418,6 +420,16 @@ if want update; then setup update; mkdir -p "$T/apps" "$T/rel"
     waitfor 'grep -q "running fine" "$T/log"' 20; stop
     check "a version that runs fine is kept" 'grep -q "running fine" "$T/log" && [ ! -e "$T/data/update-pending.json" ]'
     unset NEATLY_APP_DIR NEATLY_UPDATE_URL
+fi
+
+# ─── The one-line installer (only its refusals: a real install would change your login items) ───
+if want installer; then setup installer; mkdir -p "$T/rel"
+    cp "$B" "$T/rel/neatly"; tar -czf "$T/rel/neatly-macos-arm64.tar.gz" -C "$T/rel" neatly
+    echo "0000000000000000000000000000000000000000000000000000000000000000  x" > "$T/rel/neatly-macos-arm64.tar.gz.sha256"
+    out=$(HOME=$T/home NEATLY_URL=file://$T/rel/neatly-macos-arm64.tar.gz sh "$ROOT/scripts/install.sh" 2>&1)
+    check "installer: a download that doesn't match its fingerprint is refused, nothing installed" 'echo "$out" | grep -q "damaged" && [ ! -e "$T/home/Library/LaunchAgents" ]'
+    out=$(head -c 900 "$ROOT/scripts/install.sh" | HOME=$T/home sh 2>&1)
+    check "installer: a script cut off halfway runs nothing" '! echo "$out" | grep -q "Downloading"'
 fi
 
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───

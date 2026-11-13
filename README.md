@@ -19,8 +19,10 @@ This installs **neatly.app** (in Applications, Spotlight and your menu bar) and 
 The first time it opens, neatly asks once whether to **keep itself up to date**. If you say yes, new versions
 install quietly in the background whenever you're online (each download's SHA-256 is checked first; a mismatch
 changes nothing). If a new version keeps crashing, neatly goes back to the previous one by itself.
-Uninstall: `neatly service uninstall` removes the app, the login item and the command (then `brew uninstall neatly`
-if you used Homebrew).
+The installer checks the download's SHA-256 before installing anything, and each release carries a signed record
+of how GitHub built it (`gh attestation verify neatly-macos-arm64.tar.gz -R alpozaydin/neatly`).
+Uninstall: open neatly → **More options → Uninstall neatly** (or `neatly service uninstall`; then `brew uninstall neatly`
+if you used Homebrew). Moved neatly.app to another folder? Open it once from there and it carries on from the new place.
 
 ## Privacy
 
