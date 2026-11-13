@@ -25,7 +25,19 @@ enum AppBundle {
         return FileManager.default.homeDirectoryForCurrentUser.appending(path: "Applications")
     }
 
-    static var location: URL { folder.appending(path: "neatly.app") }
+    /// Where neatly.app is: the app this program runs from (even if you moved it, say into a subfolder),
+    /// else the default place. Updates then change the app you have, never build a second one.
+    static var location: URL {
+        if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] == nil, let running = runningBundle { return running }
+        return folder.appending(path: "neatly.app")
+    }
+
+    /// ".../neatly.app" when this program is the one inside a neatly.app.
+    static var runningBundle: URL? {
+        let p = selfExecutable.path
+        guard p.hasSuffix(".app/Contents/MacOS/neatly") else { return nil }
+        return selfExecutable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    }
     static var executable: URL { location.appending(path: "Contents/MacOS/neatly") }
 
     /// Are we running from inside neatly.app (opened from Finder/Spotlight, or the service)?

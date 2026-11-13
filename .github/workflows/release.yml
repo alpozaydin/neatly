@@ -4,13 +4,20 @@ name: release
 on:
   push:
     tags: ["v*"]
-permissions:
-  contents: write
+# Nothing by default; the build job gets only what it needs. Actions are pinned to exact commits, so a changed
+# tag upstream can't change what runs here.
+permissions: {}
 jobs:
   build:
     runs-on: xcode-27        # Apple silicon, macOS 27 SDK (needed for the on-device model's vision API)
+    permissions:
+      contents: write        # create the release
+      id-token: write        # sign the build record (attestation)
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build
         run: swift build -c release --product neatly --arch arm64
       - name: Self-checks
@@ -22,6 +29,12 @@ jobs:
           codesign --force --sign - dist/neatly          # ad-hoc signature: required to run on Apple silicon
           tar -czf neatly-macos-arm64.tar.gz -C dist neatly
           shasum -a 256 neatly-macos-arm64.tar.gz | tee neatly-macos-arm64.tar.gz.sha256
+      # A signed record of how this file was built. Anyone can check it with
+      #   gh attestation verify neatly-macos-arm64.tar.gz -R alpozaydin/neatly
+      - name: Record how it was built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8   # v4.2.2
+        with:
+          subject-path: neatly-macos-arm64.tar.gz
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}

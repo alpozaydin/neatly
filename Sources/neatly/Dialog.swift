@@ -160,9 +160,12 @@ final class CountdownDialog: NSObject {
         open.message = "Save “\(model.name)” in:"
         open.directoryURL = model.folder ?? FileManager.default.homeDirectoryForCurrentUser
         open.level = .floating
-        NSApp.activate()   // you clicked "Change…": now it's fine to come forward
-        guard open.runModal() == .OK, let url = open.url else { return }
-        model.folder = url
+        NSApp.activate()   // you clicked "Choose Folder…": now it's fine to come forward
+        // Not modal: everything else in neatly (other downloads, screenshots, the menu) keeps running meanwhile.
+        open.begin { [weak self] r in
+            guard r == .OK, let url = open.url else { return }
+            MainActor.assumeIsolated { self?.model.folder = url }
+        }
     }
 }
 

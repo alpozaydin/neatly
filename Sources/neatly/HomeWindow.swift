@@ -73,6 +73,7 @@ final class HomeWindow: NSObject, NSWindowDelegate {
                 case "online": model.online = kv[1] == "on"
                 case "continue": model.welcome()
                 case "forget": model.forget(confirm: false)
+                case "uninstall": model.uninstall()
                 case "drop": MenuBar.shared.dropped(kv[1].split(separator: "|").map { URL(fileURLWithPath: String($0)) })
                 case "snapshot": HomeWindow.snapshot(model, to: kv[1])
                 default: break
@@ -190,6 +191,22 @@ final class HomeModel: ObservableObject {
         Log.clear()
         named = 0
         Notice.show("Forgot your history.")
+    }
+
+    func uninstall() {
+        if !headless {
+            let a = NSAlert()
+            a.messageText = "Uninstall neatly?"
+            a.informativeText = "neatly stops and is removed from Applications and your menu bar. Files it named keep their names."
+            a.addButton(withTitle: "Uninstall")
+            a.addButton(withTitle: "Cancel")
+            a.buttons.first?.hasDestructiveAction = true
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
+        print("home: uninstall")
+        if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] != nil || headless { return }   // tests: never really
+        uninstallEverything()
+        NSApp.terminate(nil)
     }
 
     /// What a name looks like with the current choices — shown live in the window.
@@ -357,6 +374,16 @@ struct HomeView: View {
                             Spacer()
                             Pill(title: "Forget", primary: false) { model.forget() }
                                 .accessibilityLabel("Forget my history")
+                        }
+                        Divider().padding(.leading, 44)
+                        HStack(spacing: 12) {
+                            IconBadge(icon: "xmark.bin", color: .gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Uninstall neatly")
+                                Text("Removes the app. Your files keep their names.").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Pill(title: "Uninstall…", primary: false) { model.uninstall() }
                         }
                     }
                 }

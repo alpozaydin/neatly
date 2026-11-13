@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
-let version = "0.5.0"
+let version = "0.5.1"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -122,6 +122,14 @@ func launchctl(_ a: [String]) {
     let uid = getuid()
     let me = selfExecutable
     let exe = try AppBundle.build(from: me, version: version)
+    try pointService(to: exe)
+}
+
+/// Write the login item for the app program at `exe`, link the `neatly` command to it, and (re)start it.
+/// Also used when you moved neatly.app: opening it from its new place points everything there.
+@MainActor func pointService(to exe: URL) throws {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let uid = getuid()
     // The command line: ~/.local/bin/neatly → the app's binary (replaces an older copied binary).
     let link = home.appending(path: ".local/bin/neatly")
     try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -154,10 +162,26 @@ func launchctl(_ a: [String]) {
     launchctl(["bootstrap", "gui/\(uid)", servicePlist.path])
 }
 
+/// Remove the app, the login item and the `neatly` command, then stop the service (which may be this very
+/// program: that's why stopping comes last). Your files, names and settings are left as they are.
+@MainActor func uninstallEverything() {
+    try? FileManager.default.removeItem(at: servicePlist)
+    let link = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/bin/neatly")
+    if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))?.contains("neatly.app") == true {
+        try? FileManager.default.removeItem(at: link)
+    }
+    AppBundle.remove()
+    launchctl(["bootout", "gui/\(getuid())/\(serviceLabel)"])
+}
+
 // Opened from Finder, Spotlight or Launchpad (no arguments): make sure it's running, then get out of the way.
 // The service is the one copy that shows the menu-bar icon; opening the app never starts a second one.
 if args.isEmpty && AppBundle.isRunningInside {
-    if FileManager.default.fileExists(atPath: servicePlist.path) {
+    // Moved neatly.app (or the login item points at a copy that's gone)? Point the login item here.
+    let plistText = (try? String(contentsOf: servicePlist, encoding: .utf8)) ?? ""
+    if FileManager.default.fileExists(atPath: servicePlist.path), !plistText.contains("<string>\(selfExecutable.path)</string>") {
+        try? pointService(to: selfExecutable)
+    } else if FileManager.default.fileExists(atPath: servicePlist.path) {
         launchctl(["bootstrap", "gui/\(getuid())", servicePlist.path])          // no-op if already loaded
         launchctl(["kickstart", "gui/\(getuid())/\(serviceLabel)"])           // starts it only if not running
     } else {
@@ -207,13 +231,7 @@ if args.first == "service" {
         print("It watches ~/Downloads (asks before filing) and names new screenshots. Log: ~/Library/Logs/neatly.log")
         print("Stop it any time: neatly service uninstall")
     case "uninstall":
-        launchctl(["bootout", "gui/\(getuid())/\(serviceLabel)"])
-        try? FileManager.default.removeItem(at: servicePlist)
-        let link = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/bin/neatly")
-        if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))?.contains("neatly.app") == true {
-            try? FileManager.default.removeItem(at: link)
-        }
-        AppBundle.remove()
+        uninstallEverything()
         print("stopped and removed (the app, the login item and the neatly command)")
     default: print("usage: neatly service install|uninstall")
     }
@@ -463,6 +481,12 @@ var noAccess = Set<String>()
 /// Menu bar → Pause: new files are noticed but left alone until you resume.
 var paused = false
 
+/// Slow file work (reading a big PDF, comparing two large files byte by byte, scanning your folders) runs
+/// off the main thread, so the menu-bar icon, popups and pills never freeze while it happens.
+func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+    await Task.detached(priority: .userInitiated) { work() }.value
+}
+
 @MainActor func watchDownloads() async {
     await Welcome.wait()   // first start: not before the welcome window explained the folder prompts
     let dir = URL(fileURLWithPath: ((args.first ?? "~/Downloads") as NSString).expandingTildeInPath)
@@ -536,7 +560,7 @@ var paused = false
                 case .kept(let r) where r != "name already meaningful":
                     print("\(name)  skip (\(r))"); continue
                 case .kept, .unsure:
-                    evidence = Destination.keptEvidence(url).0
+                    evidence = await offMain { Destination.keptEvidence(url).0 }
                     // The name looks fine, but rules may know a more specific one (Sample-MT → ceng331-midterm1-fall19-solutions).
                     // Only rules: a model guess shouldn't replace a name a person may have chosen.
                     var rulesOnly = namer; rulesOnly.useModel = false
@@ -552,7 +576,7 @@ var paused = false
                     continue
                 }
                 if installers.contains(url.pathExtension.lowercased()) { continue }
-                let kebab = nameIdea == original ? Destination.keptEvidence(url).1
+                let kebab = nameIdea == original ? await offMain({ Destination.keptEvidence(url).1 })
                     : nameIdea.lowercased().split(whereSeparator: { "-_ ".contains($0) }).joined(separator: "-")
                 // "Always do this": one of your rules says where files from this site go.
                 let host = evidence.sourceHost
@@ -560,19 +584,20 @@ var paused = false
                     .flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 let target: URL?
                 if let rule { target = rule } else {
-                    target = await Destination.best(name: kebab, evidence: evidence, folders: Destination.cachedIndex(),
+                    let folders = await offMain { Destination.cachedIndex() }
+                    target = await Destination.best(name: kebab, evidence: evidence, folders: folders,
                                                     useModel: namer.useModel)
                 }
                 print("   folder: \(Destination.short(target))\(rule != nil ? " (your rule)" : "")")
                 // Match the neighbours: in a folder of "Lab Report - MAO" files, a new one is styled the same way.
-                if nameIdea != original, var local = Destination.style(of: target) {
+                if nameIdea != original, var local = await offMain({ Destination.style(of: target) }) {
                     local.length = namer.profile.length; local.date = namer.profile.date; local.appName = namer.profile.appName
                     let styled = local.render(kebab)
                     if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
                 }
                 // Downloaded the same file twice? Say so in the popup (with a Move to Trash button) instead of
                 // silently making a "-2" copy. Nobody answers → both are kept: neatly never deletes on its own.
-                let twin = Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir)
+                let twin = await offMain { Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir) }
                 let ev = evidence, suggestedName = nameIdea, how = via
                 let log = { (chosen: String, folder: URL?, auto: Bool) in
                     Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,
