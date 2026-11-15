@@ -76,8 +76,14 @@ no tracking, no cloud AI. Nothing about your files is uploaded.
 5. **Every answer is checked:** typos fixed from the file's own text, made-up words dropped. Not sure? It leaves the name alone.
 6. **It learns your style** from the names you edit, and suggests the folder you'd pick.
 
-Only three small things ever go online, all optional: the update check, a paper's arXiv number (to get its
-real title), and a phone photo's location (to name the place). [Privacy details](docs/GUIDE.md#privacy)
+Only three small things ever go online, never the files themselves:
+
+- **Update check**: asks GitHub if there's a new version (only if you said yes).
+- **Paper titles**: a research paper's arXiv number, to get its real title.
+- **Photo places**: a phone photo's GPS coordinates (just the two numbers) go to Apple Maps, to name the place.
+
+You can turn any of them off at any time: **More options → Look up papers and photo places online**, or the
+update switch next to it. [Privacy details](docs/GUIDE.md#privacy)
 
 ## More
 
