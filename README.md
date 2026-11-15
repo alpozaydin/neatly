@@ -6,7 +6,8 @@
 
 <p align="center">
   <b>Clear names for your files, automatically.</b><br>
-  Downloads, screenshots and photos get real names, and the right folder, right on your Mac.
+  An AI file renamer for Mac: downloads, screenshots and photos get real names and the right folder.<br>
+  Private and on-device with Apple Intelligence. Free and open source.
 </p>
 
 <p align="center">
