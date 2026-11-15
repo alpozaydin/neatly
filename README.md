@@ -27,7 +27,13 @@
 curl -fsSL https://raw.githubusercontent.com/alpozaydin/neatly/main/scripts/install.sh | sh
 ```
 
-or `brew install alpozaydin/tap/neatly && neatly service install`. It lives in your menu bar and keeps itself up to date.
+If you have Homebrew:
+
+```sh
+brew install alpozaydin/tap/neatly && neatly service install
+```
+
+It lives in your menu bar and keeps itself up to date.
 
 ## What it does
 
@@ -42,7 +48,7 @@ or `brew install alpozaydin/tap/neatly && neatly service install`. It lives in y
 | 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |
 
 <p align="center">
-  <img src="docs/assets/popup.png" width="440" alt="The download popup: suggested name and folder, with Save">
+  <img src="docs/assets/demo.gif" width="760" alt="Download a file in Safari; neatly suggests a clear name and folder; Save">
 </p>
 
 ## Real examples
