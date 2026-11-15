@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/hero.png" width="860" alt="Messy file names on the left, clear names from neatly on the right">
+  <img src="docs/assets/demo.gif" width="760" alt="A download arrives as doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills; Save">
 </p>
 
 ## Install
@@ -47,11 +47,11 @@ It lives in your menu bar and keeps itself up to date.
 | ↩️ **History** | Everything neatly changed, each with **Revert**. "Always do this" turns a choice into a rule. |
 | 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |
 
-<p align="center">
-  <img src="docs/assets/demo.gif" width="760" alt="A download arrives as doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills; Save">
-</p>
-
 ## Real examples
+
+<p align="center">
+  <img src="docs/assets/hero.png" width="860" alt="Messy file names on the left, clear names from neatly on the right">
+</p>
 
 | Before | After |
 |---|---|
