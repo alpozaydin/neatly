@@ -166,9 +166,13 @@ public struct Namer: Sendable {
                 e.bodySnippet = text; e.steps.append("ocr")
             }
         } else if Self.textLike.contains(e.ext), let info = Extract.textDocument(url) {
-            e.headline = info.headline
-            e.bodySnippet = info.snippet
-            e.steps.append("text")
+            // A text file with almost nothing in it ("a", "12345"): any name would be a guess.
+            let letters = ((info.headline ?? "") + (info.snippet ?? "")).filter(\.isLetter).count
+            if letters >= 12 {
+                e.headline = info.headline
+                e.bodySnippet = info.snippet
+                e.steps.append("text")
+            }
         } else if !isImage, !["zip", "dmg", "pkg", "app", "iso", "exe"].contains(e.ext),
                   let rendered = await withTimeout(.seconds(4), { await Extract.quickLook(url) }) ?? nil {
             preview = rendered; isImage = true; e.steps.append("preview")
@@ -405,7 +409,11 @@ public struct Namer: Sendable {
         if kind.issuerFirst { return issuer.map { Style.join([$0, kind.word]) } ?? kind.word }
         // Bills and payslips: the month they are FOR, not the day they arrived.
         let date = kind.qualifier == .month ? (Style.period(in: strong + " " + weak) ?? e.date) : e.date
-        return Style.join([kind.word, issuer, Style.qualifier(kind.qualifier, date)].compactMap { $0 })
+        // Names with spaces read naturally, who first: "Turkcell Invoice Nov 2026". Dashes keep the kind first,
+        // which sorts the same kind together: invoice-turkcell-nov26.
+        let natural = profile.separator == " "
+        let parts: [String?] = (natural ? [issuer, kind.word] : [kind.word, issuer]) + [Style.qualifier(kind.qualifier, date)]
+        return Style.join(parts.compactMap { $0 })
     }
 
     /// "2 bd · 1 ba · $3,100/mo · 42 Linden Ave" → apartment-3-bed-linden-st. Needs a size AND a rent or price

@@ -130,6 +130,9 @@ final class HomeModel: ObservableObject {
     @Published var dropping = false
     var forPicture = false               // drawing for a test picture: the drop handler can't be drawn off screen
     private var loading = false
+    // What the window showed when it opened: a setting is written only if you changed it, so settings the window
+    // can't show exactly ("Date Last", dashes in Title Case) are never overwritten by an unrelated click.
+    private var shownStyle = NameStyle.dashes, shownDateFirst = false
 
     func reload() {
         loading = true
@@ -138,8 +141,10 @@ final class HomeModel: ObservableObject {
         downloads = p.watchDownloads != false
         screenshots = p.watchScreenshots != false
         style = p.separator == "_" ? .underscores : (!p.lowercase || p.separator == " ") ? .title : .dashes
+        shownStyle = style
         length = p.len
         dateFirst = p.date != nil
+        shownDateFirst = dateFirst
         appName = p.appName == true
         copyShots = p.copyScreenshots == true
         countdown = timeout
@@ -156,13 +161,15 @@ final class HomeModel: ObservableObject {
         MenuBar.shared.change { p in
             p.watchDownloads = downloads
             p.watchScreenshots = screenshots
-            switch style {
-            case .dashes: p.separator = "-"; p.lowercase = true
-            case .title: p.separator = " "; p.lowercase = false
-            case .underscores: p.separator = "_"; p.lowercase = true
+            if style != shownStyle {
+                switch style {
+                case .dashes: p.separator = "-"; p.lowercase = true
+                case .title: p.separator = " "; p.lowercase = false
+                case .underscores: p.separator = "_"; p.lowercase = true
+                }
             }
             p.length = length
-            p.date = dateFirst ? .prefix : nil
+            if dateFirst != shownDateFirst { p.date = dateFirst ? .prefix : nil }
             p.appName = appName
             p.copyScreenshots = copyShots
             p.countdown = countdown
@@ -170,6 +177,7 @@ final class HomeModel: ObservableObject {
             p.onlineLookups = online ? nil : false
             p.appearance = appearance
         }
+        shownStyle = style; shownDateFirst = dateFirst
         namer.useNetwork = online && !offline
         timeout = countdown
         objectWillChange.send()   // the preview name follows

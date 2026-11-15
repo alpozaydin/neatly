@@ -72,11 +72,21 @@ enum AppBundle {
             "NSDownloadsFolderUsageDescription": "neatly suggests a name and a folder for each new download.",
             // Accept any file or folder dropped on the app's icon (Finder, Dock) — "Alternate" so neatly never
             // becomes the app that opens your files by default.
+            "NeatlyBundleFormat": bundleFormat,          // see refreshIfStale()
             "CFBundleDocumentTypes": [[
                 "CFBundleTypeName": "Any file or folder",
                 "CFBundleTypeRole": "Viewer",
                 "LSHandlerRank": "Alternate",
                 "LSItemContentTypes": ["public.item", "public.folder"],
+            ]],
+            // Right-click in Finder → Quick Actions / Services → "Rename with neatly" (any files or folders).
+            // NSRequiredContext makes it show up without turning it on in System Settings first.
+            "NSServices": [[
+                "NSMenuItem": ["default": "Rename with neatly"],
+                "NSMessage": "renameWithNeatly",
+                "NSPortName": "neatly",
+                "NSSendFileTypes": ["public.item", "public.folder"],
+                "NSRequiredContext": [String: String](),
             ]],
         ]
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
@@ -111,6 +121,7 @@ enum AppBundle {
             run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
                 ["-f", app.path])
             run("/usr/bin/mdimport", [app.path])
+            NSUpdateDynamicServices()   // "Rename with neatly" shows up in Finder's right-click menu right away
         }
         return executable
     }
@@ -119,6 +130,28 @@ enum AppBundle {
         run("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
             ["-u", location.path])
         try? FileManager.default.removeItem(at: location)
+        NSUpdateDynamicServices()   // "Rename with neatly" leaves Finder's menu too
+    }
+
+    /// What the app's Info.plist and icon look like. Raise it whenever they change (new icon, new service…).
+    static let bundleFormat = 2
+
+    /// An update is installed by the *old* version's code, so the app's Info.plist and icon are the old ones
+    /// (0.5.2 → 0.6.0 kept the old icon; 0.6.0 → 0.6.1 would miss "Rename with neatly"). So at start the running
+    /// version checks its own app and, if it was made by older code, rebuilds it around itself. Once per format.
+    static func refreshIfStale() {
+        guard ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] == nil, let app = runningBundle,
+              let info = NSDictionary(contentsOf: app.appending(path: "Contents/Info.plist")) else { return }
+        let format = (info["NeatlyBundleFormat"] as? Int) ?? 1
+        let v = info["CFBundleShortVersionString"] as? String
+        guard format < bundleFormat || v != version else { return }
+        do {
+            try build(from: selfExecutable, version: version)
+            print("app: refreshed neatly.app (format \(format) → \(bundleFormat), \(v ?? "?") → \(version))")
+        } catch {
+            print("app: couldn't refresh neatly.app: \(error)")
+        }
+        fflush(stdout)
     }
 
     /// The icon: the menu-bar symbol, white on a teal-to-blue gradient, in every size macOS wants.

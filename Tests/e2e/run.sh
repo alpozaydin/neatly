@@ -25,6 +25,8 @@ setup() {
     CUR=$1; T=$W/$1
     mkdir -p "$T/home/courses-fall26/cs334" "$T/home/finance" "$T/dl" "$T/shots" "$T/data" "$T/stage"
     export NEATLY_DATA_DIR=$T/data NEATLY_HOME=$T/home NEATLY_SCREENSHOT_DIR=$T/shots
+    # Most checks look for exact file names: use the compact style (the default, Title Case with spaces, has its own test).
+    [ "${KEEP_DEFAULT_STYLE:-}" = 1 ] || "$B" style --sep dash --case lower >/dev/null 2>&1
     echo "• $1"
 }
 start() { NEATLY_UI_TEST="$1" "$B" --watch "$T/dl" --ask --screenshots --timeout "${2:-3}" > "$T/log" 2>&1 & PID=$!; sleep 3; }
@@ -429,6 +431,59 @@ if want menu; then setup menu
         "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5; stop
     s=$(cat "$T/data/style.json")
     check "length, date, case, clipboard saved" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"lowercase\" : false" && echo "$s" | grep -q "\"copyScreenshots\" : true"'
+fi
+
+# ─── The default style: natural names with spaces ───────────────────────────
+if want default-style; then KEEP_DEFAULT_STYLE=1 setup default-style; start "dialog:save"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "by default names read naturally: Title Case with spaces, who first, dates spelled out" 'ls "$T/dl" "$T/home/finance" 2>/dev/null | grep -q "^Turkcell Invoice"'
+    stop; fi
+
+# ─── Finder: "Rename with neatly" (Services) and "Open With → neatly" ──────────
+if want finder; then setup finder
+    printf 'a' > "$T/stage/IMG_1.txt"; printf 'b' > "$T/stage/IMG_2.txt"; printf 'c' > "$T/stage/scan 3.txt"
+    NEATLY_UI_TEST="service:$T/stage/IMG_1.txt|$T/stage/IMG_2.txt|$T/stage/scan 3.txt,open:$T/stage/IMG_1.txt" \
+        "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
+    check "Rename with neatly: the service gets all 3 selected files" 'grep -q "finder: service with 3 item" "$T/log"'
+    check "…and opens the review window for them" 'grep -q "dropped 3 item" "$T/log"'
+    check "Open With → neatly opens the review window" 'grep -q "dropped 1 item" "$T/log"'
+    # Not running when you pick it: macOS starts the app, which passes the files on (sent 3×, opened once).
+    "$B" forward-open "$T/stage/IMG_2.txt" "$T/stage/scan 3.txt"; sleep 1
+    check "a just-started app hands the files to the running copy" 'grep -q "finder: handed 2 item" "$T/log"'
+    check "…once, not three times" '[ "$(grep -c "finder: handed" "$T/log")" = 1 ]'
+    stop
+    NEATLY_APP_DIR=$T/apps "$B" app-bundle >/dev/null 2>&1
+    pl="$T/apps/neatly.app/Contents/Info.plist"
+    check "the app offers itself in Open With (never as the default app)" '/usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:LSHandlerRank" "$pl" | grep -q Alternate'
+    check "the app declares the Rename with neatly service" '/usr/libexec/PlistBuddy -c "Print :NSServices:0:NSMenuItem:default" "$pl" | grep -q "Rename with neatly"'
+fi
+
+if want finder-many; then setup finder-many
+    mkdir -p "$T/many"; for i in $(seq 1 300); do printf 'x' > "$T/many/IMG_$i.txt"; done
+    "$B" --watch "$T/dl" --menubar --offline > "$T/log" 2>&1 & PID=$!; sleep 4
+    "$B" forward-open "$T"/many/*.txt; sleep 3
+    check "300 files at once: handed over and the review window opens" 'grep -q "dropped 300 item" "$T/log"'
+    check "…through a list file, not 300 arguments" 'pgrep -f "tidy --offline --list" >/dev/null'
+    check "…and the menu-bar app is still running" 'kill -0 $PID 2>/dev/null'
+    check "--offline carries over to the review window (no online lookups there either)" 'pgrep -f "tidy --offline" >/dev/null'
+    pkill -f "$T/" 2>/dev/null; stop
+fi
+
+if want finder-folders; then setup finder-folders
+    mkdir -p "$T/A" "$T/B"
+    printf 'Weekly grocery list: eggs, oat milk, spinach, lemons, coffee beans' > "$T/A/IMG_1.txt"
+    printf 'Meeting notes: quarterly budget review with the finance team' > "$T/B/IMG_2.txt"
+    printf 'Camping checklist: tent, sleeping bag, headlamp, stove' > "$T/stage/IMG_3.txt"
+    NEATLY_UI_TEST="edit0:one,edit1:two,edit2:three,rename,done" "$B" tidy "$T/A" "$T/B" "$T/stage/IMG_3.txt" > "$T/log" 2>&1
+    check "two folders and a file picked together: every file inside is listed and renamed" '[ -f "$T/A/one.txt" ] && [ -f "$T/B/two.txt" ] && [ -f "$T/stage/three.txt" ]'
+fi
+
+if want settings-keep; then setup settings-keep
+    "$B" style --date suffix --sep underscore --case title >/dev/null 2>&1
+    NEATLY_UI_TEST="home:appearance=dark" "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 5; stop
+    s=$(cat "$T/data/style.json")
+    check "changing Appearance keeps your other choices (date last, underscores, Title Case)" 'echo "$s" | grep -q suffix && echo "$s" | grep -q "\"separator\" : \"_\"" && echo "$s" | grep -q "\"lowercase\" : false" && echo "$s" | grep -q dark'
 fi
 
 # ─── The neatly window (opened from Spotlight/Applications) ──────────────────

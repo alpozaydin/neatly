@@ -16,12 +16,19 @@ final class TidyWindow: NSObject, NSWindowDelegate {
         var isDir: ObjCBool = false
         let oneFolder = paths.count == 1 && FileManager.default.fileExists(atPath: paths[0].path, isDirectory: &isDir) && isDir.boolValue
         let folder = oneFolder ? paths[0] : paths[0].deletingLastPathComponent()
-        let candidates = oneFolder
-            ? ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
-                                                             options: [.skipsHiddenFiles])) ?? [])
-            : paths
+        func inside(_ dir: URL) -> [URL] {
+            (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isRegularFileKey],
+                                                          options: [.skipsHiddenFiles])) ?? []
+        }
+        // Several things picked in Finder: folders contribute the files inside them (one level), files themselves.
+        let candidates = oneFolder ? inside(folder) : paths.flatMap { url -> [URL] in
+            var d: ObjCBool = false
+            let isFolder = FileManager.default.fileExists(atPath: url.path, isDirectory: &d) && d.boolValue
+            let isPackage = NSWorkspace.shared.isFilePackage(atPath: url.path)   // .app, .pages: one file to you
+            return isFolder && !isPackage ? inside(url) : [url]
+        }
         let files = candidates
-            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true || NSWorkspace.shared.isFilePackage(atPath: $0.path) }
             // A folder: only meaningless names (yours are left alone). Files you dropped: you asked for them.
             .filter { Decision.make(for: $0, explicit: !oneFolder).shouldRename }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }

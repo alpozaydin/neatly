@@ -37,8 +37,9 @@ or `brew install alpozaydin/tap/neatly && neatly service install`. It lives in y
 | 📸 **Screenshots** | Named the moment you take them, by what's on screen. One click to undo. |
 | 🏞️ **Photos** | Named by what they show, and where they were taken. |
 | 🧹 **Tidy** | Clean up your Desktop, Downloads or any folder at once. You review every name first. |
+| 🖱️ **Finder** | Select files → right-click → **Rename with neatly** (or Open With → neatly). |
 | ↩️ **History** | Everything neatly changed, each with **Revert**. "Always do this" turns a choice into a rule. |
-| 🎨 **Your style** | Short or long names, dashes or Title Case, dates, light or dark. It learns from your edits. |
+| 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |
 
 <p align="center">
   <img src="docs/assets/popup.png" width="440" alt="The download popup: suggested name and folder, with Save">
@@ -48,18 +49,29 @@ or `brew install alpozaydin/tap/neatly && neatly service install`. It lives in y
 
 | Before | After |
 |---|---|
-| `Screenshot 2026-11-10 at 9.41.07.png` | `turkish-airlines-boarding-pass.png` |
-| `Screenshot 2026-11-12 at 18.02.55.png` | `corner-bakery-order.png` |
-| `8812_4471.pdf` | `cs334-syllabus.pdf` → *courses/cs334* |
-| `1234567_2026-11-04_124701.pdf` | `transcript-fall26.pdf` |
-| `IMG_4108.HEIC` | `colosseum-in-rome.heic` |
-| `IMG_4120.JPG` | `galata-tower-in-istanbul.jpg` |
+| `Screenshot 2026-11-10 at 9.41.07.png` | **Turkish Airlines Boarding Pass**.png |
+| `Screenshot 2026-11-12 at 18.02.55.png` | **Hubble Space Telescope**.png |
+| `scan_20261104_8812.pdf` | **Rent Agreement**.pdf → *Documents* |
+| `invoice_78123.pdf` | **Netflix Invoice Nov 2026**.pdf → *Bills* |
+| `IMG_4108.HEIC` | **Colosseum in Rome**.heic |
+| `IMG_4120.JPG` | **Galata Tower in Istanbul**.jpg |
 
-## Private by design
+Prefer `turkish-airlines-boarding-pass`? One click in settings.
 
-🔒 Files are read and named **on your Mac**, with Apple's on-device model. No account, no tracking.
-Only three small things ever go online: the update check, a paper's arXiv number (to get its title),
-and a phone photo's location (to name the place). The last two can be switched off. [Details](docs/GUIDE.md#privacy)
+## How it works
+
+🔒 **Everything happens on your Mac.** neatly reads your files with Apple's on-device model. No account,
+no tracking, no cloud AI. Nothing about your files is uploaded.
+
+1. **Only junk names are touched.** `IMG_4821`, `Screenshot 2026-…`, `document (3)` get a name; names you chose never change.
+2. **It reads as little as it can:** where the file came from, its title, page 1 of a PDF, the text on a screenshot.
+3. **Simple rules first** for things like invoices, receipts and tickets: instant and predictable.
+4. **Then Apple Intelligence**, on device, sees at most a page of text or the picture itself, and names what it is.
+5. **Every answer is checked:** typos fixed from the file's own text, made-up words dropped. Not sure? It leaves the name alone.
+6. **It learns your style** from the names you edit, and suggests the folder you'd pick.
+
+Only three small things ever go online, all optional: the update check, a paper's arXiv number (to get its
+real title), and a phone photo's location (to name the place). [Privacy details](docs/GUIDE.md#privacy)
 
 ## More
 

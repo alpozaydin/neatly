@@ -21,6 +21,13 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         // Drops on the icon: the window forwards dragging messages to its delegate.
         item.button?.window?.registerForDraggedTypes([.fileURL])
         item.button?.window?.delegate = self
+        // Made by an older version's updater? Bring the app's icon and Finder menu up to date.
+        if !headless { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { AppBundle.refreshIfStale() } }
+        // Finder: "Open With → neatly" (AppDelegate) and "Rename with neatly" (Services) → the review window.
+        // Only the real app offers the service: a test or debug copy must never take it over.
+        if !headless, AppBundle.isRunningInside { NSApp.servicesProvider = FinderHandoff.provider }
+        FinderHandoff.provider.handle = { [weak self] urls in self?.dropped(urls) }
+        FinderHandoff.listen { [weak self] urls in self?.dropped(urls) }
         // "Open neatly" from Spotlight/Applications while it runs → show the window here.
         DistributedNotificationCenter.default().addObserver(forName: HomeWindow.showNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { HomeWindow.shared.show() }
@@ -106,8 +113,22 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
     func tidy(_ paths: [String]) {
         let p = Process()
         p.executableURL = selfExecutable
-        p.arguments = ["tidy"] + paths
-        try? p.run()
+        var flags: [String] = []
+        if offline || !namer.useNetwork { flags.append("--offline") }     // --offline means offline everywhere
+        if !namer.useModel { flags.append("--no-model") }
+        // Thousands of files (⌘A in a photo folder) can't go on a command line (limit 4096 arguments, and a
+        // total size): hand them over in a list file instead.
+        if paths.count > 200 {
+            let list = FileManager.default.temporaryDirectory.appending(path: "neatly-tidy-\(UUID().uuidString).txt")
+            guard (try? paths.joined(separator: "\n").write(to: list, atomically: true, encoding: .utf8)) != nil else { return }
+            p.arguments = ["tidy"] + flags + ["--list", list.path]
+        } else {
+            p.arguments = ["tidy"] + flags + paths
+        }
+        do { try p.run() } catch {
+            print("menu: couldn't open the review window: \(error)")
+            Notice.show("Couldn't open the review window for these files.", icon: "exclamationmark.triangle.fill")
+        }
     }
 
     @objc func openHome() { HomeWindow.shared.show() }
@@ -238,6 +259,16 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
                     else { print("menu: no item \(path)") }
                 }
                 if step.hasPrefix("drop:") { self.dropped(step.dropFirst(5).split(separator: "|").map { URL(fileURLWithPath: String($0)) }) }
+                // Finder hand-offs, by code: "Rename with neatly" (through a real pasteboard) and "Open With".
+                let files = { (s: Substring) in s.split(separator: "|").map { URL(fileURLWithPath: String($0)) } }
+                if step.hasPrefix("service:") {
+                    let pb = NSPasteboard(name: NSPasteboard.Name("dev.neatly.test.\(UUID().uuidString)"))
+                    pb.clearContents(); pb.writeObjects(files(step.dropFirst(8)) as [NSURL])
+                    var err: NSString?
+                    FinderHandoff.provider.renameWithNeatly(pb, userData: nil, error: &err)
+                    pb.releaseGlobally()
+                }
+                if step.hasPrefix("open:") { AppDelegate.shared.application(NSApp, open: files(step.dropFirst(5))) }
             }
         }
     }
@@ -256,5 +287,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         HomeWindow.shared.show()
         return true
+    }
+}
+
+
+/// Files handed to neatly from Finder: "Open With → neatly" and the "Rename with neatly" service.
+/// The running copy opens the review window for them. If neatly wasn't running, macOS starts the app, which
+/// collects the files, makes sure the background copy runs, and passes them on (`forward`).
+@MainActor
+enum FinderHandoff {
+    @MainActor final class Provider: NSObject {
+        var handle: @MainActor ([URL]) -> Void = { _ in }
+        /// The "Rename with neatly" service (NSServices in Info.plist).
+        @objc func renameWithNeatly(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+            let urls = (pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+            print("finder: service with \(urls.count) item(s)")
+            handle(urls)
+        }
+    }
+    static let provider = Provider()
+    static let openNotification = Notification.Name("dev.neatly.open" + (ProcessInfo.processInfo.environment["NEATLY_NOTIFY"] ?? ""))
+    private static var seen = Set<String>()
+
+    /// In the running copy: take files passed on by a just-started app. Each hand-off is sent a few times (the
+    /// background copy may still be starting) with one id, so it opens one window, not three.
+    static func listen(_ handle: @escaping @MainActor @Sendable ([URL]) -> Void) {
+        DistributedNotificationCenter.default().addObserver(forName: openNotification, object: nil, queue: .main) { n in
+            guard let info = n.userInfo, let id = info["id"] as? String, let paths = info["paths"] as? [String] else { return }
+            MainActor.assumeIsolated {
+                guard seen.insert(id).inserted else { return }
+                print("finder: handed \(paths.count) item(s)")
+                handle(paths.map { URL(fileURLWithPath: $0) })
+            }
+        }
+    }
+
+    static func forward(_ paths: [String]) {
+        let id = UUID().uuidString
+        for i in 0..<3 {
+            DistributedNotificationCenter.default().postNotificationName(openNotification, object: nil,
+                                                                         userInfo: ["id": id, "paths": paths], deliverImmediately: true)
+            if i < 2 { usleep(1_200_000) }
+        }
+    }
+
+    /// A just-started app (opened from Finder with files, or for the service): wait a moment for macOS to hand
+    /// over the files, then return them.
+    static func collect(for seconds: Double = 1.5) -> [URL] {
+        final class Catcher: NSObject, NSApplicationDelegate {
+            var urls: [URL] = []
+            func application(_ application: NSApplication, open urls: [URL]) { self.urls += urls }
+            /// A plain launch (Spotlight, Applications, Dock) brings no files: stop waiting right away.
+            func applicationDidFinishLaunching(_ n: Notification) {
+                if (n.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool) == true {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { if self.urls.isEmpty { FinderHandoff.stop() } }
+                }
+            }
+        }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let catcher = Catcher()
+        app.delegate = catcher
+        provider.handle = { catcher.urls += $0 }
+        app.servicesProvider = provider
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { stop() }
+        app.run()
+        return catcher.urls
+    }
+
+    static func stop() {
+        NSApp.stop(nil)
+        // stop() takes effect after the next event: send one.
+        NSApp.postEvent(NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+                                           windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0)!, atStart: false)
     }
 }

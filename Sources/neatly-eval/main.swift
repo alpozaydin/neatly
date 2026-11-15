@@ -44,6 +44,9 @@ try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: tr
 defer { try? FileManager.default.removeItem(at: dir) }
 
 var namer = Namer()
+// The eval measures the canonical names (lowercase, dashes, kind first); the app's default style only changes how
+// they're written, so pin the classic one here to keep scores comparable across versions.
+namer.profile.separator = "-"; namer.profile.lowercase = true
 namer.useNetwork = !offline
 namer.useModel = !args.contains("--no-model")
 namer.verifyRules = args.contains("--verify")

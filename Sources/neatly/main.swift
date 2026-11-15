@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
-let version = "0.6.0"
+let version = "0.6.1"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -176,7 +176,15 @@ func launchctl(_ a: [String]) {
 
 // Opened from Finder, Spotlight or Launchpad (no arguments): make sure it's running, then get out of the way.
 // The service is the one copy that shows the menu-bar icon; opening the app never starts a second one.
+// Bring this copy's neatly.app (Info.plist, icon, Finder menu) up to date — what the app does by itself at start.
+if args.first == "refresh-app" { AppBundle.refreshIfStale(); exit(0) }
+
+// Tests: pass files to the running copy the way a just-started app does.
+if args.first == "forward-open" { FinderHandoff.forward(Array(args.dropFirst())); exit(0) }
+
 if args.isEmpty && AppBundle.isRunningInside {
+    // Opened from Finder with files ("Open With", or the "Rename with neatly" service)? Catch them first.
+    let handed = FinderHandoff.collect()
     // Moved neatly.app (or the login item points at a copy that's gone)? Point the login item here.
     let plistText = (try? String(contentsOf: servicePlist, encoding: .utf8)) ?? ""
     if FileManager.default.fileExists(atPath: servicePlist.path), !plistText.contains("<string>\(selfExecutable.path)</string>") {
@@ -187,7 +195,8 @@ if args.isEmpty && AppBundle.isRunningInside {
     } else {
         try? installService()
     }
-    // Ask the running copy to show its window (it may need a moment to start).
+    // Files from Finder → the running copy opens the review window for them. Otherwise: show its window.
+    if !handed.isEmpty { FinderHandoff.forward(handed.map(\.path)); exit(0) }
     for _ in 0..<2 {
         DistributedNotificationCenter.default().postNotificationName(HomeWindow.showNotification, object: nil,
                                                                      userInfo: nil, deliverImmediately: true)
@@ -352,8 +361,16 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 }
 
 if args.first == "tidy" {
-    let targets = args.count > 1 ? args.dropFirst().map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
-                                 : [screenshotFolder()]
+    var rest = Array(args.dropFirst())
+    // tidy --list <file>: one path per line (from the menu-bar app, for more files than a command line holds).
+    if let i = rest.firstIndex(of: "--list"), i + 1 < rest.count {
+        let file = URL(fileURLWithPath: rest[i + 1])
+        let listed = ((try? String(contentsOf: file, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+        try? FileManager.default.removeItem(at: file)
+        rest.removeSubrange(i...(i + 1)); rest += listed
+    }
+    let targets = !rest.isEmpty ? rest.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+                                : [screenshotFolder()]
     TidyWindow(paths: targets, namer: namer).run()
 }
 

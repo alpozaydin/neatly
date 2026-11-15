@@ -50,6 +50,8 @@ one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
 - **Photos** (downloaded, dropped on the icon, or in a folder you tidy) are named by what they show and, for phone
   photos, where they were taken: `galata-tower-in-istanbul`, `red-tulip-in-bloom`, `woman-portrait`.
+- **From Finder**: select files or folders → right-click → **Quick Actions / Services → Rename with neatly**,
+  or **Open With → neatly**. The review window opens for all of them (folders: the files inside).
 - **History** (menu bar or the window): everything neatly renamed or moved, each with **Revert**. For a download,
   **Always do this** makes a rule: files from that site always go to that folder.
 - **Menu-bar icon**: Tidy Desktop, Tidy a Folder, History, Undo Last Download, name length, date, Title Case,
@@ -69,9 +71,9 @@ neatly --watch ~/Downloads --ask --screenshots --menubar   # the same, in this t
 Every new download gets a popup in the top-right corner with a suggested name and folder:
 
 ```
-New download  8812_4471.pdf
-Name    [cs315-syllabus]
-📁 courses-fall26 › cs315                  Choose Folder…
+New download  scan_20261104_8812.pdf
+Name    [Rent Agreement]
+📁 Documents › Home                       Choose Folder…
 Away? In 5 s it's renamed and stays in Downloads.   [Leave as Is]  [Save]
 ```
 
@@ -101,7 +103,7 @@ folder's name and the names of the files inside it.
 neatly can copy how you already name files. It reads only file **names**, never contents:
 
 ```sh
-neatly learn ~/courses-fall26     # learns e.g. "lowercase, '-'"  → transcript-fall26
+neatly learn ~/Documents         # learns e.g. "lowercase, '-'"  → rent-agreement
 neatly style                       # show the current style
 neatly style --reset               # forget it
 ```
@@ -133,8 +135,9 @@ neatly stats      # how often you saved the suggestion unchanged, and your recen
 
 ## Naming style
 
-lowercase-kebab, most distinctive word first, qualifier last, as short as possible:
-`transcript-fall26`, `unidepth-2024`, `invoice-turkcell-nov26`.
+By default names read like titles: **Turkish Airlines Boarding Pass**, **Netflix Invoice Nov 2026**,
+**Colosseum in Rome**. Prefer compact names? Pick `beach-trip` under **How names look** (or
+`neatly style --sep dash --case lower`): `turkish-airlines-boarding-pass`, `invoice-netflix-nov26`.
 
 ## How it decides (cheapest first, stops as soon as it's sure)
 

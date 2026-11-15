@@ -66,10 +66,10 @@ func transcriptRule() {
 func styleLearning() {
     let work = StyleProfile.learn(names: ["Nimbus AI Model - JKL", "Summit 2026 Side Events - JKL", "Market Map - JKL"])
     expect(work.separator == " " && !work.lowercase && work.suffix == "JKL")
-    expect(work.render("invoice-turkcell-nov26") == "Invoice Turkcell Nov26 - JKL")
+    expect(work.render("invoice-turkcell-nov26") == "Invoice Turkcell Nov 2026 - JKL")
     let school = StyleProfile.learn(names: ["hw1-datalab", "courses-fall26", "CS315-W123", "lec1"])
     expect(school.separator == "-" && school.lowercase && school.suffix == nil)
-    expect(StyleProfile.standard.render("cs213-hw2") == "cs213-hw2")
+    expect(StyleProfile.standard.render("cs213-hw2") == "CS213 HW 2")   // the default: Title Case with spaces
 }
 
 func period() {
@@ -171,6 +171,23 @@ func renameSteps() {
     expect(Rename.clean(String(repeating: "ş", count: 150)).utf8.count <= 200)
 }
 
+func qaFixes() {
+    // A case-only rename is the same file, not a clash: "Report.txt" → "report.txt", no "-2".
+    let dir = FileManager.default.temporaryDirectory.appending(path: "neatly-case-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let f = dir.appending(path: "Report.txt"); try? Data("x".utf8).write(to: f)
+    let done = try? Rename.apply(f, to: "report")
+    expect(done?.lastPathComponent == "report.txt")
+    expect(((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter { !$0.hasPrefix(".") } == ["report.txt"])
+    // A renamed screenshot is still a screenshot (↻ another name keeps the screenshot treatment).
+    let shot = dir.appending(path: "Screenshot 2026-11-15 at 10.00.00.png"); try? Data("x".utf8).write(to: shot)
+    if let renamed = try? Rename.apply(shot, to: "smoky-black-bean-chili") {
+        expect(Evidence(url: renamed).isScreenshot)
+    } else { expect(false) }
+    expect(!Evidence(url: dir.appending(path: "report.txt")).isScreenshot)
+    try? FileManager.default.removeItem(at: dir)
+}
+
 func screenshotNaming() {
     // Phrases: cut whole "with …" parts, never leave a joining word at the end, keep the place whole.
     expect(Namer.phrase(["vintage", "red", "car", "with", "red", "balloons"], maxWords: 4, maxLength: 60, keepEnd: []) == "vintage-red-car")
@@ -205,6 +222,6 @@ func screenshotNaming() {
     expect(e.isScreenshot && !Evidence(url: URL(fileURLWithPath: "/tmp/IMG_1234.JPG")).isScreenshot)
 }
 
-for t in [screenshotNaming, renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+for t in [qaFixes, screenshotNaming, renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

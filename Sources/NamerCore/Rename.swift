@@ -33,14 +33,27 @@ public enum Rename {
         if folder != nil { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
         var target = dir.appending(path: ext.isEmpty ? stem : "\(stem).\(ext)")
         var n = 2
-        while FileManager.default.fileExists(atPath: target.path) {   // never overwrite
+        // Never overwrite — but "Report.txt" → "report.txt" on a case-insensitive disk is the same file, not a clash.
+        func sameFile(_ a: URL, _ b: URL) -> Bool {
+            let ia = try? a.resourceValues(forKeys: [.fileResourceIdentifierKey]).fileResourceIdentifier
+            let ib = try? b.resourceValues(forKeys: [.fileResourceIdentifierKey]).fileResourceIdentifier
+            return ia != nil && ia?.isEqual(ib) == true
+        }
+        while FileManager.default.fileExists(atPath: target.path), !sameFile(target, url) {
             target = dir.appending(path: ext.isEmpty ? "\(stem)-\(n)" : "\(stem)-\(n).\(ext)")
             n += 1
         }
         if target.standardizedFileURL == url.standardizedFileURL { return url }
         var history = steps(url)
         let first = originalName(url) == nil
-        try FileManager.default.moveItem(at: url, to: target)
+        if target.path != url.path, FileManager.default.fileExists(atPath: target.path) {
+            // Only the letter case changes: go through a temporary name, or the move would see "already exists".
+            let temp = dir.appending(path: ".neatly-\(UUID().uuidString)")
+            try FileManager.default.moveItem(at: url, to: temp)
+            try FileManager.default.moveItem(at: temp, to: target)
+        } else {
+            try FileManager.default.moveItem(at: url, to: target)
+        }
         history.append(Step(name: url.lastPathComponent, folder: url.deletingLastPathComponent().path))
         write(target, stepsAttr, (try? JSONEncoder().encode(Array(history.suffix(20)))).map { String(decoding: $0, as: UTF8.self) } ?? "")
         if first {   // the very first name and folder, kept across repeated renames

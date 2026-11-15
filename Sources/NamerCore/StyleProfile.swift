@@ -2,8 +2,8 @@ import Foundation
 
 /// How a person names files, learned from names they already chose. Only names are read, never contents.
 public struct StyleProfile: Codable, Sendable, Equatable {
-    public var separator = "-"       // "-", "_", " "
-    public var lowercase = true      // false → Title Case
+    public var separator = " "       // " " (default: "Turkish Airlines Boarding Pass"), "-", "_"
+    public var lowercase = false     // false → Title Case (default); true → lowercase ("turkish-airlines-boarding-pass")
     public var suffix: String?       // e.g. initials: "JKL" in "Nimbus AI Model - JKL"
     public var learnedFrom = 0       // how many names this is based on
     public var examples: [String] = []
@@ -44,10 +44,15 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public func render(_ kebab: String, date d: Date? = nil, app: String? = nil) -> String {
         var parts = kebab.split(separator: "-").map(String.init)
         if appName == true, let app, !app.isEmpty { parts += ["in"] + Style.words(app) }   // shot-name-in-safari
+        // Names with spaces read like a title, so short forms are spelled out: "nov26" → "Nov 2026",
+        // "fall26" → "Fall 2026", "hw2" → "HW 2", "lecture5" → "Lecture 5". Dashes keep the compact forms.
+        if separator == " " { parts = parts.flatMap { Self.spelledOut($0) } }
         if !lowercase {
-            let small: Set<String> = ["a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "at", "by"]
+            let small: Set<String> = ["a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "at", "by", "from"]
             parts = parts.enumerated().map { i, w in
-                (i > 0 && small.contains(w)) || w.first?.isLetter != true ? w : w.prefix(1).uppercased() + w.dropFirst()
+                if w.wholeMatch(of: /[a-z]{2,5}\d{2,4}/) != nil { return w.uppercased() }        // course codes: CS331
+                if ["hw", "ai", "ml", "cv", "pdf", "ui", "ux", "api", "tv", "uk", "us", "eu", "faq", "id", "pr"].contains(w) { return w.uppercased() }
+                return (i > 0 && small.contains(w)) || w.first?.isLetter != true ? w : w.prefix(1).uppercased() + w.dropFirst()
             }
         }
         var out = parts.joined(separator: separator)
@@ -58,6 +63,18 @@ public struct StyleProfile: Codable, Sendable, Equatable {
             out = date == .prefix ? stamp + separator + out : out + separator + stamp
         }
         return out
+    }
+
+    /// "nov26" → ["nov", "2026"], "fall26" → ["fall", "2026"], "hw2" → ["hw", "2"], "lecture5" → ["lecture", "5"].
+    static func spelledOut(_ w: String) -> [String] {
+        if let m = w.wholeMatch(of: /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|fall|spring|summer|winter)(\d{2})/) {
+            return [String(m.1), "20" + m.2]
+        }
+        if let m = w.wholeMatch(of: /(hw|lab|lecture|ch|week|quiz|midterm|rec|part|unit|session)(\d{1,2})/) {
+            let word = ["ch": "chapter", "rec": "recitation"][String(m.1)] ?? String(m.1)
+            return [word, String(m.2)]
+        }
+        return [w]
     }
 
     // MARK: Learning
