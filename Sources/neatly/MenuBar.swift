@@ -12,7 +12,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
     func start() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.isVisible = !headless
-        item.button?.image = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: "neatly")
+        item.button?.image = Icon.menuBarGlyph()
+        Appearance.apply(namer.profile.appearance)
         item.button?.toolTip = "neatly — drop files or a folder here to name them"
         menu.delegate = self
         menu.autoenablesItems = false   // items are enabled/disabled by hand (Undo greys out when there's nothing)

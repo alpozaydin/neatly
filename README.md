@@ -2,7 +2,7 @@
 
 Suggests short, meaningful names for badly named files — `1234567_2026-11-04_124701.pdf` → `transcript-fall26.pdf`.
 It also suggests **which folder** each download belongs in. Reading and naming happen on your Mac, with Apple's
-on-device model; see [Privacy](#privacy) for the two things that go online.
+on-device model; see [Privacy](#privacy) for the three things that go online.
 
 ## Install
 
@@ -26,12 +26,16 @@ if you used Homebrew). Moved neatly.app to another folder? Open it once from the
 
 ## Privacy
 
-Your files are read and named on your Mac. Two things go online:
+Your files are read and named on your Mac. Three things go online:
 
 - **Update check** (only if you said yes): asks GitHub for the latest release. Nothing about you or your files is sent.
 - **Paper lookup**: for a research paper with an arXiv number (e.g. `2405.12345.pdf`), neatly asks
-  export.arxiv.org for its real title. Only that number is sent. Turn it off in **More options → Look up research
-  papers online**, or run with `--offline`.
+  export.arxiv.org for its real title. Only that number is sent.
+- **Photo places**: a photo from a phone records where it was taken. neatly asks Apple's map service which place
+  that is, so the name can say it (`colosseum-in-rome`). Only the photo's coordinates are sent, never the photo.
+  Screenshots are never looked up.
+
+Turn both lookups off in **More options → Look up papers and photo places online**, or run with `--offline`.
 
 neatly keeps, in `~/Library/Application Support/neatly/`: your settings, the names you chose (to learn your style;
 the last 2,000), and the History of what it renamed (the last 500, for Revert). **More options → Forget my history**
@@ -62,6 +66,8 @@ one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No
 - **Screenshots** are named the moment you take them, in place, by what's on screen: `coldplay-concert-ticket`,
   `turkish-airlines-boarding-pass`, `istanbul-weather-forecast`. A small pill under the menu bar shows the
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
+- **Photos** (downloaded, dropped on the icon, or in a folder you tidy) are named by what they show and, for phone
+  photos, where they were taken: `galata-tower-in-istanbul`, `red-tulip-in-bloom`, `woman-portrait`.
 - **History** (menu bar or the window): everything neatly renamed or moved, each with **Revert**. For a download,
   **Always do this** makes a rule: files from that site always go to that folder.
 - **Menu-bar icon**: Tidy Desktop, Tidy a Folder, History, Undo Last Download, name length, date, Title Case,

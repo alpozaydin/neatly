@@ -117,7 +117,7 @@ final class CountdownDialog: NSObject {
         defer { model.forPicture = false }
         for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
             let r = ImageRenderer(content: DialogView(model: model, save: {}, keep: {}, trash: {}, choose: {}, pause: {})
-                .environment(\.colorScheme, scheme).background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.98)))
+                .environment(\.colorScheme, scheme).background(look.window))
             r.scale = 2
             guard let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { continue }
             try? rep.representation(using: .png, properties: [:])?
@@ -188,13 +188,13 @@ struct DialogView: View {
             HStack(spacing: 12) {
                 Group {
                     if let t = model.thumbnail { Image(nsImage: t).resizable().aspectRatio(contentMode: .fit) }
-                    else { Image(systemName: "doc.fill").font(.system(size: 26)).foregroundStyle(brandGradient) }
+                    else { Image(systemName: "doc").font(.system(size: 24, weight: .light)).foregroundStyle(look.glyph) }
                 }
                 .frame(width: 44, height: 44)
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New download").font(.caption.weight(.semibold)).foregroundStyle(brand)
-                    Text(model.file).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text("New download").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(model.file).font(.callout).foregroundStyle(.primary).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
             }
@@ -203,32 +203,32 @@ struct DialogView: View {
                 Group {
                     if model.forPicture { Text(model.name).frame(maxWidth: .infinity, alignment: .leading) }
                     else { TextField("Type a name", text: $model.name).textFieldStyle(.plain) }
-                }.font(.system(.title3, design: .rounded).weight(.semibold))
-                    .padding(.horizontal, 10).padding(.vertical, 7)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.06)))
+                }.font(.system(size: 17, weight: .semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
                     .onChange(of: model.name) { _, _ in pause() }
                     .accessibilityLabel("New name")
             }
             HStack(spacing: 8) {
-                Image(systemName: "folder.fill").foregroundStyle(brand).accessibilityHidden(true)
+                Image(systemName: "folder").foregroundStyle(look.glyph).accessibilityHidden(true)
                 Text(model.folder.map { shortFolder($0) } ?? "Downloads").lineLimit(1).truncationMode(.head)
                     .accessibilityLabel("Goes to \(model.folder.map { shortFolder($0) } ?? "Downloads")")
                 if model.pinned { Text("your rule").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
-                Button("Choose Folder…", action: choose).buttonStyle(.plain).foregroundStyle(brand).font(.callout.weight(.medium))
+                Button("Choose Folder…", action: choose).buttonStyle(.plain).foregroundStyle(look.link).font(.callout.weight(.medium))
             }
             if let twin = model.duplicate {
                 HStack(spacing: 10) {
-                    Image(systemName: "doc.on.doc.fill").foregroundStyle(.orange).accessibilityHidden(true)
+                    Image(systemName: "doc.on.doc").foregroundStyle(look.warn).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("You already have this file").font(.callout.weight(.semibold))
                         Text("\(shortFolder(twin.deletingLastPathComponent())) › \(twin.lastPathComponent)")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer()
-                    Button("Move to Trash", action: trash).buttonStyle(.plain).foregroundStyle(.orange).font(.callout.weight(.semibold))
+                    Button("Move to Trash", action: trash).buttonStyle(.plain).foregroundStyle(look.warn).font(.callout.weight(.semibold))
                 }
-                .padding(10).background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
+                .padding(10).warnBox()
             }
             HStack(spacing: 10) {
                 Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -237,8 +237,9 @@ struct DialogView: View {
                 Pill(title: "Save", primary: true, action: save).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(.horizontal, 18).padding(.top, 26).padding(.bottom, 16)
+        .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 18)
         .frame(width: 440)
+        .background(look.window)
         .onHover { if $0 { pause() } }
     }
 
@@ -457,7 +458,7 @@ enum Notice {
         guard !headless else { return }
         let panel = NSPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
         let view = HStack(spacing: 8) {
-            Image(systemName: icon).foregroundStyle(brand)
+            Image(systemName: icon).foregroundStyle(look.accent)
             Text(text).font(.callout.weight(.medium))
         }
         .padding(.horizontal, 16).padding(.vertical, 11)

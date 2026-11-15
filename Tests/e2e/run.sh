@@ -434,9 +434,10 @@ fi
 # ─── The neatly window (opened from Spotlight/Applications) ──────────────────
 if want home; then setup home
     "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
-    NEATLY_UI_TEST="home:length=detailed,home:style=title,home:date=on,home:countdown=10,home:screenshots=off,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png,home:snapshot=$T/home.png" \
+    NEATLY_UI_TEST="home:length=detailed,home:style=title,home:date=on,home:countdown=10,home:screenshots=off,home:appearance=light,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png,home:snapshot=$T/home.png" \
         "$B" --watch "$T/dl" --screenshots --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
     s=$(cat "$T/data/style.json")
+    check "appearance (Light) is saved" 'grep -q "\"appearance\" : \"light\"" "$T/data/style.json"'
     check "window choices are saved (length, style, date, countdown)" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"countdown\" : 10" && echo "$s" | grep -q "\"lowercase\" : false"'
     check "dropping files on the window opens Tidy for them" 'grep -q "dropped 1 item" "$T/log"'
     pkill -f "neatly tidy $T" 2>/dev/null

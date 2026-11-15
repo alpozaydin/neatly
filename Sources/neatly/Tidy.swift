@@ -32,6 +32,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
 
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(headless ? .prohibited : .regular)
+        Appearance.apply(namer.profile.appearance)   // Light/Dark from Home, also in this separate window
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 620),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                          backing: .buffered, defer: false)
@@ -82,7 +83,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
         defer { model.forPicture = false }
         for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
             let r = ImageRenderer(content: TidyView(model: model).frame(width: 640, height: 620)
-                .environment(\.colorScheme, scheme).background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.97)))
+                .environment(\.colorScheme, scheme).background(look.window))
             r.scale = 2
             guard let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { continue }
             try? rep.representation(using: .png, properties: [:])?
@@ -246,6 +247,7 @@ struct TidyView: View {
             Divider()
             footer.padding(.horizontal, 24).padding(.vertical, 14)
         }
+        .background(look.window)
     }
 
     var rows: some View {
@@ -256,11 +258,10 @@ struct TidyView: View {
 
     var header: some View {
         HStack(spacing: 14) {
-            Image(systemName: "sparkles").font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 46, height: 46).background(RoundedRectangle(cornerRadius: 12).fill(brandGradient))
+            TitleMark(icon: "sparkles")
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.finished != nil ? "Done!" : "Review \(model.title)")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(size: 20, weight: look.titleWeight, design: look.titleFont))
                 if model.working, !model.items.isEmpty {
                     HStack(spacing: 8) {
                         Bar(fraction: Double(model.done) / Double(max(model.items.count, 1))).frame(width: 140, height: 6)
@@ -280,14 +281,14 @@ struct TidyView: View {
 
     var modelBanner: some View {
         HStack(spacing: 10) {
-            Image(systemName: "apple.intelligence").foregroundStyle(.orange)
+            Image(systemName: "apple.intelligence").foregroundStyle(look.warn)
             Text("Apple Intelligence is off, so names come from the text only and are simpler.").font(.callout)
             Spacer()
             Button("Turn it on") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!)
-            }.buttonStyle(.plain).foregroundStyle(brand).font(.callout.weight(.semibold))
+            }.buttonStyle(.plain).foregroundStyle(look.link).font(.callout.weight(.semibold))
         }
-        .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.12)))
+        .padding(12).warnBox()
     }
 
     var footer: some View {
@@ -341,7 +342,7 @@ struct Row: View {
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(item.checked ? 0.05 : 0.025)))
+        .surface(dim: !item.checked)
     }
 
     /// A circle only where there's a rename to approve; otherwise a status icon that clearly isn't a button.
@@ -366,16 +367,16 @@ struct Row: View {
 
     @ViewBuilder var nameField: some View {
         if model.forPicture || item.renamedTo != nil {
-            Text(item.name.isEmpty ? " " : item.name).font(.system(.body, design: .rounded).weight(.medium))
+            Text(item.name.isEmpty ? " " : item.name).font(.body.weight(.medium))
                 .padding(.horizontal, 8).padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
         } else {
             TextField("Type a name", text: $item.name)
                 .accessibilityLabel("New name for \(item.url.lastPathComponent)")
-                .textFieldStyle(.plain).font(.system(.body, design: .rounded).weight(.medium))
+                .textFieldStyle(.plain).font(.body.weight(.medium))
                 .padding(.horizontal, 8).padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
+                .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
                 .onChange(of: item.name) { _, _ in
                     if let i = model.items.firstIndex(where: { $0.id == item.id }) { model.edited(i) }
                 }
@@ -400,8 +401,8 @@ struct CheckCircle: View {
         Button(action: action) {
             ZStack {
                 Circle().strokeBorder(on ? Color.clear : Color.primary.opacity(0.25), lineWidth: 1.5)
-                    .background(Circle().fill(on ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.clear)))
-                if on { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white) }
+                    .background(Circle().fill(on ? AnyShapeStyle(look.accent) : AnyShapeStyle(Color.clear)))
+                if on { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(look.onAccent) }
             }.frame(width: 22, height: 22).opacity(enabled ? 1 : 0.5)
         }.buttonStyle(.plain).disabled(!enabled)
     }
@@ -413,10 +414,11 @@ struct Pill: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.system(.body, design: .rounded).weight(.semibold))
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .foregroundStyle(primary ? .white : .primary)
-                .background(Capsule().fill(primary ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.primary.opacity(0.08))))
+            Text(title).font(.body.weight(.medium))
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .foregroundStyle(primary ? AnyShapeStyle(look.onFill) : AnyShapeStyle(.primary))
+                .background(RoundedRectangle(cornerRadius: look.control, style: .continuous)
+                    .fill(primary ? AnyShapeStyle(look.fill) : AnyShapeStyle(look.field)))
                 .opacity(enabled ? 1 : 0.45)
         }.buttonStyle(.plain).disabled(!enabled)
     }
@@ -428,7 +430,7 @@ struct Bar: View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.1))
-                Capsule().fill(brandGradient).frame(width: max(6, g.size.width * fraction))
+                Capsule().fill(look.accent).frame(width: max(6, g.size.width * fraction))
             }
         }
     }

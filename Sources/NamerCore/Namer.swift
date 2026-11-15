@@ -185,13 +185,22 @@ public struct Namer: Sendable {
             if let text { e.bodySnippet = text; e.steps.append("ocr") }
             e.headline = headline
             e.labels = await withTimeout(.seconds(3)) { Extract.labels(image: imageFile) } ?? []
+            // A photo from a phone knows where it was taken. Asking Apple's map service sends its coordinates,
+            // so only with online lookups on. A screenshot's location is where you were, not what it shows: skipped.
+            if useNetwork, !e.isScreenshot, preview == nil, let c = Places.coordinate(url),
+               let p = await withTimeout(.seconds(3), { await Places.place(at: c) }) ?? nil {
+                e.place = p.description.isEmpty ? nil : p.description
+                e.placeName = p.best
+                if e.place != nil { e.steps.append("place") }
+            }
             mark("image: labels done")
             if !e.labels.isEmpty { e.steps.append("labels") }
         }
 
         // Known document kinds are decided by rules: fast and predictable.
         // A home listing (a screenshot or a saved page): what, how big, and where — the street tells two apart.
-        if avoid.isEmpty, let n = listingName(e) { return done(n, "rules[listing]") }
+        // Only for pictures of a page (screenshots, saved images): a rental contract PDF mentions bedrooms and rent too.
+        if avoid.isEmpty, isImage, let n = listingName(e) { return done(n, "rules[listing]") }
 
         // Screenshots: the model looking at the screen beats the document rules ("ticket-nov26" for a boarding pass),
         // except for course files, where the rules' course codes are what people want. Rules stay the fallback.
@@ -206,8 +215,11 @@ public struct Namer: Sendable {
 
         // 6. On-device model. For images it looks at the picture itself (when the OS supports it).
         let budget = isImage ? imageBudget : documentBudget
-        if useModel, clock.now - start < budget {
-            let remaining = budget - (clock.now - start)
+        // The model always gets its own few seconds: on a busy Mac reading the text can eat the whole budget (8 s
+        // measured under load), and skipping the model then left screenshots with no name at all.
+        // The caller's overall limit (20 s in the app) still applies.
+        if useModel {
+            let remaining = max(budget - (clock.now - start), isImage ? .seconds(6) : .seconds(2))
             let snapshot = e
             let look = isImage && Model.canSeeImages
             if look { e.steps.append("vision") }
@@ -216,27 +228,47 @@ public struct Namer: Sendable {
             mark("model: examples done")
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
             mark("model: calling")
-            let words = e.isScreenshot && isImage ? profile.len.screenshotWords : profile.len.modelWords
+            // Screenshots and photos get a little more room than documents: "two cats on red chairs in istanbul".
+            let wide = isImage && (e.isScreenshot || (e.bodySnippet?.count ?? 0) < 40)
+            var words = wide ? profile.len.screenshotWords : profile.len.modelWords
+            // Photos: a short phrase for what it shows (≤ 4 words on Short), plus room for the place.
+            if wide, !e.isScreenshot {
+                let extra = Style.words(e.placeName ?? "").count
+                words = words.lowerBound...(min(words.upperBound, 4) + extra)
+            }
             let answer = await withTimeout(remaining, { [words, avoid] in
                 await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil
             mark("model: answered")
             if let w = answer {
-                let (mw, ml) = e.isScreenshot && isImage ? (profile.len.screenshotMaxWords, profile.len.maxLength + 20)
+                let placeWords = Style.words(e.placeName ?? "").count
+                let (mw, ml) = wide ? (e.isScreenshot ? profile.len.screenshotMaxWords : min(profile.len.screenshotMaxWords, 4) + placeWords,
+                                       profile.len.maxLength + 30)
                                                          : (profile.len.maxWords, profile.len.maxLength)
                 // The model picked part of the page's own title ("cornbread" from "Hot Honey Cornbread"):
                 // the whole title is more specific, if it fits.
                 var w = w
-                if avoid.isEmpty, let h = e.headline {
-                    let hw = Style.words(h)
+                // Only a clean title: OCR of an emoji or an icon leaves bits like "lj" ("Your order is on its way! 🛵").
+                if avoid.isEmpty, let h = e.headline,
+                   Style.words(h).allSatisfy({ $0.count >= 3 || $0.allSatisfy(\.isNumber) || ["tv", "uk", "us", "eu", "ai", "pr", "ui", "3d", "4k"].contains($0) }) {
+                    // A title used as the name reads as a title, not a sentence: "booking confirmed", not "your booking is confirmed".
+                    let glue: Set<String> = ["your", "my", "our", "is", "are", "was", "were", "has", "have", "been", "be", "this", "that", "it", "its"]
+                    let hw = Style.words(h).filter { !glue.contains($0) }
                     if !hw.isEmpty, hw.count <= min(mw, 5), w.count == 1, Set(w).isSubset(of: Set(hw)), hw.count > 1 { w = hw }
                     // …or cut it short ("hot honey skillet" from "Hot Honey Skillet Cornbread"): the title's own words, in its order.
                     else if e.isScreenshot, w.count >= 2, hw.count <= min(mw, 5), hw.count > w.count, Array(hw.prefix(w.count)) == w { w = hw }
                     // …or kept only the generic half of a short title ("algorithm notes" for "Dijkstra's Algorithm"):
-                    // put the title's missing words in front.
+                    // the title, in its own order, plus the kind word the model added.
                     else if e.isScreenshot, (2...4).contains(hw.count), Self.readable(h), !Set(w).isDisjoint(with: hw) {
                         let missing = hw.filter { !w.contains($0) && $0.count >= 3 && !Model.kindWords.contains($0) }
-                        if !missing.isEmpty, missing.count + w.count <= mw { w = missing + w }
+                        let extra = w.filter { !hw.contains($0) && Model.kindWords.contains($0) }
+                        if !missing.isEmpty, hw.count + extra.count <= mw { w = hw + extra }
                     }
+                }
+                // A photo with a known place says where: "two cats on red chairs in istanbul".
+                // Already says where (the model used the landmark, district or city): leave it.
+                if let place = e.placeName {
+                    let pw = Style.words(place), known = Set(Style.words(e.place ?? "")).union(pw)
+                    if !pw.isEmpty, known.isDisjoint(with: Set(w)) { w = w + ["in"] + pw }
                 }
                 if let course = courseCode(e) {
                     // "cs 491 meeting" → cs491-meeting, not cs491-cs-491-meeting
@@ -246,6 +278,10 @@ public struct Namer: Sendable {
                         rest.append(x)
                     }
                     return done(Style.join([course] + rest, maxWords: mw, maxLength: ml), "model[\(trail)]")
+                }
+                if wide {
+                    let end = Style.words(e.placeName ?? "")
+                    return done(Self.phrase(w, maxWords: mw, maxLength: ml, keepEnd: w.suffix(end.count).elementsEqual(end) ? end : []), "model[\(trail)]")
                 }
                 return done(Style.join(w + [qualifierFor(e)].compactMap { $0 }, maxWords: mw, maxLength: ml), "model[\(trail)]")
             }
@@ -262,6 +298,26 @@ public struct Namer: Sendable {
             return done(Style.join(Array(Style.words(t).prefix(3)) + [qualifierFor(e)].compactMap { $0 }), "title")
         }
         return .unsure(why: "not enough evidence")
+    }
+
+    /// A short phrase as a name: joining words may repeat ("cats on chairs in istanbul"), a cut never leaves one
+    /// dangling at the end ("…-with-black-tips-on"), and the place at the end is never cut in half.
+    static func phrase(_ w: [String], maxWords: Int, maxLength: Int, keepEnd: [String]) -> String {
+        let joins: Set<String> = ["in", "on", "at", "with", "from", "to", "for", "of", "and", "near", "by"]
+        var words: [String] = []
+        for x in w where words.last != x { words.append(x) }               // no "the-the"
+        let tail = !keepEnd.isEmpty && words.suffix(keepEnd.count).elementsEqual(keepEnd) ? Array(words.suffix(keepEnd.count + 1)) : []
+        var head = Array(words.dropLast(tail.count))
+        func fits(_ a: [String]) -> Bool { a.filter { !joins.contains($0) }.count <= maxWords && a.joined(separator: "-").count <= maxLength }
+        // Too long: drop the last whole "with …" / "on …" part first ("vintage red car with red balloons" →
+        // "vintage red car"), and only then single words.
+        while !head.isEmpty, !fits(head + tail) {
+            if let j = head.lastIndex(where: { joins.contains($0) }), j > 0 { head = Array(head[..<j]) } else { head.removeLast() }
+        }
+        while let l = head.last, joins.contains(l) { head.removeLast() }
+        var out = head.isEmpty ? Array(tail.drop { joins.contains($0) }) : head + tail
+        while let l = out.last, joins.contains(l) { out.removeLast() }
+        return out.joined(separator: "-")
     }
 
     /// Most words are real (English or Turkish/German/… via the language's word list), not OCR noise.

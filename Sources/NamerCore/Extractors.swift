@@ -142,7 +142,8 @@ enum Extract {
         let digitsOnly = try! Regex(#"^[\d\s.:\-]+(at)?[\d\s.:\-]*$"#)
         return lines.filter { l in
             if menuBar, l.box.minY > 0.955 { return false }
-            if menuBar, l.box.minX > 0.88, l.text.count <= 30 { return false }                // icons down the right edge
+            // Icons down the right edge. Not further in: a maximized window's sidebar starts around there.
+            if menuBar, l.box.minX > 0.91, l.text.count <= 30 { return false }
             let t = l.text.trimmingCharacters(in: .whitespaces)
             if t.firstMatch(of: fileName) != nil { return false }                       // desktop icons
             if t.wholeMatch(of: digitsOnly) != nil, l.box.width < 0.08 { return false }  // "10.14.22", the rest of an icon's name

@@ -16,6 +16,8 @@ public struct Evidence: Sendable {
     public var paper: Paper?              // arXiv/DOI lookup result
     public var steps: [String] = []       // which stages contributed, for debugging
     public var imageURL: URL?             // the picture to read and look at: the file itself, or a Quick Look rendering
+    public var place: String?             // where a photo was taken ("Galata Tower, Istanbul, Türkiye"), from its GPS
+    public var placeName: String?         // the short form that can go in a name ("Galata Tower", "Istanbul")
 
     /// A screen capture (macOS, CleanShot, other languages' default names): named by what's on screen, not as a photo.
     public var isScreenshot: Bool {

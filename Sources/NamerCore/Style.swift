@@ -217,6 +217,10 @@ public enum Style {
             guard let d = m.output[1].substring, let n = m.output[2].substring else { continue }
             let dept = d.lowercased()
             let looksLikeCode = d == d.uppercased() || departments.contains(dept)
+            // "is 482" in "your code is 482 913" isn't IS 482: department names that are also everyday words
+            // only count when written in capitals.
+            let everyday: Set<String> = ["is", "me", "am", "ai", "ba", "ds", "ie", "ce", "ee", "info", "inf", "eng", "fin", "acc", "bus", "bio", "ml"]
+            if everyday.contains(dept), d != d.uppercased() { continue }
             if departments.contains(dept) || (academicSource && looksLikeCode && d.count >= 2) {
                 return dept + n
             }

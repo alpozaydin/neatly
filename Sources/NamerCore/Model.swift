@@ -67,6 +67,9 @@ enum Model {
         kind of thing it is: chat, note, list, recipe, receipt, order, listing, booking, ticket, boarding pass, \
         appointment, invoice, error, article, email, invite, map, directions, forecast, call, settings, chart, post, \
         quote, menu, tracking, schedule, budget, pull request.
+        Always keep the most specific name you can see: the band, brand, company, product, place, or the person \
+        being quoted. For an email or message, add who it is from ("interview invite from spotify").
+        It may read as a natural phrase: "from", "to", "with", "for" are fine.
         Ignore the menu bar, the dock, desktop icons, window buttons, prices, ids and dates.
         Never use personal names of people. Never say "screenshot", "screen", "image" or the app's name alone.
         Be descriptive: the subject, the kind of thing, and the detail that makes this one different (what \
@@ -91,6 +94,13 @@ enum Model {
         """
     }
 
+    /// Words that appear only in the examples above. A small model sometimes borrows one ("delta" for a Turkish
+    /// Airlines delay): unless it's really on the screen, it goes.
+    static let screenshotExampleWords: Set<String> = ["landlord", "loud", "music", "complaint", "camping", "trip", "gear",
+        "tent", "stove", "headlamp", "vet", "luna", "checkup", "garden", "blue", "bottle", "a12", "kindle", "paperwhite",
+        "16gb", "family", "disk", "ejected", "delta", "denver", "photo", "upload", "crash", "uploading", "eiffel",
+        "tower", "oslo", "snow", "spotify"]
+
     /// Words that only say what KIND of screen it is. A name made of nothing else fits every screenshot of that kind.
     static let kindWords: Set<String> = ["chat", "message", "messages", "text", "reminder", "conversation", "group", "thread",
         "error", "warning", "alert", "dialog", "notification", "settings", "system", "preferences", "ticket", "tickets",
@@ -101,9 +111,10 @@ enum Model {
         "whatsapp", "slack", "safari", "chrome", "finder", "imessage", "facetime", "github", "merge", "request", "pull",
         "a", "an", "the", "of", "with", "and", "for", "new", "my", "your"]
     static let screenshotExampleNames: Set<String> = ["landlord loud music complaint", "camping trip gear list",
-        "vet checkup appointment", "house listing 3 bed with garden", "blue bottle coffee order", "kindle paperwhite order",
-        "family video call", "disk not ejected warning", "delta denver flight delayed", "photo upload crash fix pull request",
-        "eiffel tower wikipedia article", "oslo snow weather forecast"]
+        "vet checkup appointment", "house listing 3 bed with garden", "house listing 3 bed garden", "blue bottle coffee order",
+        "kindle paperwhite order", "family video call", "disk not ejected warning", "delta denver flight delayed",
+        "photo upload crash fix pull request", "eiffel tower wikipedia article", "oslo snow weather forecast",
+        "interview invite from spotify", "interview invite spotify"]
     static let refineExampleTopics: Set<String> = ["cat sitting", "oslo", "login crash fix", "parcel delivery", "studio apartment", "heathrow airport"]
 
     /// The address bar says which site it is, but as text it drowns out the page ("github.com/orbit-labs/app/pull/482").
@@ -238,6 +249,11 @@ enum Model {
                           ?? (lines.count >= 2 ? lines.last : nil))?.trimmingCharacters(in: .whitespaces)
                 // A small model sometimes hands back one of the examples word for word ("oslo weather forecast" for Istanbul).
                 if let d = direct, screenshotExampleNames.contains(Style.words(d).joined(separator: " ")) { direct = nil }
+                if let d = direct {
+                    let onScreen = Set(Style.tokens(q)), squashed = Style.tokens(q).joined()
+                    direct = Style.tokens(d).filter { !screenshotExampleWords.contains($0) || onScreen.contains($0)
+                                                      || ($0.count >= 4 && squashed.contains($0)) }.joined(separator: " ")
+                }
                 let about = lines.first(where: { $0.lowercased().hasPrefix("what it is:") }).map { String($0.dropFirst(11)) }
                     ?? (lines.count >= 2 ? lines[0] : "")
                 prompt = "Screenshot: \(about)\n" + q   // what the model saw, for the spelling and made-up-word checks below
@@ -249,7 +265,7 @@ enum Model {
                 // …but an "error message" or a "warning text" isn't a chat.
                 let notChat: Set<String> = ["error", "warning", "alert", "dialog", "notification", "code", "verification", "system"]
                 let isChat = direct.map { let w = Style.words($0); return w.contains { chatWords.contains($0) } && !w.contains { notChat.contains($0) } } ?? false
-                if let d = direct, isVague(d) || isChat, let b = e.bodySnippet, b.count > 20 {
+                if let d = direct, isVague(d), let b = e.bodySnippet, b.count > 20 {
                     // Asked to "make it specific" a 3B model rewords the same thing ("whatsapp message thread").
                     // Asked only for the TOPIC, it answers well; the kind word comes from its first answer.
                     let r = LanguageModelSession(instructions: """
@@ -296,14 +312,20 @@ enum Model {
             """)
             var ask = "Describe this image."
             if let b = e.bodySnippet, !b.isEmpty { ask += "\nText read from the image (may be partial): \(String(withoutLetterhead(b).prefix(400)))" }
+            if let p = e.place { ask += "\nThe photo was taken at: \(p). Use it to be specific (the landmark or city), but only say what you can see." }
             if oneCall {
                 // One model call instead of two: the description and the name in the same answer.
                 ask += """
 
                 Answer in exactly two lines:
                 Description: <one specific sentence>
-                Name: <1 to 3 lowercase words: the MAIN SUBJECT first (a child, a painting, a map, a castle, a ship), \
-                then its most specific detail — a title, place, species, style or era; not background, clothing or small objects>
+                Name: <\(words.lowerBound) to \(words.upperBound) lowercase words, a short natural phrase: the MAIN SUBJECT first \
+                (cats, a child, a painting, a castle, a ship), then its most specific detail — what it is doing, a title, \
+                species, style or era; not background, clothing or small objects\(e.placeName != nil ? "; end with \"in <the place>\"" : "")>
+                A person is the main subject when they fill the picture: say who (a woman, a man, a couple, friends, a \
+                selfie), not what they wear.
+                Examples of names: two cats on red chairs, red tulip in bloom, swan latte art, golden gate bridge in fog, \
+                toddler laughing on a slide, smiling woman portrait, couple selfie at the beach
                 """
                 if !avoid.isEmpty { ask += "\nThe owner rejected these names: \(avoid.joined(separator: ", ")). Give a different one." }
             }
@@ -357,6 +379,14 @@ enum Model {
         if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
             FileHandle.standardError.write(Data("--- prompt\n\(prompt)\n--- answer\n\(text)\n---\n".utf8))
         }
+        // Screenshots read as titles: keep the small words that join them ("interview invite from stripe").
+        let titled = lookAtImage && (e.isScreenshot || (e.bodySnippet?.count ?? 0) < 40)   // screenshots and photos
+        let connectors: Set<String> = ["from", "to", "with", "for", "of", "on", "in", "at"]
+        // Sentence words that make a title read like a sentence ("your booking is confirmed").
+        let glue: Set<String> = ["your", "my", "our", "is", "are", "was", "were", "has", "have", "been", "be", "this", "that", "it", "its"]
+        func W(_ s: String) -> [String] {
+            titled ? Style.tokens(s).filter { (!Style.filler.contains($0) || connectors.contains($0) || $0 == "new") && !glue.contains($0) } : Style.words(s)
+        }
         // First line only; models sometimes add an explanation after it.
         let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         var line2 = line
@@ -368,14 +398,14 @@ enum Model {
         // What the model saw: the file's text, plus its own caption for photos ("German Shepherd" → fixes "shepard").
         let source = Set(Style.words(([e.metadataTitle, e.headline, e.bodySnippet, e.linkHint].compactMap { $0 }
                                       + (captioned ? [prompt] : [])).joined(separator: " ")))
-        line2 = Style.words(line2).map { w in
+        line2 = W(line2).map { w in
             guard w.count >= 5, !source.contains(w) else { return w }
             return source.first { $0.first == w.first && abs($0.count - w.count) <= 2 && editDistance($0, w) <= 2 } ?? w
         }.joined(separator: " ")
         // Made-up words ("trickaide"): not in the file and not English → drop them.
         if let vocab = NLEmbedding.wordEmbedding(for: .english) {
             let joined = Style.words([e.metadataTitle, e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: " ")).joined()
-            line2 = Style.words(line2).filter { source.contains($0) || vocab.contains($0) || $0.contains(where: \.isNumber)
+            line2 = W(line2).filter { source.contains($0) || vocab.contains($0) || $0.contains(where: \.isNumber)
                                                 || ($0.count >= 3 && joined.contains($0)) }
                 .joined(separator: " ")
         }
@@ -386,7 +416,7 @@ enum Model {
             // The text with nothing between words: "CafeNero_Guest" holds "nero", "Wi-Fi" holds "wifi".
             let squashed = Style.words([e.metadataTitle, e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: " ")).joined()
             let salad = try! Regex("[bcdfghjklmnpqrstvwxz]{4,}")
-            line2 = Style.words(line2).filter { w in
+            line2 = W(line2).filter { w in
                 let onScreen = source.contains(w) || (w.count >= 3 && squashed.contains(w))
                 // Letter salad from bad OCR is dropped — unless it's really written there ("Coldplay" has "ldpl").
                 return onScreen || (vocab.contains(w) || seen.contains(w)) && w.firstMatch(of: salad) == nil
@@ -396,8 +426,19 @@ enum Model {
         // Dropping the filename's own words stops junk coming back ("img" from IMG_4821) — but when the current name
         // is a real one ("egg-club"), the model agreeing with it is the answer: the file's name is already fine.
         let junkStem = Decision.junkReason(e.stem) != nil
-        let w = Style.words(line2).filter { ($0.count >= 2 || $0.allSatisfy(\.isNumber)) && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
-        return w.isEmpty ? nil : Array(w.prefix(words.upperBound))
+        var w = W(line2).filter { ($0.count >= 2 || $0.allSatisfy(\.isNumber)) && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
+        // No joining word at either end, and never two in a row.
+        while let f = w.first, connectors.contains(f) { w.removeFirst() }
+        w = w.enumerated().filter { i, x in !(connectors.contains(x) && i > 0 && connectors.contains(w[i - 1])) }.map(\.1)
+        let content = w.filter { !connectors.contains($0) }
+        guard !content.isEmpty else { return nil }
+        // The limit counts real words; joining words come along for free.
+        var out: [String] = [], n = 0
+        // Screenshots and photos: a little slack here; the caller cuts whole phrases to fit, not words mid-phrase.
+        let cap = titled ? words.upperBound + 3 : words.upperBound
+        for x in w { if !connectors.contains(x) { if n == cap { break }; n += 1 }; out.append(x) }
+        while let l = out.last, connectors.contains(l) { out.removeLast() }
+        return out
     }
 
     /// Downsampled copy: the model doesn't need 12 megapixels to tell a receipt from a cat.

@@ -60,7 +60,7 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
         defer { model.forPicture = false }
         for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
             let r = ImageRenderer(content: HistoryView(model: model).frame(width: 600, height: 560)
-                .environment(\.colorScheme, scheme).background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.97)))
+                .environment(\.colorScheme, scheme).background(look.window))
             r.scale = 2
             guard let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { continue }
             try? rep.representation(using: .png, properties: [:])?
@@ -128,11 +128,9 @@ struct HistoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 14) {
-                Image(systemName: "clock.arrow.circlepath").font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 46, height: 46).background(RoundedRectangle(cornerRadius: 12).fill(brandGradient))
-                    .accessibilityHidden(true)
+                TitleMark(icon: "clock.arrow.circlepath").accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("History").font(.system(size: 20, weight: .bold, design: .rounded))
+                    Text("History").font(.system(size: 20, weight: look.titleWeight, design: look.titleFont))
                     Text(model.message.isEmpty ? "Everything neatly renamed or moved. Revert puts a file back as it was."
                                                : model.message)
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -142,10 +140,11 @@ struct HistoryView: View {
             .padding(.horizontal, 24).padding(.top, 34).padding(.bottom, 14)
             if model.forPicture { content; Spacer(minLength: 0) } else { ScrollView { content } }
         }
+        .background(look.window)
     }
 
     var content: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             if !model.rules.isEmpty {
                 Card(title: "Your rules") {
                     ForEach(model.rules) { r in
@@ -188,7 +187,7 @@ struct HistoryRow: View {
                       color: entry.kind == .download ? .green : entry.kind == .screenshot ? .purple : .blue)
                 .accessibilityLabel(entry.kind.rawValue)
             VStack(alignment: .leading, spacing: 3) {
-                Text(to.lastPathComponent).font(.system(.body, design: .rounded).weight(.medium))
+                Text(to.lastPathComponent).font(.body.weight(.medium))
                     .lineLimit(1).truncationMode(.middle)
                     .strikethrough(entry.reverted == true)
                 Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -199,7 +198,7 @@ struct HistoryRow: View {
             } else {
                 if entry.kind == .download, entry.host != nil, moved, !model.hasRule(entry) {
                     Button("Always do this") { model.always(entry) }
-                        .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(brand)
+                        .buttonStyle(.plain).font(.callout.weight(.medium)).foregroundStyle(look.link)
                         .help("Files from \(site(entry.host ?? "")) always go to \(shortFolder(to.deletingLastPathComponent()))")
                         .accessibilityLabel("Always put files from \(site(entry.host ?? "")) in \(shortFolder(to.deletingLastPathComponent()))")
                 }
@@ -207,8 +206,8 @@ struct HistoryRow: View {
                     .accessibilityLabel("Revert \(to.lastPathComponent) to \(from.lastPathComponent)")
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(entry.reverted == true ? 0.025 : 0.05)))
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .surface(dim: entry.reverted == true)
     }
 
     var detail: String {

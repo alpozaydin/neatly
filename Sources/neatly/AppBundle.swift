@@ -137,28 +137,8 @@ enum AppBundle {
         run("/usr/bin/iconutil", ["-c", "icns", set.path, "-o", icns.path])
     }
 
-    static func iconPNG(_ px: Int) -> Data? {
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
-                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        let s = CGFloat(px)
-        let inset = s * 0.1   // macOS icons leave a margin around the rounded square
-        let box = NSRect(x: inset, y: inset, width: s - 2 * inset, height: s - 2 * inset)
-        let shape = NSBezierPath(roundedRect: box, xRadius: box.width * 0.225, yRadius: box.width * 0.225)
-        NSGradient(starting: NSColor(red: 0.20, green: 0.78, blue: 0.72, alpha: 1),     // teal → blue
-                   ending: NSColor(red: 0.16, green: 0.42, blue: 0.86, alpha: 1))?.draw(in: shape, angle: -90)
-        let config = NSImage.SymbolConfiguration(pointSize: box.width * 0.5, weight: .semibold)
-            .applying(.init(paletteColors: [.white]))
-        if let symbol = NSImage(systemSymbolName: "sparkles.rectangle.stack", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) {
-            let sz = symbol.size
-            symbol.draw(in: NSRect(x: box.midX - sz.width / 2, y: box.midY - sz.height / 2, width: sz.width, height: sz.height))
-        }
-        NSGraphicsContext.restoreGraphicsState()
-        return rep.representation(using: .png, properties: [:])
-    }
+    /// The app icon (see Icon.swift).
+    static func iconPNG(_ px: Int) -> Data? { Icon.png(px) }
 
     @discardableResult
     static func run(_ tool: String, _ args: [String]) -> Int32 {

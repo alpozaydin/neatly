@@ -171,6 +171,40 @@ func renameSteps() {
     expect(Rename.clean(String(repeating: "ş", count: 150)).utf8.count <= 200)
 }
 
-for t in [renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+func screenshotNaming() {
+    // Phrases: cut whole "with …" parts, never leave a joining word at the end, keep the place whole.
+    expect(Namer.phrase(["vintage", "red", "car", "with", "red", "balloons"], maxWords: 4, maxLength: 60, keepEnd: []) == "vintage-red-car")
+    expect(Namer.phrase(["white", "bird", "with", "black", "tips", "on"], maxWords: 6, maxLength: 60, keepEnd: []) == "white-bird-with-black-tips")
+    expect(Namer.phrase(["golden", "gate", "bridge", "in", "fog", "in", "san", "francisco"], maxWords: 6, maxLength: 70,
+                        keepEnd: ["san", "francisco"]).hasSuffix("in-san-francisco"))
+    expect(Namer.phrase(["cats", "on", "chairs", "in", "istanbul"], maxWords: 5, maxLength: 60, keepEnd: ["istanbul"]) == "cats-on-chairs-in-istanbul")
+    // Only kind words = vague; a subject makes it specific.
+    expect(Model.isVague("chat reminder") && Model.isVague("weather forecast") && Model.isVague("whatsapp message"))
+    expect(!Model.isVague("istanbul weather forecast") && !Model.isVague("coldplay concert ticket"))
+    // "your code is 482 913" is not the course IS 482; "IS 482" in capitals is.
+    expect(Style.courseCode(in: "Your Instagram verification code is 482 913", academicSource: false) == nil)
+    expect(Style.courseCode(in: "IS 482 Information Systems", academicSource: false) == "is482")
+    expect(Style.courseCode(in: "CS 331 midterm", academicSource: false) == "cs331")
+    // Screen text: the menu bar and desktop icon names are dropped, the window's text is kept.
+    let lines: [Extract.Line] = [
+        ("Safari  File  Edit", 0.01, CGRect(x: 0.02, y: 0.975, width: 0.2, height: 0.012)),
+        ("Fri 14 Nov 16:42", 0.01, CGRect(x: 0.85, y: 0.975, width: 0.1, height: 0.012)),
+        ("budget-final-v3.xlsx", 0.01, CGRect(x: 0.93, y: 0.6, width: 0.05, height: 0.01)),
+        ("3 bd · 2 ba · Garden", 0.02, CGRect(x: 0.2, y: 0.5, width: 0.3, height: 0.02)),
+    ]
+    let kept = Extract.screenText(lines, width: 2880, height: 1800).map(\.text)
+    expect(kept == ["3 bd · 2 ba · Garden"])
+    // A photo (no menu-bar strip) keeps its text, even near the edges.
+    expect(Extract.screenText([("STOP", 0.1, CGRect(x: 0.95, y: 0.97, width: 0.04, height: 0.02))], width: 4032, height: 3024).count == 1)
+    // Listings: size + rent on a picture of a page.
+    var e = Evidence(url: URL(fileURLWithPath: "/tmp/Screenshot 2026-11-01 at 10.00.00.png"))
+    e.bodySnippet = "$3,100/mo\n3 bd · 2 ba · 1,450 sqft\n42 Linden Ave, Portland, OR"
+    expect(Namer().listingName(e)?.hasPrefix("apartment-3-bed-linden") == true)
+    e.bodySnippet = "Serves 2. Bake for 20 minutes."
+    expect(Namer().listingName(e) == nil)
+    expect(e.isScreenshot && !Evidence(url: URL(fileURLWithPath: "/tmp/IMG_1234.JPG")).isScreenshot)
+}
+
+for t in [screenshotNaming, renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
