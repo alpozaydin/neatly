@@ -1,5 +1,6 @@
 # GitHub Pages: alpozaydin.github.io/neatly shows the README as a web page (findable on Google).
 title: "neatly — AI file renamer for Mac"
+tagline: "Free, private, on-device"
 description: "Clear names for your downloads, screenshots and photos, automatically. Private, on-device with Apple Intelligence. Free and open source."
 url: "https://alpozaydin.github.io"
 baseurl: "/neatly"
@@ -11,4 +12,10 @@ defaults:
       image: /docs/assets/social.png
 plugins:
   - jekyll-seo-tag
-exclude: [Sources, Tests, scripts, Package.swift, LICENSE, .github]
+  - jekyll-sitemap
+exclude: [Sources, Tests, scripts, workflows, Package.swift, LICENSE, .github, HANDOFF.md, TODO.md]
+author: alpozaydin
+social:
+  name: neatly
+  links:
+    - https://github.com/alpozaydin/neatly

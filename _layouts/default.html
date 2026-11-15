@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#22634A">
+{% seo %}
+<meta name="keywords" content="AI file renamer, Mac, macOS, rename screenshots automatically, rename downloads, rename photos, file organizer, Apple Intelligence, on-device AI, private, open source, free">
+<link rel="icon" type="image/png" href="{{ '/docs/assets/icon.png' | relative_url }}">
+<link rel="apple-touch-icon" href="{{ '/docs/assets/icon.png' | relative_url }}">
+<link rel="alternate" type="text/plain" title="llms.txt" href="{{ '/llms.txt' | relative_url }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "neatly",
+  "alternateName": "neatly AI file renamer",
+  "description": "{{ site.description }}",
+  "applicationCategory": "UtilitiesApplication",
+  "applicationSubCategory": "File renamer",
+  "operatingSystem": "macOS 26 or later (Apple silicon)",
+  "url": "https://alpozaydin.github.io/neatly/",
+  "downloadUrl": "https://github.com/alpozaydin/neatly/releases/latest",
+  "installUrl": "https://github.com/alpozaydin/neatly#install",
+  "codeRepository": "https://github.com/alpozaydin/neatly",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "image": "https://alpozaydin.github.io/neatly/docs/assets/social.png",
+  "screenshot": "https://alpozaydin.github.io/neatly/docs/assets/hero.png",
+  "featureList": [
+    "Names new downloads and suggests a folder",
+    "Names screenshots the moment they are taken",
+    "Names photos by what they show and where they were taken",
+    "Tidy a whole folder at once, reviewing every name",
+    "Rename with neatly from Finder",
+    "History with one-click revert",
+    "Runs on device with Apple Intelligence; files never leave the Mac"
+  ],
+  "author": { "@type": "Person", "name": "Alp Ozaydin", "url": "https://github.com/alpozaydin" }
+}
+</script>
+{% if page.faq %}
+<script type="application/ld+json">
+{ "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+{% for q in page.faq %}  { "@type": "Question", "name": {{ q.q | jsonify }}, "acceptedAnswer": { "@type": "Answer", "text": {{ q.a | strip_html | jsonify }} } }{% unless forloop.last %},{% endunless %}
+{% endfor %}] }
+</script>
+{% endif %}
+<style>
+  :root { color-scheme: light; --green:#22634A; --deep:#17432F; --ink:#1d2421; --muted:#5b6560; --line:#e4e8e5; --tint:#f3f6f4; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#ffffff; color:var(--ink); font:17px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+  nav { display:flex; align-items:center; gap:22px; max-width:900px; margin:0 auto; padding:18px 24px; font-size:15px; }
+  nav .brand { display:flex; align-items:center; gap:10px; font-weight:700; color:var(--deep); text-decoration:none; font-size:18px; margin-right:auto; }
+  nav .brand img { width:30px; height:30px; }
+  nav a { color:var(--muted); text-decoration:none; } nav a:hover { color:var(--green); }
+  nav .gh { background:var(--deep); color:#fff; padding:7px 14px; border-radius:9px; } nav .gh:hover { color:#fff; background:var(--green); }
+  main { max-width:900px; margin:0 auto; padding:8px 24px 60px; }
+  h1, h2, h3 { color:var(--deep); line-height:1.25; } h2 { margin-top:2.2em; padding-bottom:.3em; border-bottom:1px solid var(--line); }
+  a { color:var(--green); }
+  img { max-width:100%; height:auto; }
+  code { background:var(--tint); padding:.12em .4em; border-radius:6px; font-size:.88em; }
+  pre { background:#f6f8f7; border:1px solid var(--line); padding:14px 16px; border-radius:12px; overflow-x:auto; }
+  pre code { background:none; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:1em 0; font-size:.95em; }
+  th, td { border-bottom:1px solid var(--line); padding:9px 10px; text-align:left; vertical-align:top; }
+  details { border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:10px 0; background:#fff; }
+  summary { font-weight:600; cursor:pointer; color:var(--deep); }
+  footer { border-top:1px solid var(--line); color:var(--muted); font-size:14px; text-align:center; padding:26px 24px 40px; }
+  footer a { color:var(--muted); }
+</style>
+</head>
+<body>
+<nav>
+  <a class="brand" href="{{ '/' | relative_url }}"><img src="{{ '/docs/assets/icon.png' | relative_url }}" alt="">neatly</a>
+  <a href="{{ '/' | relative_url }}#install">Install</a>
+  <a href="{{ '/faq/' | relative_url }}">FAQ</a>
+  <a href="https://github.com/alpozaydin/neatly/blob/main/docs/GUIDE.md">Guide</a>
+  <a class="gh" href="https://github.com/alpozaydin/neatly">GitHub</a>
+</nav>
+<main>
+{{ content }}
+</main>
+<footer>
+  neatly — a free, open-source AI file renamer for Mac ·
+  <a href="https://github.com/alpozaydin/neatly">GitHub</a> ·
+  <a href="https://github.com/alpozaydin/neatly/releases/latest">Download</a> ·
+  <a href="{{ '/faq/' | relative_url }}">FAQ</a> ·
+  MIT licensed
+</footer>
+</body>
+</html>

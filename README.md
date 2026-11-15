@@ -89,6 +89,7 @@ update switch next to it. [Privacy details](docs/GUIDE.md#privacy)
 ## More
 
 - 📖 [User guide](docs/GUIDE.md): every feature, setting and command
+- ❓ [FAQ](https://alpozaydin.github.io/neatly/faq/): privacy, requirements, how it compares
 - 🛠️ [Development](docs/DEVELOPMENT.md): build from source, tests, releases
 
 Needs a Mac with Apple silicon and macOS 26+. Turn on Apple Intelligence for the best names.
