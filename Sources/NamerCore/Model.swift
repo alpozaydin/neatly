@@ -427,17 +427,32 @@ enum Model {
         // is a real one ("egg-club"), the model agreeing with it is the answer: the file's name is already fine.
         let junkStem = Decision.junkReason(e.stem) != nil
         var w = W(line2).filter { ($0.count >= 2 || $0.allSatisfy(\.isNumber)) && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
+        // A joining word the file itself has between the same two words comes back: "pride prejudice" → "pride and
+        // prejudice", "lord rings" → "lord of the rings" (titles read wrong without them).
+        let said = " " + Style.tokens([e.metadataTitle, e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: " ")).joined(separator: " ") + " "
+        if w.count >= 2 {
+            var joined: [String] = [w[0]]
+            for (a, b) in zip(w, w.dropFirst()) {
+                if let glue = [["and"], ["of"], ["of", "the"], ["and", "the"]].first(where: { said.contains(" \(a) \($0.joined(separator: " ")) \(b) ") }),
+                   !connectors.contains(a), !connectors.contains(b) {
+                    joined += glue
+                }
+                joined.append(b)
+            }
+            w = joined
+        }
+        let joiners: Set<String> = connectors.union(["and", "the"])
         // No joining word at either end, and never two in a row.
-        while let f = w.first, connectors.contains(f) { w.removeFirst() }
+        while let f = w.first, joiners.contains(f) { w.removeFirst() }
         w = w.enumerated().filter { i, x in !(connectors.contains(x) && i > 0 && connectors.contains(w[i - 1])) }.map(\.1)
-        let content = w.filter { !connectors.contains($0) }
+        let content = w.filter { !joiners.contains($0) }
         guard !content.isEmpty else { return nil }
         // The limit counts real words; joining words come along for free.
         var out: [String] = [], n = 0
         // Screenshots and photos: a little slack here; the caller cuts whole phrases to fit, not words mid-phrase.
         let cap = titled ? words.upperBound + 3 : words.upperBound
-        for x in w { if !connectors.contains(x) { if n == cap { break }; n += 1 }; out.append(x) }
-        while let l = out.last, connectors.contains(l) { out.removeLast() }
+        for x in w { if !joiners.contains(x) { if n == cap { break }; n += 1 }; out.append(x) }
+        while let l = out.last, joiners.contains(l) { out.removeLast() }
         return out
     }
 

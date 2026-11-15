@@ -21,7 +21,7 @@ public struct Evidence: Sendable {
 
     /// A screen capture (macOS, CleanShot, other languages' default names): named by what's on screen, not as a photo.
     public var isScreenshot: Bool {
-        let pattern = #"(?i)^(screenshot|screen shot|cleanshot|bildschirmfoto|ekran resmi|capture d.écran|captura de pantalla|schermafbeelding|istantanea|skärmavbild|snímek|zrzut ekranu)"#
+        let pattern = #"(?i)^(screenshot|screen shot|cleanshot|bildschirmfoto|ekran resmi|capture d.écran|captura de pantalla|schermafbeelding|istantanea|skärmavbild|snímek|zrzut ekranu|screen recording|ekran kaydı|bildschirmaufnahme|enregistrement de l.écran|grabación de pantalla|schermopname|registrazione schermo)"#
         if stem.range(of: pattern, options: .regularExpression) != nil { return true }
         // Already renamed by neatly ("↻ another name"): its first name says what it was.
         return Rename.originalName(url)?.range(of: pattern, options: .regularExpression) != nil

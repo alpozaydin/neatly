@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import SwiftUI
 import QuickLookThumbnailing
@@ -296,7 +297,7 @@ final class Toast: NSObject, NSTextFieldDelegate {
         fx.layer?.masksToBounds = true
 
         let thumb = NSImageView()
-        thumb.image = NSImage(contentsOf: file)
+        thumb.image = NSImage(contentsOf: file) ?? videoFrame(file)   // a screen recording: its first frame
         thumb.imageScaling = .scaleProportionallyUpOrDown
         thumb.widthAnchor.constraint(equalToConstant: 52).isActive = true
         thumb.heightAnchor.constraint(equalToConstant: 36).isActive = true
@@ -478,4 +479,13 @@ enum Notice {
         panel.orderFrontRegardless()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { panel.orderOut(nil) }
     }
+}
+
+/// The first frame of a video (screen recordings in the pill), small.
+func videoFrame(_ url: URL) -> NSImage? {
+    let g = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+    g.appliesPreferredTrackTransform = true
+    g.maximumSize = CGSize(width: 208, height: 144)
+    guard let cg = try? g.copyCGImage(at: CMTime(seconds: 0.5, preferredTimescale: 600), actualTime: nil) else { return nil }
+    return NSImage(cgImage: cg, size: .zero)
 }

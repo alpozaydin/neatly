@@ -51,7 +51,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
             let small: Set<String> = ["a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "at", "by", "from"]
             parts = parts.enumerated().map { i, w in
                 if w.wholeMatch(of: /[a-z]{2,5}\d{2,4}/) != nil { return w.uppercased() }        // course codes: CS331
-                if ["hw", "ai", "ml", "cv", "pdf", "ui", "ux", "api", "tv", "uk", "us", "eu", "faq", "id", "pr"].contains(w) { return w.uppercased() }
+                if ["hw", "ai", "ml", "cv", "pdf", "ui", "ux", "api", "tv", "uk", "us", "eu", "faq", "id", "pr", "irs", "nasa", "nyc", "usa", "vat", "dmv", "gps"].contains(w) { return w.uppercased() }
                 return (i > 0 && small.contains(w)) || w.first?.isLetter != true ? w : w.prefix(1).uppercased() + w.dropFirst()
             }
         }

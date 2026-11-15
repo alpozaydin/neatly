@@ -138,10 +138,13 @@ public struct Namer: Sendable {
             case "docx": Extract.docx(url)
             case "pptx": Extract.pptx(url)
             case "ipynb": Extract.notebook(url)
+            case "epub": Extract.epub(url)
             default: nil
         }
         if let info = office {
             if !Extract.isJunkTitle(info.title, stem: e.stem) { e.metadataTitle = info.title; e.steps.append("meta") }
+            // An e-book's title is its name, whole when short: "Pride and Prejudice".
+            if e.ext == "epub", avoid.isEmpty, let t = e.metadataTitle { return done(Style.paperName(title: t, year: nil), "meta[epub]") }
             e.headline = info.headline
             e.bodySnippet = info.snippet
             if info.hasText { e.steps.append("text") }
@@ -338,6 +341,14 @@ public struct Namer: Sendable {
     func ruleName(_ e: Evidence) -> String? {
         let strong = [e.metadataTitle, e.headline].compactMap { $0 }.joined(separator: " ")
         let weak = String((e.bodySnippet ?? "").prefix(400))
+        // A numbered official form names itself: "Form W-9 (Rev. March 2024)" → irs-form-w-9, "Form I-9" → form-i-9.
+        if let t = e.metadataTitle ?? e.headline,
+           let m = t.firstMatch(of: #/(?i)^\s*form\s+([a-z]{0,4}-?\d{1,5}[a-z]?(?:-[a-z0-9]{1,4})?)\b/#) {
+            let code = String(m.1).lowercased().replacingOccurrences(of: "-", with: "")   // "W-9" → w9 (one word in any style)
+            let irsForms: Set<String> = ["w2", "w4", "w7", "w8ben", "w9", "1040", "1040sr", "1065", "1098", "1099", "1120", "4868", "8832", "941", "ss4"]
+            let irs = irsForms.contains(code) || (e.bodySnippet ?? "").localizedCaseInsensitiveContains("Internal Revenue Service")
+            return Style.join((irs ? ["irs"] : []) + ["form", code])
+        }
         // Look at heading + start of text together; the kind list is ordered specific → generic,
         // so "DEKONT … Öğrenim Ücreti" is tuition, not just a receipt.
         let kind = Style.kind(in: strong + " " + String(weak.prefix(300))) ?? Style.kind(in: weak)

@@ -48,6 +48,8 @@ one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No
 - **Screenshots** are named the moment you take them, in place, by what's on screen: `coldplay-concert-ticket`,
   `turkish-airlines-boarding-pass`, `istanbul-weather-forecast`. A small pill under the menu bar shows the
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
+  **Screen recordings** are named the same way. Tip: macOS saves a screenshot only after its floating thumbnail
+  goes away (about 5 s). For instant names, turn it off: **⌘⇧5 → Options → Show Floating Thumbnail**.
 - **Photos** (downloaded, dropped on the icon, or in a folder you tidy) are named by what they show and, for phone
   photos, where they were taken: `galata-tower-in-istanbul`, `red-tulip-in-bloom`, `woman-portrait`.
 - **From Finder**: select files or folders → right-click → **Quick Actions / Services → Rename with neatly**,
@@ -58,7 +60,7 @@ one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No
   app name, copy screenshots to the clipboard, Pause. **Drop files or a folder on the icon** to name them.
 - **Tidy a folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
   keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
-- Works on PDFs, Word, PowerPoint, notebooks, zips, images and screenshots.
+- Works on PDFs, Word, PowerPoint, notebooks, e-books (EPUB), zips, images, screenshots and screen recordings.
 
 ## Downloads and the popup
 

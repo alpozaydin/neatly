@@ -362,6 +362,13 @@ if want shot-cleanshot; then setup shot-cleanshot; start "none"
     check "CleanShot screenshots are named too" 'ls "$T/shots" | grep -qv "^CleanShot"'
     stop; fi
 
+if want shot-recording; then setup shot-recording; start "none"
+    cp "$(cd "$(dirname "$0")" && pwd)/fixtures/recipe-recording.mov" "$T/stage/r.mov"
+    mv "$T/stage/r.mov" "$T/shots/Screen Recording 2026-11-16 at 02.19.55.mov"
+    waitfor 'ls "$T/shots" | grep -qv "^Screen Recording"' 90
+    check "screen recordings are named too" 'ls "$T/shots" | grep -q -E "\.mov$" && ! ls "$T/shots" | grep -q "^Screen Recording"'
+    stop; fi
+
 if want shot-two; then setup shot-two; start "none"
     "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1; "$E" --make shot-weather "$T/stage" >/dev/null 2>&1
     mv "$T/stage/Screenshot 2026-10-09 at 11.26.48.png" "$T/shots/"; sleep 1

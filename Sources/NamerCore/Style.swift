@@ -174,8 +174,24 @@ public enum Style {
                 return join(head + about + [y].compactMap { $0 }, maxWords: head.count + about.count + 1, maxLength: 64 + 12 * extra)
             }
         }
-        // No short name ("Attention Is All You Need"): the title's own first words.
-        return join(Array(words(title).prefix(3 + extra)) + [y].compactMap { $0 }, maxWords: 4 + extra)
+        // No short name: a short title is the name, whole ("Attention Is All You Need"). A long one is cut where a
+        // phrase ends, before a joining word, never mid-phrase: "High-Resolution Image Synthesis with Latent Diffusion
+        // Models" → high-resolution-image-synthesis.
+        let all = tokens(title)
+        let joining: Set<String> = ["of", "for", "from", "without", "with", "in", "on", "via", "using", "at", "by", "to",
+                                    "and", "the", "a", "an", "into", "through", "towards", "toward", "beyond", "as", "is"]
+        let limit = 6 + extra
+        var kept = all
+        if all.count > limit {
+            // The longest run of whole phrases that fits; at least the first phrase (cut to fit).
+            var end = 0
+            for i in 1..<all.count where i <= limit && joining.contains(all[i]) && !joining.contains(all[i - 1]) { end = i }
+            kept = end >= 2 ? Array(all.prefix(end)) : Array(all.prefix(while: { !joining.contains($0) }).prefix(limit))
+        }
+        while let l = kept.last, joining.contains(l) { kept.removeLast() }
+        while let f = kept.first, ["a", "an", "the"].contains(f) { kept.removeFirst() }
+        if kept.isEmpty { kept = Array(words(title).prefix(3 + extra)) }
+        return join(kept + [y].compactMap { $0 }, maxWords: kept.count + 1, maxLength: 64 + 12 * extra)
     }
 
     /// The core of a noun phrase: "Learning Robust Visual Features without Supervision" → [visual, features].

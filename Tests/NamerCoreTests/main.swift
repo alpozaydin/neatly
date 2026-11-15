@@ -35,7 +35,12 @@ func issuer() {
 
 func papers() {
     expect(Style.paperName(title: "UniDepth: Universal Monocular Metric Depth Estimation", year: 2024) == "unidepth-depth-estimation-2024")
-    expect(Style.paperName(title: "Attention Is All You Need", year: 2017) == "attention-is-all-2017")
+    expect(Style.paperName(title: "Attention Is All You Need", year: 2017) == "attention-is-all-you-need-2017")
+    expect(Style.paperName(title: "High-Resolution Image Synthesis with Latent Diffusion Models", year: 2021) == "high-resolution-image-synthesis-2021")
+    expect(Style.paperName(title: "Segment Anything", year: 2023) == "segment-anything-2023")
+    expect(Style.paperName(title: "Pride and Prejudice", year: nil) == "pride-and-prejudice")
+    expect(Style.paperName(title: "Deep Residual Learning for Image Recognition", year: 2015) == "deep-residual-learning-for-image-recognition-2015")
+    expect(Style.paperName(title: "Language Models are Few-Shot Learners", year: 2020) == "language-models-are-few-shot-learners-2020")
 }
 
 func isJunk(_ s: String) -> Bool { Decision.junkReason(s) != nil }

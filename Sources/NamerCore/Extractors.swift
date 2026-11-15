@@ -245,6 +245,23 @@ extension Extract {
     }
 
     /// Word: title field + first ~1,200 characters. The first paragraph is usually the heading.
+    /// An e-book's own title and author, from its package file (container.xml → the .opf).
+    static func epub(_ url: URL) -> PDFInfo? {
+        guard let container = zipEntry(url, "META-INF/container.xml"),
+              let path = container.firstMatch(of: #/full-path="([^"]+)"/#).map({ String($0.1) }),
+              let opf = zipEntry(url, path) else { return nil }
+        func field(_ tag: String) -> String? {
+            guard let m = opf.firstMatch(of: try! Regex("<dc:\(tag)[^>]*>([^<]+)</dc:\(tag)>")),
+                  let v = m.output[1].substring.map(String.init) else { return nil }
+            let t = v.replacingOccurrences(of: "&amp;", with: "&").trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        guard let title = field("title") else { return nil }
+        let author = field("creator")
+        return PDFInfo(title: title, headline: title, snippet: [title, author.map { "by " + $0 }].compactMap { $0 }.joined(separator: " "),
+                       hasText: true)
+    }
+
     static func docx(_ url: URL) -> PDFInfo? {
         guard let xml = zipEntry(url, "word/document.xml") else { return nil }
         let paragraphs = xml.components(separatedBy: "</w:p>").map { xmlText($0, tag: "w:t").joined() }.filter { !$0.isEmpty }

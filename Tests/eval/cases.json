@@ -444,9 +444,9 @@
     ]
    ],
    "expect": [
+    "attention-is-all-you-need-2017",
     "attention-2017",
-    "transformer-2017",
-    "attention-is-all-2017"
+    "transformer-2017"
    ]
   },
   {

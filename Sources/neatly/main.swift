@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
-let version = "0.6.1"
+let version = "0.6.2"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -409,10 +409,12 @@ func screenshotFolder() -> URL {
     return home.appending(path: "Desktop")
 }
 
-/// "Screenshot 2026-…", "Screen Shot …" and the same in other languages and tools.
+/// "Screenshot 2026-…", "Screen Shot …", "Screen Recording …" and the same in other languages and tools.
 func isScreenshot(_ name: String) -> Bool {
     ["Screenshot ", "Screen Shot ", "CleanShot ", "Ekran Resmi ", "Bildschirmfoto ", "Capture d’écran ", "Captura de pantalla ",
-     "Schermafbeelding ", "Istantanea schermo "].contains { name.hasPrefix($0) }
+     "Schermafbeelding ", "Istantanea schermo ",
+     "Screen Recording ", "Ekran Kaydı ", "Bildschirmaufnahme ", "Enregistrement de l’écran ", "Grabación de pantalla ",
+     "Schermopname ", "Registrazione schermo "].contains { name.hasPrefix($0) }
 }
 
 /// Screenshots are named the moment they're taken, in place: no popup, no folder question. A pill shows the
