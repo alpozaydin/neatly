@@ -48,7 +48,7 @@ It lives in your menu bar and keeps itself up to date.
 | 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |
 
 <p align="center">
-  <img src="docs/assets/demo.gif" width="760" alt="Download a file in Safari; neatly suggests a clear name and folder; Save">
+  <img src="docs/assets/demo.gif" width="760" alt="A download arrives as doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills; Save">
 </p>
 
 ## Real examples
