@@ -59,7 +59,8 @@ Open **neatly** from Spotlight or Applications: a window with a drop zone (drop 
 one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No Terminal needed.
 
 - **Downloads** get a small popup with a suggested name **and folder** (below).
-- **Screenshots** are named the moment you take them, in place. A small pill under the menu bar shows the
+- **Screenshots** are named the moment you take them, in place, by what's on screen: `coldplay-concert-ticket`,
+  `turkish-airlines-boarding-pass`, `istanbul-weather-forecast`. A small pill under the menu bar shows the
   new name: click it to change it, **↻** for another name, **Undo** to put it back. It never takes focus.
 - **History** (menu bar or the window): everything neatly renamed or moved, each with **Revert**. For a download,
   **Always do this** makes a rule: files from that site always go to that folder.
@@ -87,7 +88,7 @@ Away? In 5 s it's renamed and stays in Downloads.   [Leave as Is]  [Save]
 ```
 
 **Save** puts it in that folder with that name. Edit the name to choose your own.
-**Choose Folder…** picks another folder. **Leave as Is** changes nothing and won't ask again.
+**Choose Folder…** saves it in a folder you pick (any folder you can write to, even on another drive). **Leave as Is** changes nothing and won't ask again.
 Installers (.dmg, .pkg) are skipped. The popup never takes the keyboard from the app you're typing in.
 
 **No answer in 5 seconds = the new name is kept, in Downloads**, so downloads made by agents or scripts never wait
@@ -170,6 +171,10 @@ To add a case: copy one block in `cases.json`, change the text and the wanted na
 Tidy window and menu bar, with every button pressed by code. It runs headless (nothing appears on screen)
 in a temp folder with its own fake home and data, so it never touches your files.
 `Tests/e2e/run.sh dl-` runs only the download tests.
+
+`Tests/screens/` scores screenshot names on realistic screens (menu bar, desktop icons, app windows, crops):
+`python3 Tests/screens/make.py held /tmp/held && python3 Tests/screens/score.py /tmp/held` (draws the screens
+with Google Chrome). `tuned` is the set we tuned on; `held` was written afterwards and never tuned on.
 
 `Tests/eval/holdout.json` is a second set that the rules were **never** tuned on
 (`neatly-eval --holdout`). Its score is the honest one. Don't change neatly to fix a held-out case:

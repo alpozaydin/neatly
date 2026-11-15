@@ -17,6 +17,12 @@ public struct Evidence: Sendable {
     public var steps: [String] = []       // which stages contributed, for debugging
     public var imageURL: URL?             // the picture to read and look at: the file itself, or a Quick Look rendering
 
+    /// A screen capture (macOS, CleanShot, other languages' default names): named by what's on screen, not as a photo.
+    public var isScreenshot: Bool {
+        stem.range(of: #"(?i)^(screenshot|screen shot|cleanshot|bildschirmfoto|ekran resmi|capture d.écran|captura de pantalla|schermafbeelding|istantanea|skärmavbild|snímek|zrzut ekranu)"#,
+                   options: .regularExpression) != nil
+    }
+
     public struct Paper: Sendable {
         public var title: String
         public var year: Int?

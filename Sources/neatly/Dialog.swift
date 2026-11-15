@@ -8,7 +8,7 @@ import QuickLookThumbnailing
 /// It never takes the keyboard: whatever you're typing elsewhere stays there until you click the popup.
 /// Hovering or typing stops the countdown.
 ///
-/// Answers with one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user>", "keep", "trash" or "none".
+/// Answers with one line: "save\t<name>\t<folder path, empty = Downloads>\t<auto|user|picked>", "keep", "trash" or "none".
 @MainActor
 final class DialogModel: ObservableObject {
     @Published var name: String
@@ -16,6 +16,7 @@ final class DialogModel: ObservableObject {
     @Published var remaining: Int
     @Published var counting: Bool
     @Published var thumbnail: NSImage?
+    var picked = false       // the folder was chosen in the folder picker: the person's own choice, anywhere they can write
     var forPicture = false   // test pictures: text fields can't be drawn off screen
     let file: String
     let duplicate: URL?      // the same file you already have
@@ -106,7 +107,7 @@ final class CountdownDialog: NSObject {
             if step == "keep" { self.finish("keep") }
             if step == "trash" { self.finish(self.model.duplicate != nil ? "trash" : "keep") }
             if step.hasPrefix("edit:") { self.model.name = String(step.dropFirst(5)); self.pause(); self.saveNow(auto: false) }
-            if step.hasPrefix("place:") { self.model.folder = URL(fileURLWithPath: String(step.dropFirst(6))); self.saveNow(auto: false) }
+            if step.hasPrefix("place:") { self.picked(URL(fileURLWithPath: String(step.dropFirst(6)))) }   // as if picked in the picker
             if step.hasPrefix("snapshot=") { self.snapshot(String(step.dropFirst(9))) }
         }
     }
@@ -145,7 +146,7 @@ final class CountdownDialog: NSObject {
     func saveNow(auto: Bool) {
         let name = model.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { finish("none"); return }
-        finish("save\t\(name)\t\(model.folder?.path ?? "")\t\(auto ? "auto" : "user")")
+        finish("save\t\(name)\t\(model.folder?.path ?? "")\t\(auto ? "auto" : model.picked ? "picked" : "user")")
     }
 
     @objc func closed() { finish("none") }
@@ -159,13 +160,22 @@ final class CountdownDialog: NSObject {
         open.prompt = "Save Here"
         open.message = "Save “\(model.name)” in:"
         open.directoryURL = model.folder ?? FileManager.default.homeDirectoryForCurrentUser
-        open.level = .floating
-        NSApp.activate()   // you clicked "Choose Folder…": now it's fine to come forward
+        open.level = .modalPanel   // above the popup (which floats), never hidden behind it or another app
+        NSApp.activate()           // you clicked "Choose Folder…": now it's fine to come forward
         // Not modal: everything else in neatly (other downloads, screenshots, the menu) keeps running meanwhile.
         open.begin { [weak self] r in
             guard r == .OK, let url = open.url else { return }
-            MainActor.assumeIsolated { self?.model.folder = url }
+            MainActor.assumeIsolated { self?.picked(url) }
         }
+        open.orderFrontRegardless()   // even if macOS doesn't let neatly come forward, the picker is on top
+        open.makeKey()
+    }
+
+    /// "Save Here" in the picker means save there now, like the button says.
+    func picked(_ url: URL) {
+        model.folder = url
+        model.picked = true
+        saveNow(auto: false)
     }
 }
 

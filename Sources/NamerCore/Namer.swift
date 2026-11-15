@@ -190,7 +190,13 @@ public struct Namer: Sendable {
         }
 
         // Known document kinds are decided by rules: fast and predictable.
-        if avoid.isEmpty, let n = ruleName(e) {
+        // A home listing (a screenshot or a saved page): what, how big, and where — the street tells two apart.
+        if avoid.isEmpty, let n = listingName(e) { return done(n, "rules[listing]") }
+
+        // Screenshots: the model looking at the screen beats the document rules ("ticket-nov26" for a boarding pass),
+        // except for course files, where the rules' course codes are what people want. Rules stay the fallback.
+        let screenFirst = isImage && e.isScreenshot && useModel && Model.canSeeImages && courseCode(e) == nil
+        if avoid.isEmpty, !screenFirst, let n = ruleName(e) {
             if verifyRules, useModel, await Model.rejects(name: n, for: e) {
                 e.steps.append("rule-rejected:\(n)")
             } else {
@@ -210,28 +216,49 @@ public struct Namer: Sendable {
             mark("model: examples done")
             if !examples.isEmpty { e.steps.append("\(examples.count) of your names") }
             mark("model: calling")
-            let answer = await withTimeout(remaining, { [words = profile.len.modelWords, avoid] in
+            let words = e.isScreenshot && isImage ? profile.len.screenshotWords : profile.len.modelWords
+            let answer = await withTimeout(remaining, { [words, avoid] in
                 await Model.name(for: snapshot, lookAtImage: look, examples: examples, words: words, avoid: avoid) }) ?? nil
             mark("model: answered")
             if let w = answer {
-                let (mw, ml) = (profile.len.maxWords, profile.len.maxLength)
+                let (mw, ml) = e.isScreenshot && isImage ? (profile.len.screenshotMaxWords, profile.len.maxLength + 20)
+                                                         : (profile.len.maxWords, profile.len.maxLength)
                 // The model picked part of the page's own title ("cornbread" from "Hot Honey Cornbread"):
                 // the whole title is more specific, if it fits.
                 var w = w
                 if avoid.isEmpty, let h = e.headline {
                     let hw = Style.words(h)
                     if !hw.isEmpty, hw.count <= min(mw, 5), w.count == 1, Set(w).isSubset(of: Set(hw)), hw.count > 1 { w = hw }
+                    // …or cut it short ("hot honey skillet" from "Hot Honey Skillet Cornbread"): the title's own words, in its order.
+                    else if e.isScreenshot, w.count >= 2, hw.count <= min(mw, 5), hw.count > w.count, Array(hw.prefix(w.count)) == w { w = hw }
+                    // …or kept only the generic half of a short title ("algorithm notes" for "Dijkstra's Algorithm"):
+                    // put the title's missing words in front.
+                    else if e.isScreenshot, (2...4).contains(hw.count), Self.readable(h), !Set(w).isDisjoint(with: hw) {
+                        let missing = hw.filter { !w.contains($0) && $0.count >= 3 && !Model.kindWords.contains($0) }
+                        if !missing.isEmpty, missing.count + w.count <= mw { w = missing + w }
+                    }
                 }
                 if let course = courseCode(e) {
-                    return done(Style.join([course] + w.filter { $0 != course }, maxWords: mw, maxLength: ml), "model[\(trail)]")
+                    // "cs 491 meeting" → cs491-meeting, not cs491-cs-491-meeting
+                    var rest: [String] = []
+                    for x in w where x != course {
+                        if let last = rest.last, last + x == course { rest.removeLast(); continue }
+                        rest.append(x)
+                    }
+                    return done(Style.join([course] + rest, maxWords: mw, maxLength: ml), "model[\(trail)]")
                 }
                 return done(Style.join(w + [qualifierFor(e)].compactMap { $0 }, maxWords: mw, maxLength: ml), "model[\(trail)]")
             }
         }
 
+        if avoid.isEmpty, screenFirst, let n = ruleName(e) { return done(n, "rules[\(trail)]") }
+
         // Fallback: a clean title is still better than a junk name.
         // Only if it reads like words: OCR of an old scan gives "ennra ficenim poffumuf", worse than the junk name.
-        if let t = e.metadataTitle ?? e.headline, Self.readable(t) {
+        // A picture with a line or two of text ("ME ON MONDAY BEFORE COFFEE") has no "biggest" line: use its first one.
+        let firstLine = isImage ? e.bodySnippet?.split(whereSeparator: \.isNewline).map(String.init)
+            .first { Style.words($0).count >= 2 } : nil
+        if let t = e.metadataTitle ?? e.headline ?? firstLine, Self.readable(t) {
             return done(Style.join(Array(Style.words(t).prefix(3)) + [qualifierFor(e)].compactMap { $0 }), "title")
         }
         return .unsure(why: "not enough evidence")
@@ -323,6 +350,26 @@ public struct Namer: Sendable {
         // Bills and payslips: the month they are FOR, not the day they arrived.
         let date = kind.qualifier == .month ? (Style.period(in: strong + " " + weak) ?? e.date) : e.date
         return Style.join([kind.word, issuer, Style.qualifier(kind.qualifier, date)].compactMap { $0 })
+    }
+
+    /// "2 bd · 1 ba · $3,100/mo · 42 Linden Ave" → apartment-3-bed-linden-st. Needs a size AND a rent or price
+    /// on the same screen, so a recipe that "serves 2" or an article about bedrooms isn't taken for one.
+    func listingName(_ e: Evidence) -> String? {
+        let text = [e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: "\n")
+        guard text.count < 1500,
+              let beds = text.firstMatch(of: /(?i)\b(\d{1,2}|studio)\s*(?:-\s*)?(?:bd|bds|bed|beds|bedrooms?|br)\b/)
+                  ?? text.firstMatch(of: /(?i)\b(studio)\b/),
+              text.range(of: #"(?i)(/\s?mo\b|per month|/month|\bsq\s?ft\b|\bsqft\b|m²|\bfor rent\b|\bfor sale\b|\bba\b|\bbath)"#,
+                         options: .regularExpression) != nil
+        else { return nil }
+        let n = String(beds.1).lowercased()
+        let kind = text.range(of: #"(?i)\b(house|townhouse|villa)\b"#, options: .regularExpression).map { String(text[$0]).lowercased() } ?? "apartment"
+        let size = n == "studio" ? ["studio"] : [n, "bed"]
+        var street: [String] = []
+        if let m = text.firstMatch(of: /\b\d{1,5}\s+((?:[A-Z0-9][a-z0-9]+\s){1,2}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Dr|Drive|Lane|Ln|Way|Pl|Sokak|Sok|Cadde|Caddesi|Cd))\b/) {
+            street = Style.words(String(m.1))
+        }
+        return Style.join([kind] + size + street)
     }
 
     /// The topic of a numbered course item, from the title line that names it: "Lecture 7: Procedures" → [procedures].

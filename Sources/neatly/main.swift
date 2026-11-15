@@ -11,7 +11,7 @@ usage: neatly [options] <file or folder>...
   --why        show the evidence, and why files were skipped
   --watch      wait for new files in the folder and suggest names as they arrive
   --where      also suggest a folder to move each file to
-  --ask        with --watch: show a dialog for each file (Save / Select place… / Leave as is)
+  --ask        with --watch: show a popup for each file (Save / Choose Folder… / Leave as Is)
   --menubar    with --watch: show the menu-bar icon (Tidy, options, Pause; drop files or folders on it)
   --screenshots  with --watch: also name new screenshots where macOS saves them, with an Undo pill
   --timeout N  with --ask: no answer after N seconds = keep the new name in Downloads (default 5, 0 = wait)
@@ -31,7 +31,7 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
-let version = "0.5.1"
+let version = "0.5.2"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -321,7 +321,7 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     return (p.terminationStatus == 0, String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
 }
 
-/// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Select place… = pick a folder.
+/// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Choose Folder… = pick a folder and save there.
 /// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
 @MainActor func askUser(file: String, suggestion: String, folder: URL?, path: URL? = nil, duplicate: URL? = nil,
                         pinned: Bool = false) async -> Answer {
@@ -341,7 +341,10 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
     var chosenFolder: URL? = typed.contains("/") ? URL(fileURLWithPath: (expanded as NSString).deletingLastPathComponent) : shown
     // Compare real paths: /tmp and /private/tmp (or a symlinked home) are the same place.
     let home = Destination.homeRoot.resolvingSymlinksInPath()
-    if let f = chosenFolder?.resolvingSymlinksInPath(), !(f.path + "/").hasPrefix(home.path + "/") { chosenFolder = nil }          // only inside your home
+    // A folder you picked in the folder picker is yours to choose (another drive, iCloud…). Anything else — a typed
+    // path, a suggestion — must be inside your home.
+    let picked = parts.count > 3 && parts[3] == "picked" && !typed.contains("/")
+    if !picked, let f = chosenFolder?.resolvingSymlinksInPath(), !(f.path + "/").hasPrefix(home.path + "/") { chosenFolder = nil }
     if let f = chosenFolder?.resolvingSymlinksInPath(), f == home.appending(path: "Downloads").resolvingSymlinksInPath() {
         chosenFolder = nil                                                                 // picked Downloads = stay
     }
@@ -619,7 +622,14 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                 case .save(let chosen, var folder, let auto):
                     // Nobody looked: keep the new name, but leave it in Downloads — unless your rule says where it goes.
                     if auto && rule == nil { folder = nil }
-                    let done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
+                    var done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))
+                    // Can't put it in that folder (no permission, drive gone, full)? Keep the name, leave it in Downloads, say so.
+                    if done == nil, let f = folder, FileManager.default.fileExists(atPath: url.path) {
+                        done = chosen == original ? url : (try? Rename.apply(url, to: chosen))
+                        print("   couldn't put it in \(Destination.short(f)) (no permission, or the drive is gone) — kept in Downloads")
+                        Notice.show("Couldn't save in \(shortFolder(f)) — kept in Downloads.", icon: "exclamationmark.triangle.fill")
+                        folder = nil
+                    }
                     if let done, done.deletingLastPathComponent() == dir { seen.insert(done.lastPathComponent) }
                     let edited = chosen != nameIdea || folder?.path != target?.path
                     log(chosen, folder, auto)                 // every answer teaches names and folders (auto ones don't)

@@ -103,6 +103,7 @@ enum Extract {
             let better = ocrLines(img, accurate: true)
             if better.count >= lines.count { lines = better }
         }
+        lines = screenText(lines, width: img.width, height: img.height)
         let text = lines.map(\.text).joined(separator: "\n")
         let heights = lines.map(\.height).sorted()
         var headline: String?
@@ -126,14 +127,37 @@ enum Extract {
         }
     }
 
-    private static func ocrLines(_ img: CGImage, accurate: Bool) -> [(text: String, height: CGFloat)] {
+    typealias Line = (text: String, height: CGFloat, box: CGRect)
+
+    /// What's on screen, without the screen around it: on a full-screen capture the menu bar ("Safari File Edit …
+    /// 100% Fri 14 Nov 16:42") and the labels of desktop icons ("budget-final-v3.xlsx") say nothing about the
+    /// picture, but they're read like everything else — and once named an apartment listing "budget-san-francisco".
+    static func screenText(_ lines: [Line], width: Int, height: Int) -> [Line] {
+        let aspect = Double(width) / Double(max(height, 1))
+        // A whole screen (a Mac display's shape) with a strip of short words along the very top = the menu bar.
+        let topStrip = lines.filter { $0.box.minY > 0.955 }
+        let menuBar = (1.3...2.5).contains(aspect) && width >= 1200 && topStrip.count >= 2
+            && topStrip.allSatisfy { $0.text.count <= 40 }
+        let fileName = try! Regex(#"(?i)(\.(png|jpe?g|heic|gif|pdf|x[il1|]sx?|docx?|pptx?|key|numbers|pages|zip|dmg|mov|mp4|txt|csv)$|^(screenshot|screen shot|img_|dsc)\b)"#)
+        let digitsOnly = try! Regex(#"^[\d\s.:\-]+(at)?[\d\s.:\-]*$"#)
+        return lines.filter { l in
+            if menuBar, l.box.minY > 0.955 { return false }
+            if menuBar, l.box.minX > 0.88, l.text.count <= 30 { return false }                // icons down the right edge
+            let t = l.text.trimmingCharacters(in: .whitespaces)
+            if t.firstMatch(of: fileName) != nil { return false }                       // desktop icons
+            if t.wholeMatch(of: digitsOnly) != nil, l.box.width < 0.08 { return false }  // "10.14.22", the rest of an icon's name
+            return true
+        }
+    }
+
+    private static func ocrLines(_ img: CGImage, accurate: Bool) -> [Line] {
         let req = VNRecognizeTextRequest()
         req.recognitionLevel = accurate ? .accurate : .fast
         req.usesLanguageCorrection = accurate
         // Never let one image hold everything up: give up on the accurate pass after 4 s.
         if accurate { DispatchQueue.global().asyncAfter(deadline: .now() + 4) { [req] in req.cancel() } }
         try? VNImageRequestHandler(cgImage: img).perform([req])
-        return (req.results ?? []).compactMap { o in o.topCandidates(1).first.map { ($0.string, o.boundingBox.height) } }
+        return (req.results ?? []).compactMap { o in o.topCandidates(1).first.map { ($0.string, o.boundingBox.height, o.boundingBox) } }
     }
 
     static func ocr(pdfFirstPage url: URL) -> String? {

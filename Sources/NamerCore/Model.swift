@@ -58,6 +58,74 @@ enum Model {
     Answer with 1 to 3 lowercase words separated by spaces and nothing else.
     """
 
+    /// Screenshots get their own instructions: the name says what kind of thing is on screen and what sets it apart.
+    /// The examples are deliberately different from the test screenshots (Tests/screens), so tuning can't just copy them.
+    static func screenshotInstructions(words: ClosedRange<Int>) -> String {
+        """
+        You name screenshots so the owner can find them again later. Look at the screenshot and the text read from it.
+        A good name says the specific subject first (the company, place, person's role, product or topic), then what \
+        kind of thing it is: chat, note, list, recipe, receipt, order, listing, booking, ticket, boarding pass, \
+        appointment, invoice, error, article, email, invite, map, directions, forecast, call, settings, chart, post, \
+        quote, menu, tracking, schedule, budget, pull request.
+        Ignore the menu bar, the dock, desktop icons, window buttons, prices, ids and dates.
+        Never use personal names of people. Never say "screenshot", "screen", "image" or the app's name alone.
+        Be descriptive: the subject, the kind of thing, and the detail that makes this one different (what \
+        happened, the item, the destination, the problem). For a purchase name the item bought, not the shop — \
+        except a cafe or restaurant order. Keep words that say what happened: delayed, cancelled, failed, approved.
+        Examples:
+        - Messages: a landlord saying the music was too loud again -> landlord loud music complaint
+        - Notes: "Camping gear: tent, stove, headlamp" -> camping trip gear list
+        - Calendar event "Vet appointment" for Luna -> vet checkup appointment
+        - Website: "3 bd · 2 ba · garden", $3,100/mo -> house listing 3 bed with garden
+        - Website: order #A12 confirmed at Blue Bottle Coffee -> blue bottle coffee order
+        - Website: "Thanks for your order" — Kindle Paperwhite 16GB -> kindle paperwhite order
+        - A video call with four people, "Family" -> family video call
+        - Dialog: "The disk wasn't ejected properly" -> disk not ejected warning
+        - Mail: "Your Delta flight to Denver is delayed" -> delta denver flight delayed
+        - GitHub: "Fix crash when uploading photos #91" -> photo upload crash fix pull request
+        - Wikipedia article "Eiffel Tower" -> eiffel tower wikipedia article
+        - Weather in Oslo, snow -> oslo snow weather forecast
+        Answer in exactly two lines:
+        What it is: <one short sentence>
+        Name: <\(words.lowerBound) to \(words.upperBound) lowercase English words, like the examples>
+        """
+    }
+
+    /// Words that only say what KIND of screen it is. A name made of nothing else fits every screenshot of that kind.
+    static let kindWords: Set<String> = ["chat", "message", "messages", "text", "reminder", "conversation", "group", "thread",
+        "error", "warning", "alert", "dialog", "notification", "settings", "system", "preferences", "ticket", "tickets",
+        "weather", "forecast", "listing", "rental", "property", "directions", "route", "map", "call", "video", "meeting",
+        "note", "notes", "list", "email", "mail", "inbox", "invite", "invitation", "web", "page", "website", "app",
+        "application", "window", "browser", "screen", "screenshot", "post", "tweet", "article", "order", "receipt",
+        "confirmation", "booking", "reservation", "details", "info", "information", "summary", "overview", "update",
+        "whatsapp", "slack", "safari", "chrome", "finder", "imessage", "facetime", "github", "merge", "request", "pull",
+        "a", "an", "the", "of", "with", "and", "for", "new", "my", "your"]
+    static let screenshotExampleNames: Set<String> = ["landlord loud music complaint", "camping trip gear list",
+        "vet checkup appointment", "house listing 3 bed with garden", "blue bottle coffee order", "kindle paperwhite order",
+        "family video call", "disk not ejected warning", "delta denver flight delayed", "photo upload crash fix pull request",
+        "eiffel tower wikipedia article", "oslo snow weather forecast"]
+    static let refineExampleTopics: Set<String> = ["cat sitting", "oslo", "login crash fix", "parcel delivery", "studio apartment", "heathrow airport"]
+
+    /// The address bar says which site it is, but as text it drowns out the page ("github.com/orbit-labs/app/pull/482").
+    static var urlLine: Regex<AnyRegexOutput> { try! Regex(#"^\s*(https?://)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(/\S*)?\s*$"#).ignoresCase() }
+    static func screenBody(_ text: String) -> String {
+        let url = urlLine
+        let kept = text.split(whereSeparator: \.isNewline).filter { $0.wholeMatch(of: url) == nil }
+        return kept.isEmpty ? text : kept.joined(separator: "\n")
+    }
+    static func siteOnScreen(_ text: String) -> String? {
+        let url = urlLine
+        guard let line = text.split(whereSeparator: \.isNewline).first(where: { $0.wholeMatch(of: url) != nil }) else { return nil }
+        var host = line.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
+        host = String(host.split(separator: "/").first ?? "")
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    static func isVague(_ name: String) -> Bool {
+        let w = Style.words(name)
+        return w.isEmpty || w.allSatisfy { kindWords.contains($0) }
+    }
+
     /// Words the model must never hand back: they describe the container, not the content.
     static let banned: Set<String> = ["img", "image", "images", "photo", "picture", "pic", "heic", "jpg", "jpeg",
                                        "png", "svg", "pdf", "gif", "webp", "file", "document", "tbn", "download",
@@ -145,7 +213,82 @@ enum Model {
         var captioned = false
         var direct: String?        // one-call mode: the name came with the description
         let oneCall = true   // measured: photos 2.6 → 2.2 s, same names on both test sets
-        if lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.imageURL ?? e.url) {
+        // Screenshots: what KIND of thing is on screen (a chat, a listing, a boarding pass) plus what sets it apart.
+        // A document-style name from the text alone gave "lunch-sunday" for a family chat planning Sunday lunch.
+        if lookAtImage, e.isScreenshot, #available(macOS 27.0, *), let img = thumbnail(e.imageURL ?? e.url) {
+            let s = LanguageModelSession(instructions: screenshotInstructions(words: words))
+            var ask = ""
+            if let h = e.headline { ask += "Biggest text: \(h)\n" }
+            if let site = siteOnScreen(e.bodySnippet ?? "") { ask += "Website: \(site)\n" }
+            if let b = e.bodySnippet, !b.isEmpty { ask += "Text on screen (may be partial):\n\(String(screenBody(b).prefix(700)))\n" }
+            if !avoid.isEmpty { ask += "The owner rejected these names: \(avoid.joined(separator: ", ")). Give a different one.\n" }
+            ask += "The screenshot is attached."
+            let q = ask
+            if let out = try? await s.respond(options: GenerationOptions(temperature: avoid.isEmpty ? 0 : 0.7, maximumResponseTokens: 100),
+                                              prompt: { q; Attachment(img) }).content {
+                var lines = out.split(whereSeparator: \.isNewline).map(String.init)
+                // It may copy the examples' shape instead: "A reminder about the shared sink -> sink reminder".
+                if !lines.contains(where: { $0.lowercased().hasPrefix("name:") }),
+                   let arrow = lines.last(where: { $0.contains("->") }), let r = arrow.range(of: "->", options: .backwards) {
+                    lines = ["What it is: " + arrow[..<r.lowerBound].replacingOccurrences(of: "What it is:", with: ""),
+                             "Name: " + arrow[r.upperBound...]]
+                }
+                // Small models drop the "Name:" label now and then: the last line is the name then.
+                direct = (lines.first(where: { $0.lowercased().hasPrefix("name:") }).map { String($0.dropFirst(5)) }
+                          ?? (lines.count >= 2 ? lines.last : nil))?.trimmingCharacters(in: .whitespaces)
+                // A small model sometimes hands back one of the examples word for word ("oslo weather forecast" for Istanbul).
+                if let d = direct, screenshotExampleNames.contains(Style.words(d).joined(separator: " ")) { direct = nil }
+                let about = lines.first(where: { $0.lowercased().hasPrefix("what it is:") }).map { String($0.dropFirst(11)) }
+                    ?? (lines.count >= 2 ? lines[0] : "")
+                prompt = "Screenshot: \(about)\n" + q   // what the model saw, for the spelling and made-up-word checks below
+                captioned = true
+                // Only kind words ("chat reminder", "weather forecast", "system settings")? Every screenshot of that
+                // kind would get the same name. Ask once more, from the text, for what sets this one apart.
+                // Chats are named by what they're about, not who's in them ("landlord messages" → the heating repair).
+                let chatWords: Set<String> = ["chat", "message", "messages", "conversation", "thread", "text", "texts", "dm"]
+                // …but an "error message" or a "warning text" isn't a chat.
+                let notChat: Set<String> = ["error", "warning", "alert", "dialog", "notification", "code", "verification", "system"]
+                let isChat = direct.map { let w = Style.words($0); return w.contains { chatWords.contains($0) } && !w.contains { notChat.contains($0) } } ?? false
+                if let d = direct, isVague(d) || isChat, let b = e.bodySnippet, b.count > 20 {
+                    // Asked to "make it specific" a 3B model rewords the same thing ("whatsapp message thread").
+                    // Asked only for the TOPIC, it answers well; the kind word comes from its first answer.
+                    let r = LanguageModelSession(instructions: """
+                    You read the text of a screenshot and say what it is ABOUT: the topic, event, item, place or \
+                    problem, in 1 to 3 lowercase English words. Never the app, never the kind of message, never a \
+                    person's name, never a date, never a heading like "directions", "settings" or "inbox": look past it \
+                    to what the screen is about (the destination, the change being made, the subject of the email).
+                    Examples:
+                    - "can you feed the cat while we're in Rome" -> cat sitting
+                    - "Oslo -3° Snow H:-1 L:-6" -> oslo
+                    - "Fix login crash on iOS 18 #213 · Open" -> login crash fix
+                    - "Your parcel is out for delivery, tracking 1Z..." -> parcel delivery
+                    - "From: Home  To: Heathrow Airport · 42 min" -> heathrow airport
+                    - "studio · 1 ba · $1,800/mo" -> studio apartment
+                    """)
+                    let t = (e.headline.map { "Biggest text: \($0)\n" } ?? "") + "Text on screen:\n\(String(screenBody(b).prefix(600)))\nTopic:"
+                    let topic = (try? await r.respond(to: t, options: GenerationOptions(temperature: 0)).content)?
+                        .split(whereSeparator: \.isNewline).first.map { String($0).replacingOccurrences(of: "topic:", with: "", options: .caseInsensitive) }
+                    let apps: Set<String> = ["whatsapp", "slack", "safari", "chrome", "finder", "imessage", "facetime", "github",
+                                             "messages", "mail", "app", "application", "browser", "web", "page", "website", "screen", "screenshot", "system"]
+                    let kind = Style.words(d).filter { !apps.contains($0) && !["a", "an", "the", "of", "with", "and", "for", "new", "my", "your"].contains($0) }
+                    if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
+                        FileHandle.standardError.write(Data("--- vague \(d), topic \(topic ?? "nil")\n".utf8))
+                    }
+                    if let topic, !isVague(topic), !refineExampleTopics.contains(Style.words(topic).joined(separator: " ")) {
+                        let tw = Style.words(topic).filter { !apps.contains($0) }
+                        let k = isChat ? ["chat"] : Array(kind.filter { !tw.contains($0) }.suffix(1))
+                        direct = (tw + k.filter { !tw.contains($0) }).joined(separator: " ")
+                    }
+                }
+                if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
+                    FileHandle.standardError.write(Data("--- screenshot\n\(q)\n--- answer\n\(out)\n".utf8))
+                }
+            }
+        }
+        // A vague name for a screen with almost nothing readable on it ("message" for a crop of "dfsadf"): the
+        // screenshot's own name is more honest. Leave it.
+        if e.isScreenshot, let d = direct, isVague(d), (e.bodySnippet ?? "").filter(\.isLetter).count < 25 { return nil }
+        if direct == nil, lookAtImage, (e.bodySnippet?.count ?? 0) < 40, #available(macOS 27.0, *), let img = thumbnail(e.imageURL ?? e.url) {
             let c = LanguageModelSession(instructions: """
             You describe an image so it can be given a filename. Write one specific sentence: what the main subject is \
             (as specific as you can: the landmark, building, species, artwork style and era, vehicle, product, or kind of \
@@ -231,23 +374,29 @@ enum Model {
         }.joined(separator: " ")
         // Made-up words ("trickaide"): not in the file and not English → drop them.
         if let vocab = NLEmbedding.wordEmbedding(for: .english) {
-            line2 = Style.words(line2).filter { source.contains($0) || vocab.contains($0) || $0.contains(where: \.isNumber) }
+            let joined = Style.words([e.metadataTitle, e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: " ")).joined()
+            line2 = Style.words(line2).filter { source.contains($0) || vocab.contains($0) || $0.contains(where: \.isNumber)
+                                                || ($0.count >= 3 && joined.contains($0)) }
                 .joined(separator: " ")
         }
         // Images: every word must come from what the model saw (its caption or the text it read) or be a real word,
         // and letter salad from bad OCR ("cotrffjsol") never makes it into a name.
         if captioned, let vocab = NLEmbedding.wordEmbedding(for: .english) {
             let seen = Set(Style.words(prompt))
+            // The text with nothing between words: "CafeNero_Guest" holds "nero", "Wi-Fi" holds "wifi".
+            let squashed = Style.words([e.metadataTitle, e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: " ")).joined()
             let salad = try! Regex("[bcdfghjklmnpqrstvwxz]{4,}")
             line2 = Style.words(line2).filter { w in
-                (vocab.contains(w) || seen.contains(w)) && w.firstMatch(of: salad) == nil
+                let onScreen = source.contains(w) || (w.count >= 3 && squashed.contains(w))
+                // Letter salad from bad OCR is dropped — unless it's really written there ("Coldplay" has "ldpl").
+                return onScreen || (vocab.contains(w) || seen.contains(w)) && w.firstMatch(of: salad) == nil
             }.joined(separator: " ")
         }
         let stemWords = Set(Style.words(e.stem))
         // Dropping the filename's own words stops junk coming back ("img" from IMG_4821) — but when the current name
         // is a real one ("egg-club"), the model agreeing with it is the answer: the file's name is already fine.
         let junkStem = Decision.junkReason(e.stem) != nil
-        let w = Style.words(line2).filter { $0.count >= 2 && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
+        let w = Style.words(line2).filter { ($0.count >= 2 || $0.allSatisfy(\.isNumber)) && !banned.contains($0) && !(junkStem && stemWords.contains($0)) && $0 != e.ext }
         return w.isEmpty ? nil : Array(w.prefix(words.upperBound))
     }
 

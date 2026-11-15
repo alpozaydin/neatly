@@ -23,6 +23,9 @@ public struct StyleProfile: Codable, Sendable, Equatable {
         case short, standard, detailed
         /// Words the model may use, and the limits for the whole name.
         public var modelWords: ClosedRange<Int> { switch self { case .short: 1...3; case .standard: 2...5; case .detailed: 4...8 } }
+        /// Screenshots get a little more room: "lunch plan" says less than "sunday family lunch chat".
+        public var screenshotWords: ClosedRange<Int> { switch self { case .short: 2...5; case .standard: 3...6; case .detailed: 4...8 } }
+        public var screenshotMaxWords: Int { switch self { case .short: 6; case .standard: 7; case .detailed: 10 } }
         public var maxWords: Int { switch self { case .short: 4; case .standard: 6; case .detailed: 10 } }
         public var maxLength: Int { switch self { case .short: 40; case .standard: 60; case .detailed: 90 } }
         /// What people see (menu and window say the same thing).

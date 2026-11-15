@@ -76,10 +76,93 @@ if want dl-place; then setup dl-place; start "dialog:place:$T/home/finance"
     check "Select place puts it in the chosen folder" 'ls "$T"/home/finance/invoice-turkcell*.pdf >/dev/null 2>&1'
     stop; fi
 
-if want dl-outside-home; then setup dl-outside-home; start "dialog:place:/private/tmp"
+if want dl-outside-home; then setup dl-outside-home; start "dialog:edit:/private/tmp/typed-outside"
     arrive "$(make turkcell-invoice)"
     waitfor 'grep -q "saved as" "$T/log"' 90
-    check "a folder outside your home is refused (stays in Downloads)" 'ls "$T"/dl/invoice-turkcell*.pdf >/dev/null 2>&1'
+    check "a typed path outside your home is refused (stays in Downloads)" '[ -f "$T/dl/typed-outside.pdf" ] && [ ! -e /private/tmp/typed-outside.pdf ]'
+    stop; fi
+
+# Choose Folder…: "Save Here" in the picker saves right away (the hook goes through the same code as the picker).
+if want dl-place-saves; then setup dl-place-saves; start "dialog:place:$T/home/finance" 600
+    arrive "$(make turkcell-invoice)"
+    waitfor 'ls "$T"/home/finance/*.pdf >/dev/null 2>&1' 90
+    check "picking a folder saves at once, no extra Save click, no countdown" 'ls "$T"/home/finance/invoice-turkcell*.pdf >/dev/null 2>&1'
+    check "…logged as your choice (not auto)" '[ "$(corr auto)" = "None" ] && [ "$(corr chosenFolder)" = "$T/home/finance" ]'
+    check "…in History with the new folder" 'grep -q "finance.\{1,2\}invoice-turkcell" "$T/data/history.jsonl"'
+    check "…marked as yours (never asked again)" 'xattr "$T"/home/finance/invoice-turkcell*.pdf | grep -q dev.neatly.keep'
+    "$B" undo "$T"/home/finance/invoice-turkcell*.pdf >/dev/null
+    check "…undo puts it back in Downloads with its old name" '[ -f "$T/dl/$(ls "$T/dl" | head -1)" ] && [ -z "$(ls "$T/home/finance")" ]'
+    stop; fi
+
+if want dl-place-new; then setup dl-place-new; start "dialog:place:$T/home/new place/2026"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "a new folder (made in the picker) is created and used" 'ls "$T/home/new place/2026/"invoice-turkcell*.pdf >/dev/null 2>&1'
+    stop; fi
+
+if want dl-place-unicode; then setup dl-place-unicode; mkdir -p "$T/home/Ders Notları — Güz"; start "dialog:place:$T/home/Ders Notları — Güz"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "folder with spaces, Turkish letters and a dash" 'ls "$T/home/Ders Notları — Güz/"invoice-turkcell*.pdf >/dev/null 2>&1'
+    stop; fi
+
+if want dl-place-downloads; then setup dl-place-downloads; start "dialog:place:$T/dl"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "picking Downloads: renamed, stays in Downloads" 'ls "$T"/dl/invoice-turkcell*.pdf >/dev/null 2>&1 && [ "$(ls "$T/dl" | wc -l | tr -d " ")" = 1 ]'
+    stop; fi
+
+if want dl-place-anywhere; then setup dl-place-anywhere; mkdir -p "$W/elsewhere-$CUR"; start "dialog:place:$W/elsewhere-$CUR"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "a picked folder outside your home (another drive, say) is used" 'ls "$W/elsewhere-$CUR/"invoice-turkcell*.pdf >/dev/null 2>&1'
+    stop; fi
+
+if want dl-place-symlink; then setup dl-place-symlink; ln -s "$T/home/finance" "$T/home/fin-link"; start "dialog:place:$T/home/fin-link"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "a folder reached through a link works" 'ls "$T"/home/finance/invoice-turkcell*.pdf >/dev/null 2>&1'
+    stop; fi
+
+if want dl-place-taken; then setup dl-place-taken; start "dialog:place:$T/home/finance"
+    f=$(make turkcell-invoice)
+    arrive "$f"; waitfor 'grep -q "saved as" "$T/log"' 90
+    first=$(ls "$T/home/finance")
+    check "first file saved" '[ -n "$first" ]'
+    cp "$T/home/finance/$first" "$T/stage/keep.pdf"
+    stop; start "dialog:edit:$T/home/finance/${first%.pdf}"
+    arrive "$(make cs-syllabus)"
+    waitfor '[ "$(ls "$T/home/finance" | wc -l | tr -d " ")" = 2 ]' 90
+    check "same name already there: nothing overwritten, the new one gets -2" 'cmp -s "$T/home/finance/$first" "$T/stage/keep.pdf" && ls "$T/home/finance" | grep -q -- "-2.pdf"'
+    stop; fi
+
+if want dl-place-readonly; then setup dl-place-readonly; mkdir -p "$T/home/locked"; chmod 555 "$T/home/locked"; start "dialog:place:$T/home/locked"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "a folder you can't write to: renamed, kept in Downloads" 'ls "$T"/dl/invoice-turkcell*.pdf >/dev/null 2>&1 && [ -z "$(ls "$T/home/locked")" ]'
+    check "…and says so instead of failing quietly" 'grep -q "notice: Couldn.t save in" "$T/log"'
+    chmod 755 "$T/home/locked"
+    stop; fi
+
+if want dl-place-gone; then setup dl-place-gone; start "dialog:place:/Volumes/neatly-unplugged-drive-$$"
+    arrive "$(make turkcell-invoice)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "a drive that was unplugged: kept in Downloads, says so" 'ls "$T"/dl/invoice-turkcell*.pdf >/dev/null 2>&1 && grep -q "notice: Couldn.t save in" "$T/log"'
+    stop; fi
+
+if want dl-place-rule; then setup dl-place-rule
+    NEATLY_DATA_DIR=$T/data "$B" style --length short >/dev/null
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['rules']={'learn.northfield.edu':'$T/home/finance'};json.dump(d,open(p,'w'))"
+    mkdir -p "$T/home/other"; start "dialog:place:$T/home/other"
+    arrive "$(make cs-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "picking another folder beats your rule for this file" 'ls "$T"/home/other/*.pdf >/dev/null 2>&1 && [ -z "$(ls "$T/home/finance")" ]'
+    stop; fi
+
+if want dl-place-many; then setup dl-place-many; start "dialog:place:$T/home/finance"
+    arrive "$(make turkcell-invoice)"; sleep 1; arrive "$(make cs-syllabus)"
+    waitfor '[ "$(ls "$T/home/finance" | wc -l | tr -d " ")" = 2 ]' 120
+    check "two downloads in a row, each picked: both land there" '[ "$(ls "$T/home/finance" | wc -l | tr -d " ")" = 2 ] && [ -z "$(ls "$T/dl")" ]'
     stop; fi
 
 if want dl-countdown; then setup dl-countdown; start "dialog:wait" 3
