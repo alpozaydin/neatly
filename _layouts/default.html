@@ -68,6 +68,13 @@
   th, td { border-bottom:1px solid var(--line); padding:9px 10px; text-align:left; vertical-align:top; }
   details { border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:10px 0; background:#fff; }
   summary { font-weight:600; cursor:pointer; color:var(--deep); }
+  main, main * { overflow-wrap:anywhere; min-width:0; }
+  pre, pre code { overflow-wrap:normal; }
+  @media (max-width: 720px) {
+    nav { flex-wrap:wrap; gap:14px; padding:14px 18px; }
+    nav .brand { width:100%; }
+    main { padding:8px 18px 50px; }
+  }
   footer { border-top:1px solid var(--line); color:var(--muted); font-size:14px; text-align:center; padding:26px 24px 40px; }
   footer a { color:var(--muted); }
 </style>
