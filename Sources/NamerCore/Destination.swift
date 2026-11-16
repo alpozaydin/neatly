@@ -12,7 +12,7 @@ public enum Destination {
     /// Your home folder — or NEATLY_HOME in tests, so they never suggest (or move files into) your real folders.
     public static var homeRoot: URL {
         if let h = ProcessInfo.processInfo.environment["NEATLY_HOME"] { return URL(fileURLWithPath: h) }
-        return FileManager.default.homeDirectoryForCurrentUser
+        return Home.real
     }
 
     public static func index(home: URL = homeRoot) -> [Folder] {

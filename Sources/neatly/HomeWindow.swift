@@ -217,6 +217,17 @@ final class HomeModel: ObservableObject {
         }
         print("home: uninstall")
         if ProcessInfo.processInfo.environment["NEATLY_APP_DIR"] != nil || headless { return }   // tests: never really
+        if Home.sandboxed {
+            // App Store version: stop opening at login and quit; the app itself goes to the Trash like any other.
+            LoginItem.set(false)
+            let a = NSAlert()
+            a.messageText = "neatly has stopped"
+            a.informativeText = "To finish, drag neatly from your Applications folder to the Trash."
+            a.runModal()
+            NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+            NSApp.terminate(nil)
+            return
+        }
         uninstallEverything()
         NSApp.terminate(nil)
     }
@@ -253,7 +264,7 @@ struct HomeView: View {
                 }
                 .padding(14).surface()
             }
-            if model.welcomed && model.autoUpdate == nil {
+            if model.welcomed && model.autoUpdate == nil && !Home.sandboxed {   // the App Store updates that version
                 // Asked once, at first install: after that neatly keeps itself current with nothing to do.
                 HStack(spacing: 12) {
                     IconBadge(icon: "arrow.triangle.2.circlepath", color: .teal)
@@ -299,7 +310,7 @@ struct HomeView: View {
                     MenuBar.shared.tidyDesktop()
                 }
                 Tile(icon: "arrow.down.circle.fill", color: .green, title: "Tidy Downloads", subtitle: "Name your downloads") {
-                    MenuBar.shared.tidy([FileManager.default.homeDirectoryForCurrentUser.appending(path: "Downloads").path])
+                    MenuBar.shared.tidy([Home.real.appending(path: "Downloads").path])
                 }
                 Tile(icon: "folder.fill", color: .orange, title: "Pick a Folder", subtitle: "Any folder you like") {
                     MenuBar.shared.tidyFolder()
@@ -352,9 +363,15 @@ struct HomeView: View {
                         SwitchRow(icon: "doc.on.clipboard", color: .teal, title: "Copy new screenshots",
                                   subtitle: "So you can paste them right away", isOn: $model.copyShots)
                         Divider().padding(.leading, 44)
-                        SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
-                                  subtitle: "Nothing about you or your files is sent",
-                                  isOn: Binding(get: { model.autoUpdate == true }, set: { model.autoUpdate = $0 }))
+                        if Home.sandboxed {
+                            SwitchRow(icon: "power", color: .teal, title: "Open at login",
+                                      subtitle: "So new downloads and screenshots are always named",
+                                      isOn: Binding(get: { LoginItem.isOn }, set: { LoginItem.set($0); model.objectWillChange.send() }))
+                        } else {
+                            SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
+                                      subtitle: "Nothing about you or your files is sent",
+                                      isOn: Binding(get: { model.autoUpdate == true }, set: { model.autoUpdate = $0 }))
+                        }
                         Divider().padding(.leading, 44)
                         SwitchRow(icon: "globe", color: .blue, title: "Look up papers and photo places online",
                                   subtitle: "Sends only a paper's number or a photo's location",

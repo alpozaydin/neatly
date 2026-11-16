@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import NamerCore
 import SwiftUI
 import QuickLookThumbnailing
 
@@ -160,7 +161,7 @@ final class CountdownDialog: NSObject {
         open.canCreateDirectories = true
         open.prompt = "Save Here"
         open.message = "Save “\(model.name)” in:"
-        open.directoryURL = model.folder ?? FileManager.default.homeDirectoryForCurrentUser
+        open.directoryURL = model.folder ?? Home.real
         open.level = .modalPanel   // above the popup (which floats), never hidden behind it or another app
         NSApp.activate()           // you clicked "Choose Folder…": now it's fine to come forward
         // Not modal: everything else in neatly (other downloads, screenshots, the menu) keeps running meanwhile.

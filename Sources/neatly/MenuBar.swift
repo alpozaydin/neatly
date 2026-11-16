@@ -22,7 +22,9 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         item.button?.window?.registerForDraggedTypes([.fileURL])
         item.button?.window?.delegate = self
         // Made by an older version's updater? Bring the app's icon and Finder menu up to date.
+        #if !APPSTORE
         if !headless { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { AppBundle.refreshIfStale() } }
+        #endif
         // Finder: "Open With → neatly" (AppDelegate) and "Rename with neatly" (Services) → the review window.
         // Only the real app offers the service: a test or debug copy must never take it over.
         if !headless, AppBundle.isRunningInside { NSApp.servicesProvider = FinderHandoff.provider }
@@ -213,10 +215,12 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
     }
 
     func quitNow() {
+        #if !APPSTORE
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         p.arguments = ["bootout", "gui/\(getuid())/dev.neatly.watch"]
         try? p.run()
+        #endif
         NSApp.terminate(nil)
     }
 

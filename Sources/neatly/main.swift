@@ -31,6 +31,11 @@ usage: neatly [options] <file or folder>...
 setvbuf(stdout, nil, _IOLBF, 0)
 migrateFromOldName()   // write log lines immediately, even when not in a terminal
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
+#if APPSTORE
+// The App Store version is one app: opening it runs the menu-bar icon and both watchers (no background service).
+if args.isEmpty { args = ["--watch", Home.real.appending(path: "Downloads").path, "--ask", "--screenshots", "--menubar"] }
+#endif
+FolderAccess.resume()   // App Store version: the folder permission you gave (every process, Tidy windows too)
 let version = "0.6.3"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
@@ -47,7 +52,7 @@ if args.first == "learn" {
         return "\(sep), \(p.lowercase ? "lowercase" : "Title Case")" + (p.suffix.map { ", ends with \($0)" } ?? "")
             + "  → e.g. \(p.render("transcript-fall26"))"
     }
-    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let home = Home.real.path
     for f in folders {
         print("\(f.folder.replacingOccurrences(of: home, with: "~"))  (\(f.profile.learnedFrom) names)")
         print("    \(describe(f.profile))")
@@ -232,6 +237,9 @@ if args.first == "app-bundle" {
     exit(0)
 }
 
+#if APPSTORE
+if args.first == "service" { print("The App Store version opens at login from its settings; there's no service to install."); exit(0) }
+#endif
 if args.first == "service" {
     switch args.dropFirst().first {
     case "install":
@@ -401,9 +409,13 @@ func helper(_ a: [String]) async -> String {
 /// Where macOS saves screenshots (System Settings or Cmd-Shift-5 → Options), Desktop by default.
 func screenshotFolder() -> URL {
     if let d = ProcessInfo.processInfo.environment["NEATLY_SCREENSHOT_DIR"] { return URL(fileURLWithPath: d) }   // tests
-    let home = FileManager.default.homeDirectoryForCurrentUser
-    if let loc = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"), !loc.isEmpty {
-        let u = URL(fileURLWithPath: (loc as NSString).expandingTildeInPath)
+    let home = Home.real
+    // The sandboxed App Store version can't read another app's settings directly, but can read the file.
+    let file = home.appending(path: "Library/Preferences/com.apple.screencapture.plist")
+    let saved = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location")
+        ?? (NSDictionary(contentsOf: file)?["location"] as? String)
+    if let loc = saved, !loc.isEmpty {
+        let u = Home.expand(loc)
         if FileManager.default.fileExists(atPath: u.path) { return u }
     }
     return home.appending(path: "Desktop")
@@ -692,9 +704,19 @@ if watch {
     // One process: the menu-bar icon, the Downloads watcher and the screenshot watcher, all on the main run loop.
     NSApplication.shared.setActivationPolicy(.accessory)
     NSApplication.shared.delegate = AppDelegate.shared   // opening the app again → show its window
+    #if APPSTORE
+    // No launchd service to write the log: send it to the app's own Logs folder.
+    let logFile = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/neatly.log")
+    try? FileManager.default.createDirectory(at: logFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+    if !headless { freopen(logFile.path, "a", stdout); setvbuf(stdout, nil, _IOLBF, 0) }
+    FolderAccess.ensure()
+    LoginItem.offerOnce()
+    #endif
     if menuBar { MenuBar.shared.start() }
     Log.trim()
+    #if !APPSTORE
     Updater.start()
+    #endif
     Task { await watchDownloads() }
     NSApp.run()
 }
