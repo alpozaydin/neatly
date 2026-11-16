@@ -36,6 +36,9 @@ enum AppBundle {
     static var runningBundle: URL? {
         let p = selfExecutable.path
         guard p.hasSuffix(".app/Contents/MacOS/neatly") else { return nil }
+        // Opened straight from the downloaded disk image (or macOS's read-only copy of it): that's the installer,
+        // not where the app lives. It installs a real neatly.app into Applications.
+        if p.hasPrefix("/Volumes/") || p.contains("/AppTranslocation/") { return nil }
         return selfExecutable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     }
     static var executable: URL { location.appending(path: "Contents/MacOS/neatly") }
@@ -43,6 +46,11 @@ enum AppBundle {
     /// Are we running from inside neatly.app (opened from Finder/Spotlight, or the service)?
     static var isRunningInside: Bool {
         selfExecutable.path.contains(".app/Contents/MacOS/")
+    }
+
+    /// Remove the "downloaded from the internet" mark (com.apple.quarantine) from an app we just built or updated.
+    static func clearQuarantine(_ app: URL) {
+        _ = run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", app.path])
     }
 
     /// Build (or rebuild) the app around `binary`. Returns the app's executable.
@@ -55,6 +63,9 @@ enum AppBundle {
         try fm.createDirectory(at: staging.appending(path: "Contents/MacOS"), withIntermediateDirectories: true)
         try fm.createDirectory(at: staging.appending(path: "Contents/Resources"), withIntermediateDirectories: true)
         try fm.copyItem(at: binary, to: staging.appending(path: "Contents/MacOS/neatly"))
+        // A copy of a downloaded app carries the browser's "from the internet" mark. macOS already checked this
+        // app when you opened it; the rebuilt (locally signed) app must not be checked again as if downloaded.
+        clearQuarantine(staging)
         let plist: [String: Any] = [
             "CFBundleIdentifier": identifier,
             "CFBundleName": "neatly",
@@ -109,6 +120,7 @@ enum AppBundle {
                 else { try fm.moveItem(at: new, to: old) }
             }
             try? fm.removeItem(at: staging)
+            clearQuarantine(app)
             if run("/usr/bin/codesign", ["--force", "--sign", "-", app.path]) != 0 {   // contents changed: sign again
                 print("neatly.app: signing after the update failed")
             }

@@ -24,6 +24,11 @@
 
 ## Install
 
+**[⬇️ Download neatly for Mac](https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg)**: open it, drag
+**neatly** to **Applications**, then open neatly from Applications. Signed and notarized by Apple.
+
+Or in Terminal:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/alpozaydin/neatly/main/scripts/install.sh | sh
 ```

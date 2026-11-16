@@ -24,7 +24,7 @@ faq:
   - q: "Can I choose the naming style?"
     a: "Yes: natural names by default ('Water Bill Nov 2026'), or dashes, underscores, lowercase, short or long names, and dates before or after. neatly also learns from the names you edit."
   - q: "How do I install and uninstall it?"
-    a: "Install with one line: curl -fsSL https://raw.githubusercontent.com/alpozaydin/neatly/main/scripts/install.sh | sh, or with Homebrew: brew install alpozaydin/tap/neatly && neatly service install. To uninstall, open neatly → More options → Uninstall neatly."
+    a: "Download neatly.dmg from https://alpozaydin.github.io/neatly/, open it, drag neatly to Applications and open it (signed and notarized by Apple). Or in Terminal: curl -fsSL https://raw.githubusercontent.com/alpozaydin/neatly/main/scripts/install.sh | sh, or with Homebrew: brew install alpozaydin/tap/neatly && neatly service install. To uninstall, open neatly → More options → Uninstall neatly."
 ---
 
 # Frequently asked questions

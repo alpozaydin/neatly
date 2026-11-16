@@ -16,7 +16,8 @@ swift run -c release neatly-eval             # accuracy + speed score
 ## Releases
 
 Push a tag (`git tag v0.1.1 && git push --tags`). GitHub builds the binary and publishes it;
-then `scripts/update-tap.sh 0.1.1` updates Homebrew.
+then `scripts/update-tap.sh 0.1.1` updates Homebrew, and `scripts/make-dmg.sh 0.1.1` builds the signed, notarized
+`neatly.dmg` on the maintainer's Mac (`gh release upload v0.1.1 dist/neatly.dmg`).
 
 ## Tests
 
