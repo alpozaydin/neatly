@@ -53,6 +53,19 @@ It lives in your menu bar and keeps itself up to date.
 | ↩️ **History** | Everything neatly changed, each with **Revert**. "Always do this" turns a choice into a rule. |
 | 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |
 
+## On a real Mac
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/real-screenshot.gif" alt="A screenshot of the Hubble Space Telescope page is named hubble-space-telescope, with Undo"></td>
+    <td width="50%"><img src="docs/assets/real-download.gif" alt="An arXiv download 2304.02643v1.pdf: neatly suggests segment-anything-2023"></td>
+  </tr>
+  <tr>
+    <td align="center">📸 A screenshot, named as it's taken</td>
+    <td align="center">📥 A paper download, named by its title</td>
+  </tr>
+</table>
+
 ## Real examples
 
 <p align="center">
