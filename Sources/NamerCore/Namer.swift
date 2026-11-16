@@ -427,7 +427,7 @@ public struct Namer: Sendable {
         return Style.join(parts.compactMap { $0 })
     }
 
-    /// "2 bd · 1 ba · $3,100/mo · 42 Linden Ave" → apartment-3-bed-linden-st. Needs a size AND a rent or price
+    /// "3 bd · 2 ba · $3,100/mo · 42 Linden Ave" → apartment-3-bed-linden-ave. Needs a size AND a rent or price
     /// on the same screen, so a recipe that "serves 2" or an article about bedrooms isn't taken for one.
     func listingName(_ e: Evidence) -> String? {
         let text = [e.headline, e.bodySnippet].compactMap { $0 }.joined(separator: "\n")

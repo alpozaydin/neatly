@@ -75,7 +75,7 @@ It lives in your menu bar and keeps itself up to date.
 | Before | After |
 |---|---|
 | `Screenshot 2026-11-10 at 9.41.07.png` | **Turkish Airlines Boarding Pass**.png |
-| `Screenshot 2026-11-12 at 18.02.55.png` | **Hubble Space Telescope**.png |
+| `Screenshot 2026-11-16 at 10.13.03.png` | **Hubble Space Telescope**.png |
 | `scan_20261104_8812.pdf` | **Rent Agreement**.pdf → *Documents* |
 | `invoice_78123.pdf` | **Netflix Invoice Nov 2026**.pdf → *Bills* |
 | `IMG_4108.HEIC` | **Colosseum in Rome**.heic |
