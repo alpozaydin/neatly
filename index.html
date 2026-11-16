@@ -1,0 +1,127 @@
+---
+layout: default
+title: "neatly — clear names for your files, automatically (free Mac app)"
+description: "neatly gives your downloads, screenshots and photos clear names by itself. A free Mac app: download, drag to Applications, done. Private: everything stays on your Mac."
+---
+<style>
+  .hero { text-align:center; padding:28px 0 8px; }
+  .hero img.icon { width:112px; height:112px; filter:drop-shadow(0 10px 22px rgba(16,57,42,.25)); }
+  .hero h1 { font-size:46px; margin:14px 0 6px; letter-spacing:-.5px; }
+  .hero .lead { font-size:22px; color:var(--ink); margin:0 auto 6px; max-width:640px; }
+  .hero .sub { color:var(--muted); margin:0 auto 26px; max-width:600px; }
+  .btn { display:inline-flex; align-items:center; gap:10px; background:var(--deep); color:#fff !important; text-decoration:none;
+         font-weight:700; font-size:19px; padding:15px 28px; border-radius:14px; box-shadow:0 8px 22px rgba(23,67,47,.25); }
+  .btn:hover { background:var(--green); }
+  .fine { color:var(--muted); font-size:14px; margin-top:12px; }
+  .shot { margin:34px auto 0; border-radius:16px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.14); border:1px solid var(--line); }
+  .shot img { display:block; width:100%; }
+  section { margin-top:64px; }
+  section > h2 { text-align:center; border:none; font-size:30px; margin-bottom:6px; }
+  section > p.intro { text-align:center; color:var(--muted); margin:0 auto 26px; max-width:620px; }
+  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; counter-reset:s; }
+  .step { background:var(--tint); border-radius:16px; padding:22px 20px; }
+  .step b { display:block; font-size:18px; color:var(--deep); margin-bottom:4px; }
+  .step .n { display:inline-flex; width:30px; height:30px; border-radius:15px; background:var(--deep); color:#fff;
+             align-items:center; justify-content:center; font-weight:700; margin-bottom:10px; }
+  .cards { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+  .card { border:1px solid var(--line); border-radius:16px; padding:20px 22px; background:#fff; }
+  .card .e { font-size:28px; }
+  .card b { display:block; font-size:18px; color:var(--deep); margin:4px 0; }
+  .card code { font-size:13px; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .pair figure { margin:0; } .pair img { border-radius:12px; border:1px solid var(--line); display:block; width:100%; }
+  .pair figcaption { text-align:center; color:var(--muted); font-size:15px; margin-top:8px; }
+  .privacy { background:var(--tint); border-radius:18px; padding:26px 28px; }
+  .privacy ul { margin:10px 0 0; padding-left:20px; }
+  .check { border:1px solid var(--line); border-radius:16px; padding:20px 24px; }
+  .check ol { margin:8px 0 0; }
+  .final { text-align:center; padding:40px 20px; background:linear-gradient(160deg,#F7F4EC,#EEE8DA); border-radius:22px; }
+  .final h2 { border:none; margin-top:0; }
+  .dev { text-align:center; color:var(--muted); font-size:15px; }
+  @media (max-width: 720px) {
+    .hero h1 { font-size:36px; } .steps, .cards, .pair { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="hero">
+  <img class="icon" src="{{ '/docs/assets/icon.png' | relative_url }}" alt="neatly icon">
+  <h1>neatly</h1>
+  <p class="lead">Clear names for your files, automatically.</p>
+  <p class="sub">No more <code>IMG_4821.jpg</code> or <code>Screenshot 2026-11-14 at 23.12.04.png</code>.
+     neatly gives your downloads, screenshots and photos real names, by itself. Free, and everything stays on your Mac.</p>
+  <a class="btn" href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">⬇️&nbsp; Download for Mac</a>
+  <div class="fine">Free · For Macs with Apple silicon (M1 or newer) and macOS 26 or newer · Checked and approved by Apple</div>
+  <div class="shot"><img src="{{ '/docs/assets/demo.gif' | relative_url }}" alt="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"></div>
+</div>
+
+<section id="install">
+  <h2>Install in a minute</h2>
+  <p class="intro">No Terminal, no account, no sign-up.</p>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><b>Download</b>Click <a href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">Download for Mac</a>. A file called <code>neatly.dmg</code> lands in your Downloads.</div>
+    <div class="step"><span class="n">2</span><b>Drag to Applications</b>Open <code>neatly.dmg</code> and drag the neatly icon onto the Applications folder next to it.</div>
+    <div class="step"><span class="n">3</span><b>Open it</b>Open neatly from Applications (or Spotlight). Click <b style="display:inline">Allow</b> when your Mac asks about Downloads and Desktop. Done: it lives in your menu bar.</div>
+  </div>
+</section>
+
+<section>
+  <h2>What it does</h2>
+  <p class="intro">It only renames files with meaningless names. Names you chose yourself are never touched, and every change can be undone.</p>
+  <div class="cards">
+    <div class="card"><div class="e">📥</div><b>Downloads</b>A small window suggests a clear name and the right folder. Click Save, change it, or just ignore it.<br><code>doc_8f3a2c.pdf → Water Bill Nov 2026.pdf</code></div>
+    <div class="card"><div class="e">📸</div><b>Screenshots and screen recordings</b>Named the moment you take them, by what's on screen. One click to undo.<br><code>Screenshot 2026-11-16… → Hubble Space Telescope.png</code></div>
+    <div class="card"><div class="e">🏞️</div><b>Photos</b>Named by what they show and where you took them.<br><code>IMG_4108.HEIC → Colosseum in Rome.heic</code></div>
+    <div class="card"><div class="e">🧹</div><b>Tidy a whole folder</b>Clean up your Desktop or Downloads at once. You see every new name first, then click Rename.<br><code>History</code> lets you put any name back.</div>
+  </div>
+</section>
+
+<section>
+  <h2>Before and after</h2>
+  <div class="shot" style="margin-top:20px"><img src="{{ '/docs/assets/hero.png' | relative_url }}" alt="Messy file names on the left, clear names from neatly on the right"></div>
+</section>
+
+<section>
+  <h2>On a real Mac</h2>
+  <div class="pair" style="margin-top:20px">
+    <figure><img src="{{ '/docs/assets/real-screenshot.gif' | relative_url }}" alt="A screenshot of the Hubble Space Telescope page gets its name right away"><figcaption>📸 A screenshot, named as it's taken</figcaption></figure>
+    <figure><img src="{{ '/docs/assets/real-download.gif' | relative_url }}" alt="A downloaded research paper gets its title as its name"><figcaption>📥 A downloaded paper, named by its title</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <div class="privacy">
+    <h2 style="text-align:left;margin:0;border:none;font-size:24px">🔒 Private by design</h2>
+    <p style="margin:8px 0 0">neatly reads your files <b>on your Mac</b>, with Apple's built-in AI (Apple Intelligence). Your files are never uploaded. No account, no tracking.</p>
+    <ul>
+      <li>Only three tiny things can go online, never your files: a check for updates, a research paper's number (to find its title), and a photo's location (to name the place).</li>
+      <li>You can turn each of them off in neatly's settings.</li>
+      <li>It's open source: anyone can read exactly what it does.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="check">
+    <h2 style="text-align:left;margin:0;border:none;font-size:24px">Will it work on my Mac?</h2>
+    <ol>
+      <li>Click the  Apple menu (top left) → <b>About This Mac</b>.</li>
+      <li><b>Chip</b> should say <b>Apple M1</b> or newer (M2, M3, M4…). <b>macOS</b> should be <b>26</b> or newer.</li>
+      <li>For the best names, turn on <b>Apple Intelligence</b>: System Settings → Apple Intelligence &amp; Siri.</li>
+    </ol>
+    <p style="margin:12px 0 0;color:var(--muted)">To remove neatly later: open it → More options → Uninstall neatly.</p>
+  </div>
+</section>
+
+<section>
+  <div class="final">
+    <h2>Give your files real names</h2>
+    <a class="btn" href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">⬇️&nbsp; Download for Mac</a>
+    <div class="fine">Free · Questions? See the <a href="{{ '/faq/' | relative_url }}">FAQ</a></div>
+  </div>
+</section>
+
+<section>
+  <p class="dev">Developer? neatly is open source (MIT, Swift). Install with Homebrew:
+    <code>brew install alpozaydin/tap/neatly && neatly service install</code>,
+    or see the <a href="https://github.com/alpozaydin/neatly">code on GitHub</a>. Ideas, issues and pull requests are welcome.</p>
+</section>

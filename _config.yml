@@ -13,7 +13,7 @@ defaults:
 plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
-exclude: [Sources, Tests, scripts, workflows, Package.swift, LICENSE, .github, HANDOFF.md, TODO.md]
+exclude: [README.md, Sources, Tests, scripts, workflows, Package.swift, LICENSE, .github, HANDOFF.md, TODO.md]
 author: alpozaydin
 social:
   name: neatly
