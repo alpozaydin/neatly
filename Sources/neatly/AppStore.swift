@@ -1,5 +1,5 @@
 import AppKit
-import NamerCore
+import NeatlyCore
 import ServiceManagement
 
 /// The App Store version runs in Apple's sandbox: it may only open folders you give it. neatly asks once for your

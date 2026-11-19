@@ -1,6 +1,6 @@
 import AVFoundation
 import AppKit
-import NamerCore
+import NeatlyCore
 import SwiftUI
 import QuickLookThumbnailing
 
@@ -286,7 +286,7 @@ final class Toast: NSObject, NSTextFieldDelegate {
     var remaining: Int
     var timer: Timer?
 
-    init(name: String, file: URL, seconds: Int, redo allowRedo: Bool = true) {
+    init(name: String, file: URL, seconds: Int, redo allowRedo: Bool = true, editable: Bool = true) {
         original = name
         remaining = seconds
         super.init()
@@ -313,6 +313,7 @@ final class Toast: NSObject, NSTextFieldDelegate {
         field.target = self
         field.action = #selector(commit)
         field.toolTip = "Click to change the name, Return to save"
+        if !editable { field.isEditable = false; field.isSelectable = false; field.toolTip = nil }
         field.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
         let redo = NSButton(title: "↻", target: self, action: #selector(another))
         redo.bezelStyle = .rounded
@@ -419,6 +420,8 @@ enum InApp {
     private static var open: [NSObject] = []   // keep each window alive until it answers
     /// Something is on screen (a popup or a pill): don't restart for an update now.
     static var busy: Bool { !open.isEmpty }
+    static func keep(_ o: NSObject) { open.append(o) }
+    static func release(_ o: NSObject) { open.removeAll { $0 === o } }
 
     static func ask(file: String, suggestion: String, folder: URL?, seconds: Int, path: URL? = nil,
                     duplicate: URL? = nil, pinned: Bool = false) async -> String {
@@ -431,9 +434,9 @@ enum InApp {
         }
     }
 
-    static func pill(name: String, file: URL, seconds: Int, redo: Bool = true) async -> String {
+    static func pill(name: String, file: URL, seconds: Int, redo: Bool = true, editable: Bool = true) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
-            let t = Toast(name: name, file: file, seconds: max(seconds, 3), redo: redo)
+            let t = Toast(name: name, file: file, seconds: max(seconds, 3), redo: redo, editable: editable)
             open.append(t)
             t.onFinish = { line in open.removeAll { $0 === t }; c.resume(returning: line) }
             t.present()

@@ -41,7 +41,24 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public init() {}
 
     /// Turn a canonical name (lowercase-kebab) into this person's style.
-    public func render(_ kebab: String, date d: Date? = nil, app: String? = nil) -> String {
+    /// How the file itself writes brand names and acronyms: "BrightPath", "iPhone", "GPS", "II". An all-caps word
+    /// only counts on a line that also has lowercase, so a heading in capitals ("PRODUCT ENGINES") isn't an acronym.
+    public static func casing(in texts: [String]) -> [String: String] {
+        let camel = try! Regex("^([A-Z][a-z]+([A-Z][a-z]+)+|i[A-Z][a-z]+)$")
+        let acronym = try! Regex("^[A-Z]{2,5}$")
+        var out: [String: String] = [:], plain = Set<String>()
+        for line in texts.flatMap({ $0.split(whereSeparator: \.isNewline) }) {
+            let mixed = line.contains(where: \.isLowercase)
+            for raw in line.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
+                let w = String(raw), low = w.lowercased()
+                if w.wholeMatch(of: camel) != nil || (mixed && w.wholeMatch(of: acronym) != nil) { out[low] = out[low] ?? w }
+                else if w != w.uppercased() { plain.insert(low) }   // also written as a normal word: not an acronym
+            }
+        }
+        return out.filter { k, v in v.wholeMatch(of: camel) != nil || !plain.contains(k) }
+    }
+
+    public func render(_ kebab: String, date d: Date? = nil, app: String? = nil, casing: [String: String] = [:]) -> String {
         var parts = kebab.split(separator: "-").map(String.init)
         if appName == true, let app, !app.isEmpty { parts += ["in"] + Style.words(app) }   // shot-name-in-safari
         // Names with spaces read like a title, so short forms are spelled out: "nov26" → "Nov 2026",
@@ -50,6 +67,7 @@ public struct StyleProfile: Codable, Sendable, Equatable {
         if !lowercase {
             let small: Set<String> = ["a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "at", "by", "from"]
             parts = parts.enumerated().map { i, w in
+                if let c = casing[w], !(i > 0 && small.contains(w)) { return c }                 // BrightPath, GPS
                 if w.wholeMatch(of: /[a-z]{2,5}\d{2,4}/) != nil { return w.uppercased() }        // course codes: CS331
                 if ["hw", "ai", "ml", "cv", "pdf", "ui", "ux", "api", "tv", "uk", "us", "eu", "faq", "id", "pr", "irs", "nasa", "nyc", "usa", "vat", "dmv", "gps"].contains(w) { return w.uppercased() }
                 return (i > 0 && small.contains(w)) || w.first?.isLetter != true ? w : w.prefix(1).uppercased() + w.dropFirst()

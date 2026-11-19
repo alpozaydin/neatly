@@ -99,9 +99,14 @@ enum Extract {
         // can take over a minute (66 s on a terminal weather report), so it only runs when the fast one finds
         // little: photos, handwriting, a few words on a whiteboard.
         var lines = ocrLines(img, accurate: false)
-        if lines.count < 15 {
+        // Soft text (a slide in a video call, a blurry photo of a screen) makes the fast reader return plenty of
+        // lines, all garbled ("Compl8te th8 nevv prcAJucL"): that needs the accurate reader too.
+        let garbled = garbledShare(lines.map(\.text))
+        if lines.count < 15 || garbled >= 0.15 {
             let better = ocrLines(img, accurate: true)
-            if better.count >= lines.count { lines = better }
+            if better.count >= lines.count || (garbled >= 0.15 && !better.isEmpty && garbledShare(better.map(\.text)) < garbled) {
+                lines = better
+            }
         }
         lines = screenText(lines, width: img.width, height: img.height)
         let text = lines.map(\.text).joined(separator: "\n")
@@ -125,6 +130,24 @@ enum Extract {
             req.usesLanguageCorrection = level == .accurate
             try? VNImageRequestHandler(cgImage: img).perform([req])
         }
+    }
+
+    /// Share of words that no screen really shows: digits inside letters ("compl8te", "en9in"), stray symbols
+    /// inside a word ("portfol•o"), capitals in odd places ("nevV", "prcAJucL"). Brand casing ("BrightPath",
+    /// "iPhone") and codes ("CS331", "4K") are fine.
+    static func garbledShare(_ lines: [String]) -> Double {
+        let words = lines.flatMap { $0.split(whereSeparator: { $0.isWhitespace }) }.map(String.init)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { $0.count >= 3 && $0.contains(where: \.isLetter) }
+        guard words.count >= 8 else { return 0 }
+        let digitInside = try! Regex("[A-Za-z][0-9]+[a-z]")
+        let symbolInside = try! Regex("[A-Za-z][•*<>(){}|\\[\\]][A-Za-z]")
+        let fineCase = try! Regex("^([A-Z]?[a-z]+([A-Z][a-z]+)*|i[A-Z][a-z]+|[A-Z0-9&-]+|[A-Z][a-z]*[0-9]*)$")
+        let bad = words.filter { w in
+            w.firstMatch(of: digitInside) != nil || w.firstMatch(of: symbolInside) != nil
+                || (w.allSatisfy { $0.isLetter } && w.wholeMatch(of: fineCase) == nil)
+        }
+        return Double(bad.count) / Double(words.count)
     }
 
     typealias Line = (text: String, height: CGFloat, box: CGRect)

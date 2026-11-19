@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import QuickLookThumbnailing
-import NamerCore
+import NeatlyCore
 
 /// The review window: files dropped on neatly, or a whole folder (Tidy Desktop / Downloads / Pick a Folder).
 /// neatly suggests a name for each; you can change any name, untick any file, then Rename. Nothing changes
@@ -12,7 +12,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
     var window: NSWindow?
 
     /// `paths`: one folder (tidy what's inside) or several files (dropped on neatly).
-    init(paths: [URL], namer: Namer) {
+    init(paths: [URL], neatly: Neatly) {
         var isDir: ObjCBool = false
         let oneFolder = paths.count == 1 && FileManager.default.fileExists(atPath: paths[0].path, isDirectory: &isDir) && isDir.boolValue
         let folder = oneFolder ? paths[0] : paths[0].deletingLastPathComponent()
@@ -33,13 +33,13 @@ final class TidyWindow: NSObject, NSWindowDelegate {
             .filter { Decision.make(for: $0, explicit: !oneFolder).shouldRename }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
         model = TidyModel(title: oneFolder ? folder.lastPathComponent : "\(files.count) file\(files.count == 1 ? "" : "s")",
-                          files: files, namer: namer, wholeFolder: oneFolder)
+                          files: files, neatly: neatly, wholeFolder: oneFolder)
         super.init()
     }
 
     func run() -> Never {
         NSApplication.shared.setActivationPolicy(headless ? .prohibited : .regular)
-        Appearance.apply(namer.profile.appearance)   // Light/Dark from Home, also in this separate window
+        Appearance.apply(neatly.profile.appearance)   // Light/Dark from Home, also in this separate window
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 620),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                          backing: .buffered, defer: false)
@@ -125,13 +125,13 @@ final class TidyModel: ObservableObject {
     @Published var warming = false
     let title: String
     let wholeFolder: Bool
-    var namer: Namer
+    var neatly: Neatly
     var forPicture = false
 
-    init(title: String, files: [URL], namer: Namer, wholeFolder: Bool) {
+    init(title: String, files: [URL], neatly: Neatly, wholeFolder: Bool) {
         self.title = title
         self.wholeFolder = wholeFolder
-        self.namer = namer
+        self.neatly = neatly
         items = files.map { TidyItem(url: $0, name: $0.deletingPathExtension().lastPathComponent) }
         for i in items.indices { loadThumbnail(i) }
     }
@@ -151,11 +151,11 @@ final class TidyModel: ObservableObject {
         message = items.isEmpty ? (wholeFolder ? "Everything here already has a clear name." : "Nothing to rename.") : ""
         // Wake the model first (slow only on a fresh install), so no file times out while it starts.
         let t0 = Date()
-        if !items.isEmpty && namer.useModel { warming = true; await Namer.warmUp(); warming = false }
+        if !items.isEmpty && neatly.useModel { warming = true; await Neatly.warmUp(); warming = false }
         print("tidy: model ready after \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
         for i in items.indices {
             items[i].state = .reading
-            var n = namer
+            var n = neatly
             n.documentBudget = .seconds(15)
             n.imageBudget = .seconds(20)
             let t1 = Date()
@@ -248,7 +248,7 @@ struct TidyView: View {
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, 24).padding(.top, 34).padding(.bottom, 14)
-            if !Namer.modelAvailable { modelBanner.padding(.horizontal, 24).padding(.bottom, 12) }
+            if !Neatly.modelAvailable { modelBanner.padding(.horizontal, 24).padding(.bottom, 12) }
             if model.forPicture { rows; Spacer(minLength: 0) }   // the off-screen renderer can't draw scroll views
             else { ScrollView { rows } }
             Divider()

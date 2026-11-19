@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import NamerCore
+import NeatlyCore
 
 /// "Where did my file go?": everything neatly renamed or moved, newest first, each with Revert.
 /// For a download from a site, "Always do this" makes its folder a rule: files from that site go there,
@@ -80,7 +80,7 @@ final class HistoryModel: ObservableObject {
 
     func reload() {
         entries = History.all().reversed()
-        rules = (namer.profile.rules ?? [:]).map { Rule(host: $0.key, folder: $0.value) }.sorted { $0.host < $1.host }
+        rules = (neatly.profile.rules ?? [:]).map { Rule(host: $0.key, folder: $0.value) }.sorted { $0.host < $1.host }
     }
 
     func revert(_ e: HistoryEntry) {
@@ -115,7 +115,7 @@ final class HistoryModel: ObservableObject {
 
     func hasRule(_ e: HistoryEntry) -> Bool {
         guard let host = e.host else { return false }
-        return namer.profile.rules?[host] == URL(fileURLWithPath: e.to).deletingLastPathComponent().path
+        return neatly.profile.rules?[host] == URL(fileURLWithPath: e.to).deletingLastPathComponent().path
     }
 }
 

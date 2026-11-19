@@ -400,7 +400,10 @@ enum Model {
                                       + (captioned ? [prompt] : [])).joined(separator: " ")))
         line2 = W(line2).map { w in
             guard w.count >= 5, !source.contains(w) else { return w }
-            return source.first { $0.first == w.first && abs($0.count - w.count) <= 2 && editDistance($0, w) <= 2 } ?? w
+            // Never trade a real word for a misread one ("part" → "part11" from OCR of "Part II").
+            let real = NLEmbedding.wordEmbedding(for: .english)?.contains(w) ?? false
+            return source.first { $0.first == w.first && abs($0.count - w.count) <= 2 && editDistance($0, w) <= 2
+                && !(real && ($0.contains(where: \.isNumber) || !$0.allSatisfy(\.isLetter))) } ?? w
         }.joined(separator: " ")
         // Made-up words ("trickaide"): not in the file and not English → drop them.
         if let vocab = NLEmbedding.wordEmbedding(for: .english) {

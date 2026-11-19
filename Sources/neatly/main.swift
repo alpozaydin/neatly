@@ -1,6 +1,6 @@
 import Foundation
 import AppKit
-import NamerCore
+import NeatlyCore
 
 let usage = """
 usage: neatly [options] <file or folder>...
@@ -36,7 +36,7 @@ var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn
 if args.isEmpty { args = ["--watch", Home.real.appending(path: "Downloads").path, "--ask", "--screenshots", "--menubar"] }
 #endif
 FolderAccess.resume()   // App Store version: the folder permission you gave (every process, Tidy windows too)
-let version = "0.6.3"
+let version = "0.6.4"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -221,7 +221,7 @@ if args.first == "decide" {
 
 // Do the one-time setup now (the app does this by itself after installing or updating; tests call it first).
 if args.first == "warmup" {
-    let t = Date(); await Namer.warmUp(); print("ready after \(Int(Date().timeIntervalSince(t))) s"); exit(0)
+    let t = Date(); await Neatly.warmUp(); print("ready after \(Int(Date().timeIntervalSince(t))) s"); exit(0)
 }
 
 // Check for an update now (also used by tests with a fake release): neatly update
@@ -316,12 +316,12 @@ if args.first == "undo" {
 let screenshots = flag("--screenshots")
 let menuBar = flag("--menubar")
 let apply = flag("--apply"), force = flag("--force"), why = flag("--why"), watch = flag("--watch"), ask = flag("--ask"), whereTo = flag("--where")
-var namer = Namer()
-namer.profile = StyleProfile.load() ?? .standard
+var neatly = Neatly()
+neatly.profile = StyleProfile.load() ?? .standard
 let offline = flag("--offline")
-namer.useNetwork = !offline && namer.profile.onlineLookups != false
-namer.useModel = !flag("--no-model")
-var timeout = namer.profile.countdown ?? 5   // set in the neatly window, or --timeout N
+neatly.useNetwork = !offline && neatly.profile.onlineLookups != false
+neatly.useModel = !flag("--no-model")
+var timeout = neatly.profile.countdown ?? 5   // set in the neatly window, or --timeout N
 if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(args[i + 1]) {
     timeout = max(0, n); args.removeSubrange(i...(i + 1))
 }
@@ -379,7 +379,7 @@ if args.first == "tidy" {
     }
     let targets = !rest.isEmpty ? rest.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
                                 : [screenshotFolder()]
-    TidyWindow(paths: targets, namer: namer).run()
+    TidyWindow(paths: targets, neatly: neatly).run()
 }
 
 /// The one-time setup (text reader, classifier, embeddings, model: ~50 s on a fresh install). Files that arrive
@@ -387,7 +387,7 @@ if args.first == "tidy" {
 @MainActor
 enum Warm {
     private static var task: Task<Void, Never>?
-    static func start() { if task == nil { task = Task.detached { await Namer.warmUp() } } }
+    static func start() { if task == nil { task = Task.detached { await Neatly.warmUp() } } }
     static func ready() async { await task?.value }
 }
 
@@ -456,14 +456,14 @@ func isScreenshot(_ name: String) -> Bool {
                 continue
             }
             seen.insert(name); pending[name] = nil
-            if paused || namer.profile.watchScreenshots == false { continue }
+            if paused || neatly.profile.watchScreenshots == false { continue }
             let url = dir.appending(path: name)
             await Warm.ready()
-            guard case .suggested(let s) = await namer.suggest(for: url, app: p.app, within: .seconds(20)),
+            guard case .suggested(let s) = await neatly.suggest(for: url, app: p.app, within: .seconds(20)),
                   let renamed = try? Rename.apply(url, to: s.name) else { print("\(name)  screenshot: no better name"); continue }
             seen.insert(renamed.lastPathComponent)
             print("\(name)  →  \(renamed.lastPathComponent)   [screenshot, \(s.via)]")
-            if namer.profile.copyScreenshots == true, let img = NSImage(contentsOf: renamed) {
+            if neatly.profile.copyScreenshots == true, let img = NSImage(contentsOf: renamed) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.writeObjects([img])
             }
@@ -480,7 +480,7 @@ func isScreenshot(_ name: String) -> Bool {
                     break pill
                 case "redo" where rejected.count < 3:
                     rejected.append(shown)
-                    var alt = namer; alt.avoid = rejected
+                    var alt = neatly; alt.avoid = rejected
                     guard case .suggested(let s2) = await alt.suggest(for: file, explicit: true, app: p.app),
                           let moved = try? Rename.apply(file, to: s2.name) else { print("   no other name found"); byYou = true; break pill }
                     seen.insert(moved.lastPathComponent)
@@ -557,19 +557,20 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
     var sizeSince: [String: Date] = [:]
     let changes = DirWatcher(dir)
     var warmed = Date.distantPast
-    if namer.useModel { Warm.start() }   // fresh install: everything set up before the first download
+    if neatly.useModel { Warm.start() }   // fresh install: everything set up before the first download
     let shotDir = screenshotFolder()
     if screenshots { Task { await watchScreenshots(shotDir) } }
     print("watching \(dir.path) — download something (Ctrl-C to stop)")
     while true {
         await changes.next(timeout: pending.isEmpty ? .seconds(3) : .milliseconds(150))
         // A download in progress: load the model now, so it's ready when the file lands.
-        if namer.useModel, Date().timeIntervalSince(warmed) > 120,
+        if neatly.useModel, Date().timeIntervalSince(warmed) > 120,
            ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).contains(where: {
                skip.contains(($0 as NSString).pathExtension.lowercased()) }) {
-            warmed = Date(); Task.detached { Namer.prewarm() }
+            warmed = Date(); Task.detached { Neatly.prewarm() }
         }
-        let now = listing()
+        var now = listing()
+        var ready: [String] = []
         for (name, size) in now where !seen.contains(name) {
             // Finished = same size for 0.6 s (a download that pauses briefly isn't mistaken for a finished one).
             // Browsers download under a temporary name and stamp the finished file with where it came from:
@@ -577,8 +578,30 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
             let fromBrowser = getxattr(dir.appending(path: name).path, "com.apple.metadata:kMDItemWhereFroms", nil, 0, 0, 0) > 0
             // Anything else (curl, an agent, a copy from a slow disk) may pause mid-write: wait for 3 s of stillness.
             if pending[name] == size, Date().timeIntervalSince(sizeSince[name] ?? Date()) >= (fromBrowser ? 0.1 : 3) {
+                ready.append(name)
+            } else if pending[name] != size { pending[name] = size; sizeSince[name] = Date() }
+        }
+        // Several at once ("Download all", a few attachments): gather the rest of the group, then one popup for all.
+        if ask, !ready.isEmpty, !paused, neatly.profile.watchDownloads != false {
+            let group = await gatherGroup(ready, in: dir, seen: seen, listing: listing, downloading: {
+                Set(((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter {
+                    skip.contains(($0 as NSString).pathExtension.lowercased()) })
+            })
+            let files = group.filter { !installers.contains(($0 as NSString).pathExtension.lowercased()) }
+            if files.count >= 3 {
+                for name in group { seen.insert(name); pending[name] = nil; sizeSince[name] = nil }
+                await handleBatch(files.sorted().map { dir.appending(path: $0) }, downloads: dir)
+                ready = group.filter { !files.contains($0) }   // installers: as usual (nothing to file)
+                now = listing()
+                seen.formUnion(now.keys.filter { Decision.hasKeepMark(dir.appending(path: $0)) })
+            } else {
+                ready = group
+            }
+        }
+        for name in ready.sorted() {
+            do {
                 seen.insert(name); pending[name] = nil; sizeSince[name] = nil
-                if paused || namer.profile.watchDownloads == false { print("\(name)  skip (paused)"); continue }
+                if paused || neatly.profile.watchDownloads == false { print("\(name)  skip (paused)"); continue }
                 let url = dir.appending(path: name)
                 // What the file is now. Before renaming, moving or trashing it, neatly checks it's still exactly this:
                 // if it grew, or was replaced, while you were deciding, it's looked at again from the start.
@@ -587,7 +610,7 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                 // Every new download gets a name and a folder — except installers and files already handled.
                 var nameIdea = original, via = "kept", evidence: Evidence
                 await Warm.ready()
-                switch await namer.suggest(for: url, explicit: force, within: .seconds(20)) {
+                switch await neatly.suggest(for: url, explicit: force, within: .seconds(20)) {
                 case .suggested(let s):
                     nameIdea = s.name; via = s.via; evidence = s.evidence
                     print("\(name)  →  \(s.name)   [\(s.via), \(Int(s.millis.rounded())) ms]")
@@ -597,7 +620,7 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                     evidence = await offMain { Destination.keptEvidence(url).0 }
                     // The name looks fine, but rules may know a more specific one (Sample-MT → cs331-midterm1-fall19-solutions).
                     // Only rules: a model guess shouldn't replace a name a person may have chosen.
-                    var rulesOnly = namer; rulesOnly.useModel = false
+                    var rulesOnly = neatly; rulesOnly.useModel = false
                     if case .suggested(let s) = await rulesOnly.suggest(for: url, explicit: true), s.via.hasPrefix("rules") {
                         nameIdea = s.name; via = s.via; evidence = s.evidence
                         print("\(name)  name ok, but rules suggest \(s.name)")
@@ -614,18 +637,18 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                     : nameIdea.lowercased().split(whereSeparator: { "-_ ".contains($0) }).joined(separator: "-")
                 // "Always do this": one of your rules says where files from this site go.
                 let host = evidence.sourceHost
-                let rule = host.flatMap { namer.profile.rules?[$0] }.map { URL(fileURLWithPath: $0) }
+                let rule = host.flatMap { neatly.profile.rules?[$0] }.map { URL(fileURLWithPath: $0) }
                     .flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 let target: URL?
                 if let rule { target = rule } else {
                     let folders = await offMain { Destination.cachedIndex() }
                     target = await Destination.best(name: kebab, evidence: evidence, folders: folders,
-                                                    useModel: namer.useModel)
+                                                    useModel: neatly.useModel)
                 }
                 print("   folder: \(Destination.short(target))\(rule != nil ? " (your rule)" : "")")
                 // Match the neighbours: in a folder of "Lab Report - JKL" files, a new one is styled the same way.
                 if nameIdea != original, var local = await offMain({ Destination.style(of: target) }) {
-                    local.length = namer.profile.length; local.date = namer.profile.date; local.appName = namer.profile.appName
+                    local.length = neatly.profile.length; local.date = neatly.profile.date; local.appName = neatly.profile.appName
                     let styled = local.render(kebab)
                     if styled != nameIdea { print("   styled like its folder: \(styled)"); nameIdea = styled }
                 }
@@ -693,7 +716,7 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                     print("   left as is")
                 case .noAnswer: print("   no answer, left as is")
                 }
-            } else if pending[name] != size { pending[name] = size; sizeSince[name] = Date() }
+            }
         }
         seen.formIntersection(now.keys)          // forget deleted files
         if apply { seen.formUnion(listing().keys) }
@@ -741,7 +764,7 @@ if watch {
     }
     files.removeAll { partial.contains($0.pathExtension.lowercased()) }
 
-    if namer.useModel { print("model: \(Namer.modelStatus)\n") }
+    if neatly.useModel { print("model: \(Neatly.modelStatus)\n") }
 
     let pad = min(48, files.map(\.lastPathComponent.count).max() ?? 0)
     let folderIndex = whereTo ? Destination.cachedIndex() : []
@@ -756,13 +779,13 @@ if watch {
     for url in files {
         let old = url.lastPathComponent
         let shown = old.count > pad ? String(old.prefix(pad - 1)) + "…" : old.padding(toLength: pad, withPad: " ", startingAt: 0)
-        switch await namer.suggest(for: url, explicit: force) {
+        switch await neatly.suggest(for: url, explicit: force) {
         case .kept(let r):
             kept += 1
             if why || whereTo { print("\(shown)     keep   (\(r))") }
             if whereTo {
                 let (ev, kebab) = Destination.keptEvidence(url)
-                let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: namer.useModel)
+                let f = await Destination.best(name: kebab, evidence: ev, folders: folderIndex, useModel: neatly.useModel)
                 print("      folder:  \(Destination.short(f))")
                 showShortlist(kebab, ev)
             }
@@ -774,7 +797,7 @@ if watch {
             let new = url.pathExtension.isEmpty ? s.name : "\(s.name).\(url.pathExtension.lowercased())"
             print("\(shown)  →  \(new)   [\(s.via), \(Int(s.millis.rounded())) ms]")
             if whereTo {
-                let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: namer.useModel)
+                let f = await Destination.best(name: s.name, evidence: s.evidence, folders: folderIndex, useModel: neatly.useModel)
                 print("      folder:  \(Destination.short(f))")
                 showShortlist(s.name, s.evidence)
             }

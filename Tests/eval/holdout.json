@@ -1,5 +1,5 @@
 {
- "note": "Held-out set. Expected names were written before namer ever ran on these files. Never change rules or prompts to fix a case here; add the file to cases.json instead and write a new held-out case. All names and numbers are made up. Round 2, written 2026-11-10 after round 1 moved into cases.json.",
+ "note": "Held-out set. Expected names were written before neatly ever ran on these files. Never change rules or prompts to fix a case here; add the file to cases.json instead and write a new held-out case. All names and numbers are made up. Round 2, written 2026-11-10 after round 1 moved into cases.json.",
  "decision": {
   "rename": [
    "Scan 12 Nov 2026.pdf",

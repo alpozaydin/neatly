@@ -17,7 +17,7 @@ enum Papers {
     static func arxiv(_ id: String) async -> Evidence.Paper? {
         guard let url = URL(string: "https://export.arxiv.org/api/query?id_list=\(id)") else { return nil }
         var req = URLRequest(url: url, timeoutInterval: timeout)
-        req.setValue("namer/0.1 (open-source file renamer)", forHTTPHeaderField: "User-Agent")
+        req.setValue("neatly/0.1 (open-source file renamer)", forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: req),
               let xml = String(data: data, encoding: .utf8),
               let entry = xml.range(of: "<entry>") else { return nil }

@@ -3,7 +3,7 @@ func expect(_ ok: Bool, _ line: Int = #line) {
     if !ok { failures += 1; print("FAIL main.swift:\(line)") }
 }
 import Foundation
-@testable import NamerCore
+@testable import NeatlyCore
 
 private func date(_ y: Int, _ m: Int, _ d: Int = 1) -> Date {
     Calendar.current.date(from: DateComponents(year: y, month: m, day: d))!
@@ -65,7 +65,7 @@ func transcriptRule() {
     e.metadataTitle = "Student Transcript"
     e.sourceURLs = ["https://student.northfield.edu/proxy/Student_Information/main.php"]
     e.date = date(2026, 11, 4)
-    expect(Namer().ruleName(e) == "transcript-fall26")
+    expect(Neatly().ruleName(e) == "transcript-fall26")
 }
 
 func styleLearning() {
@@ -87,7 +87,7 @@ func period() {
 }
 
 func destinations() {
-    let home = FileManager.default.temporaryDirectory.appending(path: "namer-home-\(UUID().uuidString)")
+    let home = FileManager.default.temporaryDirectory.appending(path: "neatly-home-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: home) }
     for d in ["courses-fall26/cs315", "Work/Companies/Nimbus AI", "Work/Companies/Brightline", "Documents/official"] {
         try? FileManager.default.createDirectory(at: home.appending(path: d), withIntermediateDirectories: true)
@@ -195,11 +195,11 @@ func qaFixes() {
 
 func screenshotNaming() {
     // Phrases: cut whole "with …" parts, never leave a joining word at the end, keep the place whole.
-    expect(Namer.phrase(["vintage", "red", "car", "with", "red", "balloons"], maxWords: 4, maxLength: 60, keepEnd: []) == "vintage-red-car")
-    expect(Namer.phrase(["white", "bird", "with", "black", "tips", "on"], maxWords: 6, maxLength: 60, keepEnd: []) == "white-bird-with-black-tips")
-    expect(Namer.phrase(["golden", "gate", "bridge", "in", "fog", "in", "san", "francisco"], maxWords: 6, maxLength: 70,
+    expect(Neatly.phrase(["vintage", "red", "car", "with", "red", "balloons"], maxWords: 4, maxLength: 60, keepEnd: []) == "vintage-red-car")
+    expect(Neatly.phrase(["white", "bird", "with", "black", "tips", "on"], maxWords: 6, maxLength: 60, keepEnd: []) == "white-bird-with-black-tips")
+    expect(Neatly.phrase(["golden", "gate", "bridge", "in", "fog", "in", "san", "francisco"], maxWords: 6, maxLength: 70,
                         keepEnd: ["san", "francisco"]).hasSuffix("in-san-francisco"))
-    expect(Namer.phrase(["cats", "on", "chairs", "in", "istanbul"], maxWords: 5, maxLength: 60, keepEnd: ["istanbul"]) == "cats-on-chairs-in-istanbul")
+    expect(Neatly.phrase(["cats", "on", "chairs", "in", "istanbul"], maxWords: 5, maxLength: 60, keepEnd: ["istanbul"]) == "cats-on-chairs-in-istanbul")
     // Only kind words = vague; a subject makes it specific.
     expect(Model.isVague("chat reminder") && Model.isVague("weather forecast") && Model.isVague("whatsapp message"))
     expect(!Model.isVague("istanbul weather forecast") && !Model.isVague("coldplay concert ticket"))
@@ -221,12 +221,25 @@ func screenshotNaming() {
     // Listings: size + rent on a picture of a page.
     var e = Evidence(url: URL(fileURLWithPath: "/tmp/Screenshot 2026-11-01 at 10.00.00.png"))
     e.bodySnippet = "$3,100/mo\n3 bd · 2 ba · 1,450 sqft\n42 Linden Ave, Portland, OR"
-    expect(Namer().listingName(e)?.hasPrefix("apartment-3-bed-linden") == true)
+    expect(Neatly().listingName(e)?.hasPrefix("apartment-3-bed-linden") == true)
     e.bodySnippet = "Serves 2. Bake for 20 minutes."
-    expect(Namer().listingName(e) == nil)
+    expect(Neatly().listingName(e) == nil)
     expect(e.isScreenshot && !Evidence(url: URL(fileURLWithPath: "/tmp/IMG_1234.JPG")).isScreenshot)
 }
 
-for t in [qaFixes, screenshotNaming, renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
+func softTextAndCasing() {
+    // Fast OCR of a slide in a video call: garbled → the accurate reader runs too.
+    expect(Extract.garbledShare(["Compl8te th8 nevv prcAJucL tinish kw htres ond IKWe four", "A5set & Portfol•o Plannlng Tools",
+                                 "QteupaDcy S T•Thgnt Rl*k", "Op•ratlng Cort Rev•ew"]) >= 0.15)
+    expect(Extract.garbledShare(["Raising $2m to finish the app and grow school sales", "BrightPath by Lumora",
+                                 "Part II: GPS Tools", "Lesson & Homework Planning Tools", "iPhone 4K CS331"]) < 0.15)
+    // Brand names and acronyms keep the file's spelling; a heading in capitals doesn't make acronyms.
+    let c = StyleProfile.casing(in: ["STUDY TOOLS\nPart II: GPS Tools\nBrightPath by Lumora"])
+    expect(c["gps"] == "GPS" && c["ii"] == "II" && c["brightpath"] == "BrightPath" && c["study"] == nil && c["tools"] == nil)
+    var p = StyleProfile(); p.separator = " "; p.lowercase = false
+    expect(p.render("brightpath-contact-list", casing: c) == "BrightPath Contact List")
+}
+
+for t in [softTextAndCasing, qaFixes, screenshotNaming, renameSteps, paperTopics, examples, destinations, styleLearning, period, terms, slugWords, kinds, issuer, papers, junkNames, transcriptRule] { t() }
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

@@ -1,5 +1,5 @@
 import Foundation
-import NamerCore
+import NeatlyCore
 
 // Runs Tests/eval/cases.json and prints a score. Usage: swift run neatly-eval [--offline] [--no-model] [--holdout]
 // --holdout runs Tests/eval/holdout.json instead: cases nobody tuned the rules on, for an honest score.
@@ -43,15 +43,15 @@ let dir = FileManager.default.temporaryDirectory.appending(path: "neatly-eval-\(
 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: dir) }
 
-var namer = Namer()
+var neatly = Neatly()
 // The eval measures the canonical names (lowercase, dashes, kind first); the app's default style only changes how
 // they're written, so pin the classic one here to keep scores comparable across versions.
-namer.profile.separator = "-"; namer.profile.lowercase = true
-namer.useNetwork = !offline
-namer.useModel = !args.contains("--no-model")
-namer.verifyRules = args.contains("--verify")
-namer.history = []   // scores must not depend on whoever runs them: no personal corrections
-print("\nNAMING    model: \(namer.useModel ? Namer.modelStatus : "off")\n")
+neatly.profile.separator = "-"; neatly.profile.lowercase = true
+neatly.useNetwork = !offline
+neatly.useModel = !args.contains("--no-model")
+neatly.verifyRules = args.contains("--verify")
+neatly.history = []   // scores must not depend on whoever runs them: no personal corrections
+print("\nNAMING    model: \(neatly.useModel ? Neatly.modelStatus : "off")\n")
 
 var exact = 0, head = 0, none = 0, run = 0
 var times: [Double] = []
@@ -66,7 +66,7 @@ for c in cases.naming {
     let got: String?
     var via = ""
     // Naming is tested on its own: the decision step was scored above.
-    switch await namer.suggest(for: url, explicit: true) {
+    switch await neatly.suggest(for: url, explicit: true) {
     case .suggested(let s):
         got = s.name; via = s.via; times.append(s.millis)
         if let r = s.evidence.steps.first(where: { $0.hasPrefix("rule-rejected:") }) { via += "  ← model rejected \(r.dropFirst(14))" }

@@ -167,6 +167,40 @@ if want dl-place-many; then setup dl-place-many; start "dialog:place:$T/home/fin
     check "two downloads in a row, each picked: both land there" '[ "$(ls "$T/home/finance" | wc -l | tr -d " ")" = 2 ] && [ -z "$(ls "$T/dl")" ]'
     stop; fi
 
+# Several downloads at once ("Download all"): one popup for the group, not one per file.
+three() { a=$(make cs-syllabus); b=$(make turkcell-invoice); c=$(make northfield-transcript); arrive "$a"; arrive "$b"; arrive "$c"; }
+if want dl-batch-folder; then setup dl-batch-folder; start "batch:folder:Semester Papers"
+    three
+    waitfor '[ "$(ls "$T/dl/Semester Papers" 2>/dev/null | wc -l | tr -d " ")" = 3 ]' 120
+    check "one popup for the group" '[ "$(grep -c "one popup for all" "$T/log")" = 1 ] && ! grep -q "folder:" "$T/log"'
+    check "all three in the new folder" '[ "$(ls "$T/dl/Semester Papers" | wc -l | tr -d " ")" = 3 ] && [ "$(ls "$T/dl")" = "Semester Papers" ]'
+    check "each one named" '[ -f "$T/dl/Semester Papers/cs334-syllabus.pdf" ] && ! ls "$T/dl/Semester Papers" | grep -q "^[0-9_]*\.pdf$"'
+    sleep 2
+    check "the new names aren't asked about again" '[ "$(grep -c "one popup for all" "$T/log")" = 1 ] && ! grep -q "→.*skip" "$T/log"'
+    "$B" undo "$T/dl/Semester Papers/cs334-syllabus.pdf" >/dev/null
+    check "undo puts a file back in Downloads" '[ -f "$T/dl/8812_4471.pdf" ]'
+    stop; fi
+
+if want dl-batch-wait; then setup dl-batch-wait; start "batch:wait" 3
+    three
+    waitfor '[ "$(ls "$T/dl" | grep -c "^[0-9_]*\.pdf$")" = 0 ] && [ -f "$T/dl/cs334-syllabus.pdf" ]' 120
+    check "no answer: all renamed, all still in Downloads" '[ -f "$T/dl/cs334-syllabus.pdf" ] && [ "$(ls "$T/dl" | wc -l | tr -d " ")" = 3 ] && [ -z "$(find "$T/dl" -mindepth 1 -type d)" ]'
+    check "in History as saved while you were away" '[ "$(grep -c "\"auto\":true" "$T/data/history.jsonl")" = 3 ]'
+    stop; fi
+
+if want dl-batch-keep; then setup dl-batch-keep; start "batch:keep"
+    three; names=$(ls "$T/dl")
+    waitfor 'grep -q "left as is" "$T/log"' 120
+    sleep 2
+    check "Leave as Is: nothing renamed" '[ "$(ls "$T/dl")" = "$names" ]'
+    stop; fi
+
+if want dl-batch-two; then setup dl-batch-two; start "batch:keep" 2
+    a=$(make cs-syllabus); b=$(make turkcell-invoice); arrive "$a"; arrive "$b"
+    waitfor '[ "$(grep -c "saved as" "$T/log")" = 2 ]' 120
+    check "two at once: the usual popup for each" '! grep -q "one popup for all" "$T/log" && [ "$(grep -c "saved as" "$T/log")" = 2 ]'
+    stop; fi
+
 if want dl-countdown; then setup dl-countdown; start "dialog:wait" 3
     arrive "$(make cs-syllabus)"
     waitfor '[ -f "$T/dl/cs334-syllabus.pdf" ]' 90
@@ -257,11 +291,11 @@ if want dl-weird-names; then setup dl-weird-names; start "dialog:save"
     check "quotes, accents and dashes in the name: no crash, saved" 'grep -q "saved as" "$T/log"'
     stop; fi
 
-if want dl-burst; then setup dl-burst; start "dialog:save"
+if want dl-burst; then setup dl-burst; start "batch:rename"
     for id in cs-syllabus turkcell-invoice garanti-receipt payslip boarding-pass northfield-transcript homework lab-manual exam-schedule; do
         arrive "$(make $id)"; done
-    waitfor '[ "$(grep -c "saved as" "$T/log")" -ge 9 ]' 300
-    check "9 downloads at once: all 9 handled, none lost" '[ "$(grep -c "saved as" "$T/log")" -ge 9 ]'
+    waitfor '[ "$(grep -c "saved as" "$T/log")" -ge 8 ]' 300
+    check "9 downloads at once: one popup, all named (a name that's already fine stays)" '[ "$(grep -c "one popup for all" "$T/log")" = 1 ] && [ "$(grep -c "saved as" "$T/log")" -ge 8 ]'
     check "every file still exists (renamed or with its downloaded name)" '[ "$(find "$T/dl" "$T/home" -type f | wc -l | tr -d " ")" -ge 9 ]'
     check "Downloads is empty or only renamed files" '! ls "$T/dl" | grep -q -E "^(8812_4471|EAF2026)"'
     stop

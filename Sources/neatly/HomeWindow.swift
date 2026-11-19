@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import NamerCore
+import NeatlyCore
 
 /// The window you get when you open neatly (Spotlight, Applications, or "Open neatly…" in the menu).
 /// Written for people who never open Terminal: one promise, a big drop target, three big buttons,
@@ -136,7 +136,7 @@ final class HomeModel: ObservableObject {
 
     func reload() {
         loading = true
-        let p = namer.profile
+        let p = neatly.profile
         on = !paused
         downloads = p.watchDownloads != false
         screenshots = p.watchScreenshots != false
@@ -178,7 +178,7 @@ final class HomeModel: ObservableObject {
             p.appearance = appearance
         }
         shownStyle = style; shownDateFirst = dateFirst
-        namer.useNetwork = online && !offline
+        neatly.useNetwork = online && !offline
         timeout = countdown
         objectWillChange.send()   // the preview name follows
     }
@@ -236,7 +236,7 @@ final class HomeModel: ObservableObject {
     var preview: String {
         let base = length == .short ? "hot-honey-cornbread" : length == .standard ? "hot-honey-cornbread-recipe"
                                                                                  : "hot-honey-cornbread-recipe-cast-iron"
-        return namer.profile.render(base, date: Date(), app: appName ? "Safari" : nil) + ".png"
+        return neatly.profile.render(base, date: Date(), app: appName ? "Safari" : nil) + ".png"
     }
 }
 
@@ -293,7 +293,7 @@ struct HomeView: View {
                 }
                 .padding(12).warnBox()
             }
-            if !Namer.modelAvailable {
+            if !Neatly.modelAvailable {
                 HStack(spacing: 10) {
                     Image(systemName: "apple.intelligence").foregroundStyle(look.warn)
                     Text("Apple Intelligence is off, so names are simpler.").font(.callout)

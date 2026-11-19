@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests/screens/score.py <shots dir> [neatly binary] [extra neatly args...]: name every screenshot, score against cases.json."""
 import json, os, re, subprocess, sys, tempfile
-d = os.path.abspath(sys.argv[1]); b = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser("~/src/namer/.build/release/neatly")
+d = os.path.abspath(sys.argv[1]); b = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser("~/src/neatly/.build/release/neatly")
 cases = json.load(open(os.path.join(d, "cases.json")))
 data = tempfile.mkdtemp()   # a fresh user: nothing learned yet
 out = subprocess.run([b, *sys.argv[3:], d], capture_output=True, text=True, env={**os.environ, "NEATLY_DATA_DIR": data}).stdout

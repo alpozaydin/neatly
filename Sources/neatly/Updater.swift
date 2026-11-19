@@ -1,6 +1,6 @@
 import Foundation
 import CryptoKit
-import NamerCore
+import NeatlyCore
 
 /// Keeps neatly up to date by itself — once the person said yes (asked once, in the welcome window).
 /// Every few hours, when online: ask GitHub for the latest release; if it's newer, download it, check its SHA-256
@@ -132,7 +132,7 @@ enum Updater {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(ProcessInfo.processInfo.environment["NEATLY_UPDATE_SOON"] != nil ? 2 : 120))
             while true {
-                if namer.profile.autoUpdate == true, let v = await checkOnce() {
+                if neatly.profile.autoUpdate == true, let v = await checkOnce() {
                     print("updated to neatly \(v)")
                     try? Data(v.utf8).write(to: Correction.fileURL.deletingLastPathComponent().appending(path: ".updated"))
                     // Restart into the new version once nothing is on screen (launchd starts it again right away).

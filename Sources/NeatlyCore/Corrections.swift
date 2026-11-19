@@ -5,12 +5,12 @@ import Foundation
 public struct Correction: Codable, Sendable {
     public var date = Date()
     public var original: String     // filename before
-    public var suggested: String    // what namer proposed
+    public var suggested: String    // what neatly proposed
     public var chosen: String       // what you typed ("" = you kept the original name)
     public var via: String
     public var source: String?
     public var title: String?
-    public var suggestedFolder: String?   // where namer proposed to put it (nil = Downloads)
+    public var suggestedFolder: String?   // where neatly proposed to put it (nil = Downloads)
     public var chosenFolder: String?      // where you actually put it
     public var auto: Bool?                // saved by the countdown, not by you: not a signal of what you want
     public var context: String?           // one line on what the file was about, for finding similar files later
@@ -23,7 +23,7 @@ public struct Correction: Codable, Sendable {
         self.auto = auto; self.context = context
     }
 
-    /// What the file was about. Older entries have no context: fall back to the title and namer's guess.
+    /// What the file was about. Older entries have no context: fall back to the title and neatly's guess.
     var about: String {
         context ?? [title, suggested.replacingOccurrences(of: "-", with: " "), source.map { "from \($0)" }]
             .compactMap { $0 }.joined(separator: ". ")

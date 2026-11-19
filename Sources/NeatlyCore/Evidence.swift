@@ -47,6 +47,13 @@ public struct Evidence: Sendable {
         return nil
     }
 
+    /// Where a downloaded file came from, read straight from the file (nothing else is read).
+    public static func sourceHost(of url: URL) -> String? {
+        var e = Evidence(url: url)
+        e.sourceURLs = Extract.sourceURLs(url)
+        return e.sourceHost
+    }
+
     /// Human description of the source for the model ("Gmail attachment", "Google Images", "recraft.ai").
     public var sourceDescription: String? {
         guard let host = sourceHost else { return nil }

@@ -1,5 +1,5 @@
 import AppKit
-import NamerCore
+import NeatlyCore
 
 /// The menu-bar icon: Tidy, naming options, Pause, Undo. Drop files or a folder on it to name them.
 /// Settings change the same style.json as `neatly style`, and apply to the next file right away.
@@ -13,7 +13,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.isVisible = !headless
         item.button?.image = Icon.menuBarGlyph()
-        Appearance.apply(namer.profile.appearance)
+        Appearance.apply(neatly.profile.appearance)
         item.button?.toolTip = "neatly — drop files or a folder here to name them"
         menu.delegate = self
         menu.autoenablesItems = false   // items are enabled/disabled by hand (Undo greys out when there's nothing)
@@ -45,7 +45,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let p = namer.profile
+        let p = neatly.profile
         let status = NSMenuItem(title: paused ? "Paused" : "Naming downloads and screenshots", action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
@@ -116,8 +116,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         let p = Process()
         p.executableURL = selfExecutable
         var flags: [String] = []
-        if offline || !namer.useNetwork { flags.append("--offline") }     // --offline means offline everywhere
-        if !namer.useModel { flags.append("--no-model") }
+        if offline || !neatly.useNetwork { flags.append("--offline") }     // --offline means offline everywhere
+        if !neatly.useModel { flags.append("--no-model") }
         // Thousands of files (⌘A in a photo folder) can't go on a command line (limit 4096 arguments, and a
         // total size): hand them over in a list file instead.
         if paths.count > 200 {
@@ -170,8 +170,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
     }
 
     func change(_ edit: (inout StyleProfile) -> Void) {
-        edit(&namer.profile)
-        try? namer.profile.save()
+        edit(&neatly.profile)
+        try? neatly.profile.save()
     }
 
     @objc func setLength(_ sender: NSMenuItem) {

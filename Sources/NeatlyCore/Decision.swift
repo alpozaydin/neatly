@@ -17,7 +17,7 @@ public enum Decision: Sendable, Equatable {
         _ = setxattr(url.path, keepAttr, v, v.count, 0, 0)
     }
 
-    static func hasKeepMark(_ url: URL) -> Bool {
+    public static func hasKeepMark(_ url: URL) -> Bool {
         ([keepAttr] + ["dev.filed.keep", "dev.namer.keep"]).contains { getxattr(url.path, $0, nil, 0, 0, 0) > 0 }   // + old names
     }
 
@@ -25,7 +25,7 @@ public enum Decision: Sendable, Equatable {
     public static func make(for url: URL, explicit: Bool = false) -> Decision {
         let stem = url.deletingPathExtension().lastPathComponent
         if hasKeepMark(url) { return .keep(why: "you chose this name") }
-        if Rename.originalName(url) != nil, !explicit { return .keep(why: "already renamed by namer") }
+        if Rename.originalName(url) != nil, !explicit { return .keep(why: "already renamed by neatly") }
         if explicit { return .rename(why: "requested") }
         if let junk = junkReason(stem) { return .rename(why: junk) }
         return .keep(why: "name already meaningful")
