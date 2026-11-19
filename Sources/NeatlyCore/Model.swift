@@ -265,7 +265,11 @@ enum Model {
                 // …but an "error message" or a "warning text" isn't a chat.
                 let notChat: Set<String> = ["error", "warning", "alert", "dialog", "notification", "code", "verification", "system"]
                 let isChat = direct.map { let w = Style.words($0); return w.contains { chatWords.contains($0) } && !w.contains { notChat.contains($0) } } ?? false
-                if let d = direct, isVague(d), let b = e.bodySnippet, b.count > 20 {
+                // A shop's name plus kind words ("amazon order confirmation") says no more than the kind alone.
+                let shop = Set(siteOnScreen(e.bodySnippet ?? "").map { Style.words($0.split(separator: ".").dropLast().joined(separator: " ")) } ?? [])
+                let vague = direct.map { d in isVague(d) || (!shop.isEmpty && Style.words(d).allSatisfy { kindWords.contains($0) || shop.contains($0) }
+                                                             && Style.words(d).contains { shop.contains($0) }) } ?? false
+                if let d = direct, vague, let b = e.bodySnippet, b.count > 20 {
                     // Asked to "make it specific" a 3B model rewords the same thing ("whatsapp message thread").
                     // Asked only for the TOPIC, it answers well; the kind word comes from its first answer.
                     let r = LanguageModelSession(instructions: """
@@ -282,19 +286,52 @@ enum Model {
                     - "studio · 1 ba · $1,800/mo" -> studio apartment
                     """)
                     let t = (e.headline.map { "Biggest text: \($0)\n" } ?? "") + "Text on screen:\n\(String(screenBody(b).prefix(600)))\nTopic:"
-                    let topic = (try? await r.respond(to: t, options: GenerationOptions(temperature: 0)).content)?
-                        .split(whereSeparator: \.isNewline).first.map { String($0).replacingOccurrences(of: "topic:", with: "", options: .caseInsensitive) }
+                    func ask(_ t: String) async -> String? {
+                        (try? await r.respond(to: t, options: GenerationOptions(temperature: 0)).content)?
+                            .split(whereSeparator: \.isNewline).first.map { String($0).replacingOccurrences(of: "topic:", with: "", options: .caseInsensitive) }
+                    }
+                    var topic = await ask(t)
+                    // Still only the kind ("order confirmation")? The heading pulls it there: ask again without the
+                    // heading and the lines that only say what kind of screen it is ("Thanks, your order is placed").
+                    if topic.map(isVague) ?? true {
+                        let rest = screenBody(b).split(whereSeparator: \.isNewline).filter { line in
+                            line != e.headline.map { Substring($0) } && !Style.words(String(line)).contains { kindWords.contains($0) || ["thanks", "thank", "placed", "confirmed"].contains($0) }
+                        }
+                        if rest.count >= 1, rest.joined().filter(\.isLetter).count >= 12 {
+                            topic = await ask("Text on screen:\n\(String(rest.joined(separator: "\n").prefix(600)))\nTopic:") ?? topic
+                        }
+                    }
                     let apps: Set<String> = ["whatsapp", "slack", "safari", "chrome", "finder", "imessage", "facetime", "github",
                                              "messages", "mail", "app", "application", "browser", "web", "page", "website", "screen", "screenshot", "system"]
-                    let kind = Style.words(d).filter { !apps.contains($0) && !["a", "an", "the", "of", "with", "and", "for", "new", "my", "your"].contains($0) }
+                    let kind = Style.words(d).filter { !apps.contains($0) && !shop.contains($0) && !["a", "an", "the", "of", "with", "and", "for", "new", "my", "your"].contains($0) }
                     if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
                         FileHandle.standardError.write(Data("--- vague \(d), topic \(topic ?? "nil")\n".utf8))
                     }
                     if let topic, !isVague(topic), !refineExampleTopics.contains(Style.words(topic).joined(separator: " ")) {
                         let tw = Style.words(topic).filter { !apps.contains($0) }
-                        let k = isChat ? ["chat"] : Array(kind.filter { !tw.contains($0) }.suffix(1))
+                        // The word that says what it is ("order", not "confirmation"); else the last kind word.
+                        let main = ["order", "ticket", "receipt", "invoice", "booking", "reservation", "directions"]
+                        let k = isChat ? ["chat"] : (kind.first { main.contains($0) && !tw.contains($0) }.map { [$0] }
+                                                     ?? Array(kind.filter { !tw.contains($0) }.suffix(1)))
                         direct = (tw + k.filter { !tw.contains($0) }).joined(separator: " ")
                     }
+                }
+                // Directions: where to is the whole point ("directions to sfo"). Short airport-style codes win.
+                if let d = direct, Style.words(d).contains(where: { ["directions", "route", "map", "maps"].contains($0) }),
+                   let to = (e.bodySnippet ?? "").split(whereSeparator: \.isNewline)
+                       .compactMap({ $0.firstMatch(of: /^\s*To:\s*(.+)$/).map { String($0.1) } }).first {
+                    let code = to.firstMatch(of: /\(([A-Z]{2,5})\)/).map { String($0.1) }
+                    let place = code ?? Style.words(to).prefix(3).joined(separator: " ")
+                    if !place.isEmpty, !Style.words(d).contains(where: { Style.words(place).contains($0) }) {
+                        direct = "directions to " + place.lowercased()
+                    }
+                }
+                // It said what it is ("a concert ticket") but the name lost the kind: put it back at the end.
+                let kinds = ["ticket", "boarding pass", "receipt", "invoice", "recipe", "order", "booking", "reservation"]
+                if let d = direct, !d.isEmpty, let k = kinds.first(where: { about.lowercased().contains($0) }),
+                   !Style.words(d).contains(where: { kindWords.contains($0) || Style.words(k).contains($0) }),
+                   Style.words(d).count < words.upperBound + 2 {
+                    direct = d + " " + k
                 }
                 if ProcessInfo.processInfo.environment["NEATLY_DEBUG"] != nil {
                     FileHandle.standardError.write(Data("--- screenshot\n\(q)\n--- answer\n\(out)\n".utf8))
