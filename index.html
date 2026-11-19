@@ -1,12 +1,17 @@
 ---
 layout: default
-title: "Clear names for your files, automatically (free Mac app)"
+title: "neatly — free AI file renamer for Mac"
 description: "neatly gives your downloads, screenshots and photos clear names by itself. A free Mac app: download, drag to Applications, done. Private: everything stays on your Mac."
 ---
 <style>
   .hero { text-align:center; padding:28px 0 8px; }
   .hero img.icon { width:112px; height:112px; filter:drop-shadow(0 10px 22px rgba(16,57,42,.25)); }
   .hero h1 { font-size:46px; margin:14px 0 6px; letter-spacing:-.5px; }
+  .hero h1 .kind { display:block; font-size:19px; font-weight:600; color:var(--muted); letter-spacing:0; margin-top:4px; }
+  .shot video, .pair video { display:block; width:100%; height:auto; }
+  .guides { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  .guides a { display:block; border:1px solid var(--line); border-radius:14px; padding:14px 18px; text-decoration:none; color:var(--deep); font-weight:600; }
+  .guides a span { display:block; color:var(--muted); font-weight:400; font-size:15px; }
   .hero .lead { font-size:22px; color:var(--ink); margin:0 auto 6px; max-width:640px; }
   .hero .sub { color:var(--muted); margin:0 auto 26px; max-width:600px; }
   .btn { display:inline-flex; align-items:center; gap:10px; background:var(--deep); color:#fff !important; text-decoration:none;
@@ -39,19 +44,19 @@ description: "neatly gives your downloads, screenshots and photos clear names by
   .final h2 { border:none; margin-top:0; }
   .dev { text-align:center; color:var(--muted); font-size:15px; }
   @media (max-width: 720px) {
-    .hero h1 { font-size:36px; } .steps, .cards, .pair { grid-template-columns:1fr; }
+    .hero h1 { font-size:36px; } .steps, .cards, .pair, .guides { grid-template-columns:1fr; }
   }
 </style>
 
 <div class="hero">
   <img class="icon" src="{{ '/docs/assets/icon.png' | relative_url }}" alt="neatly icon">
-  <h1>neatly</h1>
+  <h1>neatly <span class="kind">Free AI file renamer for Mac</span></h1>
   <p class="lead">Clear names for your files, automatically.</p>
   <p class="sub">No more <code>IMG_4821.jpg</code> or <code>Screenshot 2026-11-14 at 23.12.04.png</code>.
      neatly gives your downloads, screenshots and photos real names, by itself. Free, and everything stays on your Mac.</p>
   <a class="btn" href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">⬇️&nbsp; Download for Mac</a>
   <div class="fine">Free · For Macs with Apple silicon (M1 or newer) and macOS 26 or newer · Checked and approved by Apple</div>
-  <div class="shot"><img src="{{ '/docs/assets/demo.gif' | relative_url }}" alt="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"></div>
+  <div class="shot"><video autoplay muted loop playsinline width="1200" height="750" poster="{{ '/docs/assets/demo-poster.jpg' | relative_url }}" aria-label="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"><source src="{{ '/docs/assets/demo.mp4' | relative_url }}" type="video/mp4"><img src="{{ '/docs/assets/demo.gif' | relative_url }}" alt="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"></video></div>
 </div>
 
 <section id="install">
@@ -77,14 +82,14 @@ description: "neatly gives your downloads, screenshots and photos clear names by
 
 <section>
   <h2>Before and after</h2>
-  <div class="shot" style="margin-top:20px"><img src="{{ '/docs/assets/hero.png' | relative_url }}" alt="Messy file names on the left, clear names from neatly on the right"></div>
+  <div class="shot" style="margin-top:20px"><img src="{{ '/docs/assets/hero.png' | relative_url }}" loading="lazy" alt="Messy file names on the left, clear names from neatly on the right"></div>
 </section>
 
 <section>
   <h2>On a real Mac</h2>
   <div class="pair" style="margin-top:20px">
-    <figure><img src="{{ '/docs/assets/real-screenshot.gif' | relative_url }}" alt="A screenshot of the Hubble Space Telescope page gets its name right away"><figcaption>📸 A screenshot, named as it's taken</figcaption></figure>
-    <figure><img src="{{ '/docs/assets/real-download.gif' | relative_url }}" alt="A downloaded research paper gets its title as its name"><figcaption>📥 A downloaded paper, named by its title</figcaption></figure>
+    <figure><video autoplay muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-screenshot-poster.jpg' | relative_url }}" aria-label="A screenshot of the Hubble Space Telescope page gets its name right away"><source src="{{ '/docs/assets/real-screenshot.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📸 A screenshot, named as it's taken</figcaption></figure>
+    <figure><video autoplay muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-download-poster.jpg' | relative_url }}" aria-label="A downloaded research paper gets its title as its name"><source src="{{ '/docs/assets/real-download.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📥 A downloaded paper, named by its title</figcaption></figure>
   </div>
 </section>
 
@@ -109,6 +114,17 @@ description: "neatly gives your downloads, screenshots and photos clear names by
       <li>For the best names, turn on <b>Apple Intelligence</b>: System Settings → Apple Intelligence &amp; Siri.</li>
     </ol>
     <p style="margin:12px 0 0;color:var(--muted)">To remove neatly later: open it → More options → Uninstall neatly.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Guides</h2>
+  <p class="intro">Ways to get clear file names on a Mac, with and without neatly.</p>
+  <div class="guides">
+    <a href="{{ '/rename-screenshots-mac/' | relative_url }}">Rename screenshots automatically on Mac<span>Name each screenshot by what's on screen.</span></a>
+    <a href="{{ '/organize-downloads-mac/' | relative_url }}">Organize the Downloads folder on Mac<span>Clear names and the right folder for every download.</span></a>
+    <a href="{{ '/ai-file-renamer-mac/' | relative_url }}">AI file renamer for Mac<span>How AI renaming works, and how to keep it private.</span></a>
+    <a href="{{ '/alternatives/' | relative_url }}">neatly vs Finder, Shortcuts and Hazel<span>Which tool fits which job.</span></a>
   </div>
 </section>
 
