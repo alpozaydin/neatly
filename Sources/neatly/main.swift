@@ -36,7 +36,7 @@ var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn
 if args.isEmpty { args = ["--watch", Home.real.appending(path: "Downloads").path, "--ask", "--screenshots", "--menubar"] }
 #endif
 FolderAccess.resume()   // App Store version: the folder permission you gave (every process, Tidy windows too)
-let version = "0.6.4"
+let version = "0.6.5"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
