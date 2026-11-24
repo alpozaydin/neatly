@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 import NeatlyCore
 
-/// Keeps neatly up to date by itself — once the person said yes (asked once, in the welcome window).
+/// Keeps neatly up to date by itself: on from the start, can be turned off in the window (More options).
 /// Every few hours, when online: ask GitHub for the latest release; if it's newer, download it, check its SHA-256
 /// against the published one, make sure the new program actually runs, update neatly.app in place, and restart.
 /// Any failure (offline, bad download, mismatch) changes nothing; it simply tries again later.
@@ -126,13 +126,15 @@ enum Updater {
         }
     }
 
-    /// In the background service: check a little after start, then every 6 hours, only if the person said yes.
+    /// In the background service: check a little after start, then every 6 hours, unless it's turned off.
+    /// Tests (NEATLY_HEADLESS) never ask the real GitHub or touch the real app: only a fake release they set up.
     @MainActor static func start() {
         checkHealth()
+        if headless && ProcessInfo.processInfo.environment["NEATLY_UPDATE_URL"] == nil { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(ProcessInfo.processInfo.environment["NEATLY_UPDATE_SOON"] != nil ? 2 : 120))
             while true {
-                if neatly.profile.autoUpdate == true, let v = await checkOnce() {
+                if neatly.profile.autoUpdate != false, let v = await checkOnce() {
                     print("updated to neatly \(v)")
                     try? Data(v.utf8).write(to: Correction.fileURL.deletingLastPathComponent().appending(path: ".updated"))
                     // Restart into the new version once nothing is on screen (launchd starts it again right away).

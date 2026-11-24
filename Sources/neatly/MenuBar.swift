@@ -33,6 +33,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         // "Open neatly" from Spotlight/Applications while it runs → show the window here.
         DistributedNotificationCenter.default().addObserver(forName: HomeWindow.showNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { HomeWindow.shared.show() }
+            DistributedNotificationCenter.default().postNotificationName(HomeWindow.shownNotification, object: nil,
+                                                                         userInfo: nil, deliverImmediately: true)
         }
         // First run after installing: show the window, which explains the folder permission prompts before
         // macOS shows them (the watchers wait for its Continue button).
@@ -291,6 +293,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         HomeWindow.shared.show()
         return true
+    }
+
+    /// The App Store version starts when you open it (Spotlight, Launchpad, Finder) or at login. Opened by you:
+    /// show the window right away, so the first open works. At login: stay quietly in the menu bar.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if APPSTORE
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        let atLogin = event?.eventID == AEEventID(kAEOpenApplication)
+            && event?.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue == OSType(keyAELaunchedAsLogInItem)
+        print("app: opened \(atLogin ? "at login" : openedAsApp ? "by you" : "from the command line")")
+        if openedAsApp, !atLogin, Welcome.done, !headless { HomeWindow.shared.show() }
+        #endif
     }
 }
 

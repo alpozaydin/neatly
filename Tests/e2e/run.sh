@@ -29,7 +29,7 @@ setup() {
     [ "${KEEP_DEFAULT_STYLE:-}" = 1 ] || "$B" style --sep dash --case lower >/dev/null 2>&1
     echo "• $1"
 }
-start() { NEATLY_UI_TEST="$1" "$B" --watch "$T/dl" --ask --screenshots --timeout "${2:-3}" > "$T/log" 2>&1 & PID=$!; sleep 3; }
+start() { NEATLY_UI_TEST="$1" "$B" --watch "$T/dl" --ask --screenshots --timeout "${2:-3}" ${3:-} > "$T/log" 2>&1 & PID=$!; sleep 3; }   # $3: extra flags
 stop() { kill "$PID" 2>/dev/null; wait "$PID" 2>/dev/null; }
 make() { "$E" --make "$1" "$T/stage" 2>/dev/null | tail -1; }        # a test file, with its "downloaded from" data
 arrive() { mv "$1" "$T/dl/"; }                                         # a download finishing = a file appearing
@@ -188,6 +188,15 @@ if want dl-batch-wait; then setup dl-batch-wait; start "batch:wait" 3
     check "in History as saved while you were away" '[ "$(grep -c "\"auto\":true" "$T/data/history.jsonl")" = 3 ]'
     stop; fi
 
+# "Change nothing" chosen for when you don't answer: the group is left exactly as it arrived.
+if want dl-batch-leave; then setup dl-batch-leave; start "batch:wait" 3 --leave-if-away
+    three
+    waitfor 'grep -q "no answer, left as is" "$T/log"' 120
+    sleep 2
+    check "Change nothing: no answer, no file renamed or moved" '[ -f "$T/dl/8812_4471.pdf" ] && [ "$(ls "$T/dl" | wc -l | tr -d " ")" = 3 ] && [ -z "$(find "$T/dl" -mindepth 1 -type d)" ] && ! grep -q "saved as" "$T/log"'
+    check "not marked as names you chose (Tidy still offers them)" '! xattr "$T/dl/8812_4471.pdf" | grep -q dev.neatly.keep'
+    stop; fi
+
 if want dl-batch-keep; then setup dl-batch-keep; start "batch:keep"
     three; names=$(ls "$T/dl")
     waitfor 'grep -q "left as is" "$T/log"' 120
@@ -214,6 +223,17 @@ if want dl-look; then setup dl-look; start "dialog:snapshot=$T/dialog.png" 4
     waitfor '[ -s "$T/dialog.png" ]' 90
     check "download popup drawn (light and dark)" '[ -s "$T/dialog.png" ] && [ -s "$T/dialog-dark.png" ]'
     waitfor 'grep -q "saved as" "$T/log"' 30
+    stop; fi
+
+# "Change nothing" chosen for when you don't answer: same name, same place, even with a rule for that site.
+if want dl-countdown-leave; then setup dl-countdown-leave
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['rules']={'learn.northfield.edu':'$T/home/finance'};json.dump(d,open(p,'w'))"
+    start "dialog:wait" 3 --leave-if-away
+    arrive "$(make cs-syllabus)"
+    waitfor 'grep -q "no answer, left as is" "$T/log"' 90
+    sleep 1
+    check "Change nothing: no answer, same name, same place" '[ -f "$T/dl/8812_4471.pdf" ] && [ "$(ls "$T/dl" | wc -l | tr -d " ")" = 1 ] && [ -z "$(ls "$T/home/finance")" ] && ! grep -q "saved as" "$T/log"'
+    check "nothing in History, no Undo pill, not marked as your choice" '! grep -q 8812_4471 "$T/data/history.jsonl" 2>/dev/null && ! xattr "$T/dl/8812_4471.pdf" | grep -q dev.neatly.keep'
     stop; fi
 
 # A rule ("Always do this") is followed even when nobody answers.
@@ -530,11 +550,12 @@ fi
 # ─── The neatly window (opened from Spotlight/Applications) ──────────────────
 if want home; then setup home
     "$E" --make shot-recipe "$T/stage" >/dev/null 2>&1
-    NEATLY_UI_TEST="home:length=detailed,home:style=title,home:date=on,home:countdown=10,home:screenshots=off,home:appearance=light,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png,home:snapshot=$T/home.png" \
+    NEATLY_UI_TEST="home:length=detailed,home:style=title,home:date=on,home:countdown=10,home:away=leave,home:screenshots=off,home:appearance=light,home:drop=$T/stage/Screenshot 2026-10-09 at 11.26.48.png,home:snapshot=$T/home.png" \
         "$B" --watch "$T/dl" --screenshots --menubar > "$T/log" 2>&1 & PID=$!; sleep 5
     s=$(cat "$T/data/style.json")
     check "appearance (Light) is saved" 'grep -q "\"appearance\" : \"light\"" "$T/data/style.json"'
     check "window choices are saved (length, style, date, countdown)" 'echo "$s" | grep -q detailed && echo "$s" | grep -q prefix && echo "$s" | grep -q "\"countdown\" : 10" && echo "$s" | grep -q "\"lowercase\" : false"'
+    check "“Change nothing” if you don't answer is saved" 'echo "$s" | grep -q "\"leaveIfAway\" : true"'
     check "dropping files on the window opens Tidy for them" 'grep -q "dropped 1 item" "$T/log"'
     pkill -f "neatly tidy $T" 2>/dev/null
     "$E" --make shot-weather "$T/stage" >/dev/null 2>&1; mv "$T/stage/Screenshot 2026-10-11 at 09.20.03.png" "$T/shots/"; sleep 6
@@ -579,15 +600,16 @@ if want update; then setup update; mkdir -p "$T/apps" "$T/rel"
     out=$(NEATLY_VERSION_OVERRIDE=0.0.1 "$B" update 2>&1)
     check "newer version: downloaded, checked and installed" 'echo "$out" | grep -q "updated to neatly $v"'
     check "…in place (Launchpad keeps it), signed, runs" '[ "$(stat -f %i "$T/apps/neatly.app")" = "$ino" ] && codesign --verify --deep "$T/apps/neatly.app" 2>/dev/null && "$T/apps/neatly.app/Contents/MacOS/neatly" --version | grep -q "$v"'
-    # The background service does it by itself — only after the person said yes.
+    # The background service does it by itself: on from the start, unless you turned it off.
     NEATLY_DATA_DIR=$T/data "$B" style --length short >/dev/null
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['autoUpdate']=False;json.dump(d,open(p,'w'))"
     NEATLY_VERSION_OVERRIDE=0.0.1 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!; sleep 6
-    check "not asked yet / said no: never updates" '! grep -q "updated to" "$T/log"'
+    check "turned off: never updates" '! grep -q "updated to" "$T/log"'
     stop
-    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d['autoUpdate']=True;json.dump(d,open(p,'w'))"
+    python3 -c "import json;p='$T/data/style.json';d=json.load(open(p));d.pop('autoUpdate',None);json.dump(d,open(p,'w'))"
     NEATLY_VERSION_OVERRIDE=0.0.1 NEATLY_UPDATE_SOON=1 "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!
     waitfor 'grep -q "updated to" "$T/log"' 40
-    check "said yes once: the service updates by itself" 'grep -q "updated to neatly $v" "$T/log"'
+    check "fresh install: the service updates by itself (on by default)" 'grep -q "updated to neatly $v" "$T/log"'
     stop
     check "the version before is kept, to go back to" '[ -x "$T/data/previous/neatly" ] && [ "$(cat "$T/data/previous/version")" = "0.0.1" ]'
     # The new version keeps crashing (3 starts without running 2 minutes): the 4th start goes back.
@@ -613,6 +635,16 @@ if want installer; then setup installer; mkdir -p "$T/rel"
 fi
 
 # ─── neatly.app (built into a temp folder; never touches the installed app or login item) ───
+# Opened from Spotlight while neatly is still starting (it wasn't running): the window comes up the first time.
+if want open-early; then setup open-early
+    "$B" show-window > /dev/null 2>&1 & OP=$!
+    sleep 3
+    "$B" --watch "$T/dl" --menubar > "$T/log" 2>&1 & PID=$!
+    waitfor '! kill -0 $OP 2>/dev/null' 20
+    check "opened while it was still starting: the window shows the first time" 'grep -q "home: shown" "$T/log"'
+    check "…and the opener stops asking once the window is up" '! kill -0 $OP 2>/dev/null && [ "$(grep -c "home: shown" "$T/log")" -le 2 ]'
+    kill $OP 2>/dev/null; stop; fi
+
 if want app; then setup app; mkdir -p "$T/apps"
     NEATLY_APP_DIR=$T/apps "$B" app-bundle > /dev/null
     A=$T/apps/neatly.app

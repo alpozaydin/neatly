@@ -13,10 +13,11 @@ public struct StyleProfile: Codable, Sendable, Equatable {
     public var appName: Bool?        // screenshots: add the app they were taken in ("… in Safari")
     public var copyScreenshots: Bool? // screenshots: also put the image on the clipboard
     public var countdown: Int?        // download popup: seconds before it saves by itself (0 = wait)
+    public var leaveIfAway: Bool?     // download popup: when nobody answers, change nothing (nil = keep the new name, in Downloads)
     public var watchDownloads: Bool?  // nil/true = suggest names for new downloads
     public var watchScreenshots: Bool? // nil/true = name new screenshots
     public var appearance: String?    // "light" / "dark"; nil = follow the Mac
-    public var autoUpdate: Bool?      // asked once in the welcome window; nil = not asked yet
+    public var autoUpdate: Bool?      // nil/true = keeps itself up to date (website/Homebrew version); false = turned off
     public var onlineLookups: Bool?   // nil/true = look up paper titles on arXiv (the only lookup that leaves your Mac)
     public var rules: [String: String]? // "Always do this": downloads from this site → this folder
 

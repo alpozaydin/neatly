@@ -97,7 +97,7 @@ no tracking, no cloud AI. Nothing about your files is uploaded.
 
 Only three small things ever go online, never the files themselves:
 
-- **Update check**: asks GitHub if there's a new version (only if you said yes).
+- **Update check**: asks GitHub if there's a new version (on unless you turn it off).
 - **Paper titles**: a research paper's arXiv number, to get its real title.
 - **Photo places**: a phone photo's GPS coordinates (just the two numbers) go to Apple Maps, to name the place.
 

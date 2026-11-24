@@ -14,9 +14,9 @@ Needs a Mac with Apple silicon and macOS 26 or newer. Turn on Apple Intelligence
 everything except the last step below works without it. No Xcode needed.
 
 This installs **neatly.app** (in Applications, Spotlight and your menu bar) and starts it at login.
-The first time it opens, neatly asks once whether to **keep itself up to date**. If you say yes, new versions
-install quietly in the background whenever you're online (each download's SHA-256 is checked first; a mismatch
-changes nothing). If a new version keeps crashing, neatly goes back to the previous one by itself.
+neatly **keeps itself up to date**: new versions install quietly in the background whenever you're online
+(each download's SHA-256 is checked first; a mismatch changes nothing). Turn it off in **More options → Update
+neatly automatically**. If a new version keeps crashing, neatly goes back to the previous one by itself.
 The installer checks the download's SHA-256 before installing anything, and each release carries a signed record
 of how GitHub built it (`gh attestation verify neatly-macos-arm64.tar.gz -R alpozaydin/neatly`).
 Uninstall: open neatly → **More options → Uninstall neatly** (or `neatly service uninstall`; then `brew uninstall neatly`
@@ -26,7 +26,7 @@ if you used Homebrew). Moved neatly.app to another folder? Open it once from the
 
 Your files are read and named on your Mac. Three things go online:
 
-- **Update check** (only if you said yes): asks GitHub for the latest release. Nothing about you or your files is sent.
+- **Update check** (on unless you turn it off): asks GitHub for the latest release. Nothing about you or your files is sent.
 - **Paper lookup**: for a research paper with an arXiv number (e.g. `2405.12345.pdf`), neatly asks
   export.arxiv.org for its real title. Only that number is sent.
 - **Photo places**: a photo from a phone records where it was taken. neatly asks Apple's map service which place

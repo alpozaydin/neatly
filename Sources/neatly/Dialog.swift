@@ -7,6 +7,7 @@ import QuickLookThumbnailing
 /// The download popup: a picture of the file, the suggested name (editable), where it goes, and Save.
 /// If nobody answers, the new name is kept but the file stays in Downloads (unless one of your rules says
 /// where it goes), so agents and scripts never wait on a click and nothing disappears into a folder unseen.
+/// With "Change nothing" chosen in the window (`leave`), no answer means no change at all, rules included.
 /// It never takes the keyboard: whatever you're typing elsewhere stays there until you click the popup.
 /// Hovering or typing stops the countdown.
 ///
@@ -23,9 +24,10 @@ final class DialogModel: ObservableObject {
     let file: String
     let duplicate: URL?      // the same file you already have
     let pinned: Bool         // the folder comes from one of your rules: it's used even when nobody answers
-    init(file: String, name: String, folder: URL?, seconds: Int, duplicate: URL?, pinned: Bool) {
+    let leave: Bool          // nobody answers → change nothing (instead of keeping the new name)
+    init(file: String, name: String, folder: URL?, seconds: Int, duplicate: URL?, pinned: Bool, leave: Bool = false) {
         self.file = file; self.name = name; self.folder = folder; self.remaining = seconds
-        self.counting = seconds > 0; self.duplicate = duplicate; self.pinned = pinned
+        self.counting = seconds > 0; self.duplicate = duplicate; self.pinned = pinned; self.leave = leave
     }
 }
 
@@ -39,8 +41,10 @@ final class CountdownDialog: NSObject {
                       styleMask: [.titled, .closable, .nonactivatingPanel, .fullSizeContentView], backing: .buffered, defer: false)
     var timer: Timer?
 
-    init(file: String, name: String, folder: URL?, seconds: Int, path: URL? = nil, duplicate: URL? = nil, pinned: Bool = false) {
-        model = DialogModel(file: file, name: name, folder: folder, seconds: seconds, duplicate: duplicate, pinned: pinned)
+    init(file: String, name: String, folder: URL?, seconds: Int, path: URL? = nil, duplicate: URL? = nil, pinned: Bool = false,
+         leave: Bool = false) {
+        model = DialogModel(file: file, name: name, folder: folder, seconds: seconds, duplicate: duplicate, pinned: pinned,
+                            leave: leave)
         super.init()
         let view = DialogView(model: model, save: { [weak self] in self?.saveNow(auto: false) },
                               keep: { [weak self] in self?.finish("keep") },
@@ -92,7 +96,7 @@ final class CountdownDialog: NSObject {
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
                     self.model.remaining -= 1
-                    if self.model.remaining <= 0 { self.saveNow(auto: true) }
+                    if self.model.remaining <= 0 { self.timeUp() }
                 }
             }
         }
@@ -143,6 +147,9 @@ final class CountdownDialog: NSObject {
         panel.orderOut(nil)
         onFinish(line)
     }
+
+    /// The countdown ran out: keep the new name, or change nothing if that's what you chose.
+    func timeUp() { if model.leave { finish("none") } else { saveNow(auto: true) } }
 
     /// auto = the countdown ran out: nobody looked, so this mustn't be read as "the person agreed".
     func saveNow(auto: Bool) {
@@ -248,6 +255,7 @@ struct DialogView: View {
     var status: String {
         guard model.counting else { return "" }
         let s = "\(max(model.remaining, 0)) s"
+        if model.leave { return "Away? In \(s) nothing changes." }
         if model.pinned { return "Saves in \(s), by your rule." }
         return model.duplicate != nil ? "Away? In \(s) both are kept." : "Away? In \(s) it's renamed and stays in Downloads."
     }
@@ -424,10 +432,10 @@ enum InApp {
     static func release(_ o: NSObject) { open.removeAll { $0 === o } }
 
     static func ask(file: String, suggestion: String, folder: URL?, seconds: Int, path: URL? = nil,
-                    duplicate: URL? = nil, pinned: Bool = false) async -> String {
+                    duplicate: URL? = nil, pinned: Bool = false, leave: Bool = false) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
             let d = CountdownDialog(file: file, name: suggestion, folder: folder, seconds: seconds, path: path,
-                                    duplicate: duplicate, pinned: pinned)
+                                    duplicate: duplicate, pinned: pinned, leave: leave)
             open.append(d)
             d.onFinish = { line in open.removeAll { $0 === d }; c.resume(returning: line) }
             d.present()

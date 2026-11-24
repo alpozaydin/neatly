@@ -9,8 +9,10 @@ import SwiftUI
 ///   Rename Only:   each file gets its name and stays in Downloads.
 ///   Leave as Is:   nothing changes.
 /// No answer = Rename Only, like a single download: nothing moves unseen. A pill then says what was done, with Undo.
+/// With "Change nothing" chosen in the window, no answer = nothing changes.
 ///
-/// Answers with one line: "folder\t<folder name>\t<where, empty = Downloads>\t<user|picked>", "rename\t<auto|user>" or "keep".
+/// Answers with one line: "folder\t<folder name>\t<where, empty = Downloads>\t<user|picked>", "rename\t<auto|user>",
+/// "keep" or "keep\tauto" (nobody answered).
 @MainActor
 final class BatchModel: ObservableObject {
     @Published var folderName: String
@@ -18,6 +20,7 @@ final class BatchModel: ObservableObject {
     @Published var remaining: Int
     @Published var counting: Bool
     @Published var thumbnails: [NSImage] = []
+    var leave = false                       // nobody answers → change nothing
     @Published var named = 0                // how many names are ready
     var edited = false                      // you typed a folder name: suggestions don't replace it any more
     var picked = false
@@ -82,7 +85,7 @@ final class BatchDialog: NSObject {
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
                     self.model.remaining -= 1
-                    if self.model.remaining <= 0 { self.finish("rename\tauto") }
+                    if self.model.remaining <= 0 { self.finish(self.model.leave ? "keep\tauto" : "rename\tauto") }
                 }
             }
         }
@@ -234,15 +237,17 @@ struct BatchView: View {
     var status: String {
         let each = "Each file gets a clear name."
         guard model.counting else { return each }
+        if model.leave { return "\(each) Away? In \(max(model.remaining, 0)) s nothing changes." }
         return "\(each) Away? In \(max(model.remaining, 0)) s they're renamed and stay in Downloads."
     }
 }
 
 extension InApp {
-    static func askBatch(files: [URL], source: String?, folderName: String, seconds: Int,
+    static func askBatch(files: [URL], source: String?, folderName: String, seconds: Int, leave: Bool = false,
                          progress: @escaping (BatchModel) -> Void) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
             let d = BatchDialog(files: files, source: source, folderName: folderName, seconds: seconds)
+            d.model.leave = leave
             keep(d)
             d.onFinish = { line in release(d); c.resume(returning: line) }
             progress(d.model)
@@ -350,11 +355,13 @@ enum BatchName {
         }
     }
     let reply = await InApp.askBatch(files: files, source: source, folderName: BatchName.initial(files, source: source),
-                                     seconds: timeout) { state.model = $0 }
+                                     seconds: timeout, leave: leaveWhenAway) { state.model = $0 }
     state.model = nil
     let parts = reply.components(separatedBy: "\t")
     if parts.first == "keep" {
         naming.cancel()
+        // Nobody answered: leave them alone, but don't record "you chose these names" either.
+        if parts.count > 1, parts[1] == "auto" { print("   no answer, left as is"); return }
         files.forEach { Decision.markKeep($0) }
         print("   left as is")
         return

@@ -6,7 +6,7 @@ permalink: /privacy/
 
 # Privacy Policy
 
-*Last updated: 16 November 2026*
+*Last updated: 24 November 2026*
 
 **neatly collects no data.** It has no account, no analytics, no tracking and no ads. Your files are read and named
 on your Mac, with Apple's on-device model (Apple Intelligence). They are never uploaded.
@@ -23,8 +23,8 @@ Never your files or their contents. Each of these can be turned off in neatly's 
    (for example `2304.02643`) to arXiv (export.arxiv.org) to get its real title.
 2. **Photo places.** For a photo with a location, neatly sends only the two GPS coordinates to Apple's geocoding
    service to get the place name (for example "Rome"). Screenshots are never looked up.
-3. **Update check** (only in the version downloaded from the website, not the App Store version). If you said yes,
-   neatly asks GitHub whether there is a newer version.
+3. **Update check** (only in the version downloaded from the website or Homebrew, not the App Store version).
+   Unless you turn it off, neatly asks GitHub every few hours whether there is a newer version.
 
 These services see your IP address like any website does. neatly sends them nothing else about you.
 

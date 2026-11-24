@@ -33,10 +33,12 @@ migrateFromOldName()   // write log lines immediately, even when not in a termin
 var args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-psn_") }   // Finder's process id
 #if APPSTORE
 // The App Store version is one app: opening it runs the menu-bar icon and both watchers (no background service).
+/// Opened with no arguments: by you (Spotlight, Launchpad, Finder) or at login. See AppDelegate.
+let openedAsApp = args.isEmpty
 if args.isEmpty { args = ["--watch", Home.real.appending(path: "Downloads").path, "--ask", "--screenshots", "--menubar"] }
 #endif
 FolderAccess.resume()   // App Store version: the folder permission you gave (every process, Tidy windows too)
-let version = "0.6.5"
+let version = "0.6.6"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -179,6 +181,21 @@ func launchctl(_ a: [String]) {
     launchctl(["bootout", "gui/\(getuid())/\(serviceLabel)"])
 }
 
+/// Show the running copy's window. Just started (it wasn't running)? It needs a few seconds before it listens:
+/// keep asking until it says the window is up (at most 15 s), so the first open from Spotlight always works.
+@MainActor func askRunningCopyToShowWindow() {
+    final class Flag: @unchecked Sendable { var on = false }
+    let shown = Flag()
+    let center = DistributedNotificationCenter.default()
+    let token = center.addObserver(forName: HomeWindow.shownNotification, object: nil, queue: nil) { _ in shown.on = true }
+    let until = Date().addingTimeInterval(15)
+    while !shown.on && Date() < until {
+        center.postNotificationName(HomeWindow.showNotification, object: nil, userInfo: nil, deliverImmediately: true)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+    center.removeObserver(token)
+}
+
 // Opened from Finder, Spotlight or Launchpad (no arguments): make sure it's running, then get out of the way.
 // The service is the one copy that shows the menu-bar icon; opening the app never starts a second one.
 // Bring this copy's neatly.app (Info.plist, icon, Finder menu) up to date — what the app does by itself at start.
@@ -186,6 +203,8 @@ if args.first == "refresh-app" { AppBundle.refreshIfStale(); exit(0) }
 
 // Tests: pass files to the running copy the way a just-started app does.
 if args.first == "forward-open" { FinderHandoff.forward(Array(args.dropFirst())); exit(0) }
+// Tests: ask the running copy for its window the way the app does when you open it (Spotlight, Launchpad).
+if args.first == "show-window" { askRunningCopyToShowWindow(); exit(0) }
 
 if args.isEmpty && AppBundle.isRunningInside {
     // Opened from Finder with files ("Open With", or the "Rename with neatly" service)? Catch them first.
@@ -202,11 +221,7 @@ if args.isEmpty && AppBundle.isRunningInside {
     }
     // Files from Finder → the running copy opens the review window for them. Otherwise: show its window.
     if !handed.isEmpty { FinderHandoff.forward(handed.map(\.path)); exit(0) }
-    for _ in 0..<2 {
-        DistributedNotificationCenter.default().postNotificationName(HomeWindow.showNotification, object: nil,
-                                                                     userInfo: nil, deliverImmediately: true)
-        usleep(1_500_000)
-    }
+    askRunningCopyToShowWindow()
     exit(0)
 }
 
@@ -325,6 +340,10 @@ var timeout = neatly.profile.countdown ?? 5   // set in the neatly window, or --
 if let i = args.firstIndex(of: "--timeout"), i + 1 < args.count, let n = Int(args[i + 1]) {
     timeout = max(0, n); args.removeSubrange(i...(i + 1))
 }
+/// When nobody answers a download popup: keep the new name in Downloads (default), or change nothing at all
+/// (set in the neatly window, or --leave-if-away).
+let leaveFlag = flag("--leave-if-away")
+var leaveWhenAway = leaveFlag || neatly.profile.leaveIfAway == true
 
 enum Answer { case save(name: String, folder: URL?, auto: Bool), keep, trash, noAnswer }
 
@@ -339,12 +358,13 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 }
 
 /// The dialog (see Dialog.swift). Save = the name in the field, in the shown folder. Choose Folder… = pick a folder and save there.
-/// Leave as is = no change. No answer within `timeout` seconds = Save, so agents downloading files never wait on a click.
+/// Leave as is = no change. No answer within `timeout` seconds = Save (or nothing at all, with `leaveWhenAway`),
+/// so agents downloading files never wait on a click.
 @MainActor func askUser(file: String, suggestion: String, folder: URL?, path: URL? = nil, duplicate: URL? = nil,
                         pinned: Bool = false) async -> Answer {
     // Shown inside neatly and awaited, so the menu-bar icon stays responsive while it's open.
     let reply = await InApp.ask(file: file, suggestion: suggestion, folder: folder, seconds: timeout, path: path,
-                                duplicate: duplicate, pinned: pinned)
+                                duplicate: duplicate, pinned: pinned, leave: leaveWhenAway)
     let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
     if parts.first == "keep" { return .keep }
     if parts.first == "trash" { return .trash }

@@ -12,6 +12,8 @@ final class HomeWindow: NSObject, NSWindowDelegate {
     static let shared = HomeWindow()
     /// Tests use their own name (NEATLY_NOTIFY), so they never open the window of the neatly you actually run.
     static let showNotification = Notification.Name("dev.neatly.show" + (ProcessInfo.processInfo.environment["NEATLY_NOTIFY"] ?? ""))
+    /// The answer: "the window is up", so the copy that asked can stop asking.
+    static let shownNotification = Notification.Name("dev.neatly.shown" + (ProcessInfo.processInfo.environment["NEATLY_NOTIFY"] ?? ""))
 
     let model = HomeModel()
     var window: NSWindow?
@@ -40,7 +42,7 @@ final class HomeWindow: NSObject, NSWindowDelegate {
             // A menu-bar-only app can't reliably come to the front on recent macOS: act like a normal app
             // (Dock icon, ⌘-Tab) while the window is open, then go back to the menu bar when it closes.
             NSApp.setActivationPolicy(.regular)
-            window.center()
+            if !window.isVisible { window.center() }   // already open (asked twice): leave it where you put it
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
             NSApp.activate()
@@ -55,7 +57,7 @@ final class HomeWindow: NSObject, NSWindowDelegate {
     }
 
     /// NEATLY_UI_TEST="home:length=standard,home:style=title,home:date=on,home:downloads=off,home:screenshots=off,
-    ///                 home:countdown=10,home:drop=<path>,home:snapshot=<png>"
+    ///                 home:countdown=10,home:away=leave,home:drop=<path>,home:snapshot=<png>"
     func uiTest() {
         guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [model] in
@@ -69,6 +71,7 @@ final class HomeWindow: NSObject, NSWindowDelegate {
                 case "downloads": model.downloads = kv[1] == "on"
                 case "screenshots": model.screenshots = kv[1] == "on"
                 case "countdown": model.countdown = Int(kv[1]) ?? 5
+                case "away": model.leaveIfAway = kv[1] == "leave"
                 case "autoupdate": model.autoUpdate = kv[1] == "on"
                 case "online": model.online = kv[1] == "on"
                 case "appearance": model.appearance = kv[1] == "system" ? nil : kv[1]
@@ -121,7 +124,8 @@ final class HomeModel: ObservableObject {
     @Published var appName = false { didSet { save() } }
     @Published var copyShots = false { didSet { save() } }
     @Published var countdown = 5 { didSet { save() } }
-    @Published var autoUpdate: Bool? = nil { didSet { save() } }   // nil = not asked yet
+    @Published var leaveIfAway = false { didSet { save() } }   // no answer: change nothing
+    @Published var autoUpdate: Bool? = nil { didSet { save() } }   // nil = on (the default)
     @Published var online = true { didSet { save() } }
     @Published var appearance: String? = nil { didSet { save(); Appearance.apply(appearance) } }   // nil = like the Mac
     @Published var welcomed = true
@@ -148,6 +152,7 @@ final class HomeModel: ObservableObject {
         appName = p.appName == true
         copyShots = p.copyScreenshots == true
         countdown = timeout
+        leaveIfAway = leaveWhenAway
         autoUpdate = p.autoUpdate
         online = p.onlineLookups != false
         appearance = p.appearance
@@ -173,6 +178,7 @@ final class HomeModel: ObservableObject {
             p.appName = appName
             p.copyScreenshots = copyShots
             p.countdown = countdown
+            p.leaveIfAway = leaveIfAway ? true : nil
             p.autoUpdate = autoUpdate
             p.onlineLookups = online ? nil : false
             p.appearance = appearance
@@ -180,6 +186,7 @@ final class HomeModel: ObservableObject {
         shownStyle = style; shownDateFirst = dateFirst
         neatly.useNetwork = online && !offline
         timeout = countdown
+        leaveWhenAway = leaveIfAway
         objectWillChange.send()   // the preview name follows
     }
 
@@ -261,21 +268,6 @@ struct HomeView: View {
                          + "neatly only looks at new files there, and everything stays on your Mac.")
                         .fixedSize(horizontal: false, vertical: true)
                     HStack { Spacer(); Chip(text: "Continue", selected: true) { model.welcome() } }
-                }
-                .padding(14).surface()
-            }
-            if model.welcomed && model.autoUpdate == nil && !Home.sandboxed {   // the App Store updates that version
-                // Asked once, at first install: after that neatly keeps itself current with nothing to do.
-                HStack(spacing: 12) {
-                    IconBadge(icon: "arrow.triangle.2.circlepath", color: .teal)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep neatly up to date by itself?").font(.callout.weight(.semibold))
-                        Text("New versions install quietly in the background. You won't need to do anything.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("No thanks") { model.autoUpdate = false }.buttonStyle(.plain).font(.callout).foregroundStyle(.secondary)
-                    Chip(text: "Yes, keep it updated", selected: true) { model.autoUpdate = true }
                 }
                 .padding(14).surface()
             }
@@ -370,7 +362,7 @@ struct HomeView: View {
                         } else {
                             SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
                                       subtitle: "Nothing about you or your files is sent",
-                                      isOn: Binding(get: { model.autoUpdate == true }, set: { model.autoUpdate = $0 }))
+                                      isOn: Binding(get: { model.autoUpdate != false }, set: { model.autoUpdate = $0 }))
                         }
                         Divider().padding(.leading, 44)
                         SwitchRow(icon: "globe", color: .blue, title: "Look up papers and photo places online",
@@ -395,7 +387,9 @@ struct HomeView: View {
                             IconBadge(icon: "timer", color: .gray)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("If I don't answer a download suggestion")
-                                Text("neatly keeps the new name, in Downloads, after:").font(.caption).foregroundStyle(.secondary)
+                                Text(model.countdown == 0 ? "The popup stays until you answer."
+                                     : model.leaveIfAway ? "Nothing changes after:" : "neatly keeps the new name, in Downloads, after:")
+                                    .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
@@ -404,6 +398,12 @@ struct HomeView: View {
                                 Chip(text: s == 0 ? "Wait for me" : "\(s) sec", selected: model.countdown == s) { model.countdown = s }
                             }
                         }.padding(.leading, 44)
+                        if model.countdown != 0 {
+                            HStack(spacing: 6) {
+                                Chip(text: "Keep the new name", selected: !model.leaveIfAway) { model.leaveIfAway = false }
+                                Chip(text: "Change nothing", selected: model.leaveIfAway) { model.leaveIfAway = true }
+                            }.padding(.leading, 44)
+                        }
                         Divider().padding(.leading, 44)
                         HStack(spacing: 12) {
                             IconBadge(icon: "trash", color: .gray)
