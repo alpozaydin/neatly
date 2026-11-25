@@ -11,7 +11,7 @@ usage: neatly [options] <file or folder>...
   --why        show the evidence, and why files were skipped
   --watch      wait for new files in the folder and suggest names as they arrive
   --where      also suggest a folder to move each file to
-  --ask        with --watch: show a popup for each file (Save / Choose Folder… / Leave as Is)
+  --ask        with --watch: show a popup for each file (Rename & Move / Rename Only / Keep Original)
   --menubar    with --watch: show the menu-bar icon (Tidy, options, Pause; drop files or folders on it)
   --screenshots  with --watch: also name new screenshots where macOS saves them, with an Undo pill
   --timeout N  with --ask: no answer after N seconds = keep the new name in Downloads (default 5, 0 = wait)
@@ -38,7 +38,7 @@ let openedAsApp = args.isEmpty
 if args.isEmpty { args = ["--watch", Home.real.appending(path: "Downloads").path, "--ask", "--screenshots", "--menubar"] }
 #endif
 FolderAccess.resume()   // App Store version: the folder permission you gave (every process, Tidy windows too)
-let version = "0.6.6"
+let version = "0.6.7"
 if (args.isEmpty && !AppBundle.isRunningInside) || args.contains("-h") || args.contains("--help") { print(usage); exit(0) }
 if args.first == "--version" { print("neatly \(version)"); exit(0) }
 
@@ -361,10 +361,10 @@ func osascript(_ script: String) -> (ok: Bool, out: String) {
 /// Leave as is = no change. No answer within `timeout` seconds = Save (or nothing at all, with `leaveWhenAway`),
 /// so agents downloading files never wait on a click.
 @MainActor func askUser(file: String, suggestion: String, folder: URL?, path: URL? = nil, duplicate: URL? = nil,
-                        pinned: Bool = false) async -> Answer {
+                        pinned: Bool = false, moveOnly: Bool = false) async -> Answer {
     // Shown inside neatly and awaited, so the menu-bar icon stays responsive while it's open.
     let reply = await InApp.ask(file: file, suggestion: suggestion, folder: folder, seconds: timeout, path: path,
-                                duplicate: duplicate, pinned: pinned, leave: leaveWhenAway)
+                                duplicate: duplicate, pinned: pinned, leave: leaveWhenAway, moveOnly: moveOnly)
     let parts = reply.trimmingCharacters(in: .newlines).components(separatedBy: "\t")
     if parts.first == "keep" { return .keep }
     if parts.first == "trash" { return .trash }
@@ -627,7 +627,7 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                 // if it grew, or was replaced, while you were deciding, it's looked at again from the start.
                 let stamp = FileStamp(url)
                 let original = url.deletingPathExtension().lastPathComponent
-                // Every new download gets a name and a folder — except installers and files already handled.
+                // Every new download gets a name and a folder idea — except installers and files already handled.
                 var nameIdea = original, via = "kept", evidence: Evidence
                 await Warm.ready()
                 switch await neatly.suggest(for: url, explicit: force, within: .seconds(20)) {
@@ -675,6 +675,13 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                 // Downloaded the same file twice? Say so in the popup (with a Move to Trash button) instead of
                 // silently making a "-2" copy. Nobody answers → both are kept: neatly never deletes on its own.
                 let twin = await offMain { Destination.duplicate(of: url, in: target) ?? Destination.duplicate(of: url, in: dir) }
+                // The name is already good: it stays exactly as it is, so the popup only offers the folder.
+                // No folder idea either (and no duplicate)? Then there's nothing to suggest: no popup at all.
+                // (A stray space isn't a new name: "Fincart meeting " stays as it is.)
+                let keepsName = nameIdea.trimmingCharacters(in: .whitespaces) == original.trimmingCharacters(in: .whitespaces)
+                if keepsName { nameIdea = original }
+                if keepsName && target == nil && twin == nil { print("   nothing to suggest — left as is"); continue }
+                if keepsName { print("   popup: folder only (name kept)") }
                 let ev = evidence, suggestedName = nameIdea, how = via
                 let log = { (chosen: String, folder: URL?, auto: Bool) in
                     Correction(original: name, suggested: suggestedName, chosen: chosen, via: how,
@@ -683,7 +690,7 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                                auto: auto ? true : nil, context: String(gist(ev).prefix(300))).save()
                 }
                 let answer = await askUser(file: name, suggestion: nameIdea, folder: target, path: url, duplicate: twin,
-                                           pinned: rule != nil)
+                                           pinned: rule != nil, moveOnly: keepsName)
                 // Still the same file neatly looked at? (Not grown, not swapped for another one meanwhile.)
                 if case .noAnswer = answer {} else if let stamp, FileStamp(url) != stamp {
                     if FileStamp(url) != nil {
@@ -693,7 +700,8 @@ func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
                     continue
                 }
                 switch answer {
-                case .save(let chosen, var folder, let auto):
+                case .save(let typed, var folder, let auto):
+                    let chosen = keepsName ? original : typed   // folder only: the name stays (moving drops a stray space)
                     // Nobody looked: keep the new name, but leave it in Downloads — unless your rule says where it goes.
                     if auto && rule == nil { folder = nil }
                     var done = (chosen == original && folder == nil) ? url : (try? Rename.apply(url, to: chosen, in: folder))

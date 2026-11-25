@@ -14,7 +14,12 @@ export NEATLY_HEADLESS=1   # never show a window or take focus while testing
 export NEATLY_NOTIFY=".test$$"   # our own "show window" signal: never reaches the neatly you actually run
 FILTER=${1:-}
 # Whatever happens, stop everything this run started (watchers, Tidy windows) when it ends.
-trap 'pkill -f "$W" 2>/dev/null; pkill -f "neatly-e2e" 2>/dev/null' EXIT
+# A Tidy window started from a file list has neither in its command line: find it by its test data folder.
+cleanup() {
+    pkill -f "$W" 2>/dev/null; pkill -f "neatly-e2e" 2>/dev/null
+    for p in $(pgrep -f "neatly tidy"); do ps eww -p "$p" 2>/dev/null | grep -q "NEATLY_DATA_DIR=$W" && kill "$p"; done
+}
+trap cleanup EXIT
 pass=0; fail=0; failed=()
 
 check() {   # check "what" 'shell condition'
@@ -236,6 +241,28 @@ if want dl-countdown-leave; then setup dl-countdown-leave
     check "nothing in History, no Undo pill, not marked as your choice" '! grep -q 8812_4471 "$T/data/history.jsonl" 2>/dev/null && ! xattr "$T/dl/8812_4471.pdf" | grep -q dev.neatly.keep'
     stop; fi
 
+# A download that already has a good name keeps it exactly: the popup only offers the folder.
+if want dl-good-name; then setup dl-good-name; start "dialog:save"
+    f=$(make cs-syllabus); mv "$f" "$T/stage/cs334-syllabus .pdf"; arrive "$T/stage/cs334-syllabus .pdf"
+    waitfor 'grep -q "saved as\|left as is\|nothing to suggest" "$T/log"' 90
+    check "good name: the popup offers only the folder" 'grep -q "popup: folder only" "$T/log"'
+    check "Move: same name (stray space dropped), in the suggested folder" '[ -f "$T/home/courses-fall26/cs334/cs334-syllabus.pdf" ] && [ -z "$(ls "$T/dl")" ]'
+    stop; fi
+
+# A good name and no idea where it goes: nothing to suggest, so no popup at all.
+if want dl-good-alone; then setup dl-good-alone; start "dialog:save"
+    printf 'eggs\nmilk\nbread\n' > "$T/stage/Grocery list for Sunday.txt"; arrive "$T/stage/Grocery list for Sunday.txt"
+    waitfor 'grep -q "nothing to suggest\|saved as\|left as is\|skip" "$T/log"' 90
+    check "good name, no folder idea: no popup, nothing changes" 'grep -q "nothing to suggest" "$T/log" && [ -f "$T/dl/Grocery list for Sunday.txt" ]'
+    stop; fi
+
+# "Rename Only": the suggested name, and the file stays in Downloads.
+if want dl-rename-only; then setup dl-rename-only; start "dialog:renameonly"
+    arrive "$(make cs-syllabus)"
+    waitfor 'grep -q "saved as" "$T/log"' 90
+    check "Rename Only: renamed, stays in Downloads" '[ -f "$T/dl/cs334-syllabus.pdf" ] && [ -z "$(ls "$T/home/courses-fall26/cs334")" ]'
+    stop; fi
+
 # A rule ("Always do this") is followed even when nobody answers.
 if want dl-rule; then setup dl-rule
     NEATLY_DATA_DIR=$T/data "$B" style --length short >/dev/null
@@ -443,6 +470,19 @@ if want tidy; then setup tidy
     check "undo --last restores all" '[ "$(ls "$T/shots" | grep -c "^Screenshot")" = "3" ]'
     NEATLY_UI_TEST="rename,undoall,done" "$B" tidy "$T/shots" > "$T/log" 2>&1
     check "Undo All in the window restores all" '[ "$(ls "$T/shots" | grep -c "^Screenshot")" = "3" ]'
+fi
+
+# A big folder: newest first, and a time choice. Files outside the chosen time are left alone, and switching to
+# a longer time names the newly shown files too (what was found before is kept).
+if want tidy-span; then setup tidy-span; mkdir -p "$T/big"
+    for i in $(seq -w 1 30); do printf "Meeting notes %s\nAgenda: budget review and hiring plan\n" $i > "$T/big/scan_00$i.txt"; done
+    for i in $(seq -w 1 10); do touch -t "$(date -v-3d +%Y%m%d%H%M)" "$T/big/scan_00$i.txt"; done
+    for i in $(seq 11 20); do touch -t "$(date -v-60d +%Y%m%d%H%M)" "$T/big/scan_00$i.txt"; done
+    for i in $(seq 21 30); do touch -t "$(date -v-800d +%Y%m%d%H%M)" "$T/big/scan_00$i.txt"; done
+    NEATLY_TIDY_MTIME=1 NEATLY_TIDY_SPAN=7 NEATLY_UI_TEST="span:365,rename,done" "$B" tidy "$T/big" > "$T/log" 2>&1
+    check "started with the last 7 days: 10 files read first" '[ "$(grep -m10 "tidy: scan" "$T/log" | grep -c "scan_00\(0[1-9]\|10\)")" = 10 ]'
+    check "switched to the last year: those 20 renamed" '[ "$(ls "$T/big" | grep -c "^scan_")" = 10 ]'
+    check "older files (outside the time) left alone" '[ "$(ls "$T/big" | grep -c "^scan_00[23]")" = 10 ] && [ -f "$T/big/scan_0030.txt" ]'
 fi
 
 # A file neatly can't read stays editable: type a name, Rename works (v0.3.0 locked the field — dead end).

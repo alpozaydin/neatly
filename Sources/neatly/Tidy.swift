@@ -31,9 +31,19 @@ final class TidyWindow: NSObject, NSWindowDelegate {
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true || NSWorkspace.shared.isFilePackage(atPath: $0.path) }
             // A folder: only meaningless names (yours are left alone). Files you dropped: you asked for them.
             .filter { Decision.make(for: $0, explicit: !oneFolder).shouldRename }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        // A folder: newest first (when it arrived there), so recent files are named first. Dropped files: A to Z.
+        // NEATLY_TIDY_MTIME (tests): use the date a test can set with `touch`, since "added" dates can't be faked.
+        let byMtime = ProcessInfo.processInfo.environment["NEATLY_TIDY_MTIME"] != nil
+        func arrived(_ u: URL) -> Date {
+            let v = try? u.resourceValues(forKeys: [.addedToDirectoryDateKey, .creationDateKey, .contentModificationDateKey])
+            if byMtime { return v?.contentModificationDate ?? .distantPast }
+            return v?.addedToDirectoryDate ?? v?.creationDate ?? v?.contentModificationDate ?? .distantPast
+        }
+        let dated = files.map { (url: $0, date: arrived($0)) }
+            .sorted { oneFolder ? $0.date > $1.date
+                                : $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending }
         model = TidyModel(title: oneFolder ? folder.lastPathComponent : "\(files.count) file\(files.count == 1 ? "" : "s")",
-                          files: files, neatly: neatly, wholeFolder: oneFolder)
+                          files: dated, neatly: neatly, wholeFolder: oneFolder)
         super.init()
     }
 
@@ -64,7 +74,7 @@ final class TidyWindow: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) { NSApp.terminate(nil) }
 
-    /// NEATLY_UI_TEST="edit0:name,untick1,rename,undoall,done,snapshot=<png>": press the buttons by code.
+    /// NEATLY_UI_TEST="edit0:name,untick1,span:365,rename,undoall,done,snapshot=<png>": press the buttons by code.
     func uiTest() {
         guard let t = ProcessInfo.processInfo.environment["NEATLY_UI_TEST"] else { return }
         let steps = t.split(separator: ",").map(String.init)
@@ -77,6 +87,11 @@ final class TidyWindow: NSObject, NSWindowDelegate {
                     model.items[i].name = String(step[step.index(after: colon)...]); model.edited(i)
                 }
                 if step.hasPrefix("untick"), let i = Int(step.dropFirst(6)), model.items.indices.contains(i) { model.items[i].checked = false }
+                if step.hasPrefix("span:"), let d = Int(step.dropFirst(5)), let s = TidySpan(rawValue: d) {
+                    model.span = s
+                    try? await Task.sleep(for: .milliseconds(300))
+                    while model.working { try? await Task.sleep(for: .milliseconds(200)) }   // the newly shown files
+                }
                 if step == "rename" { model.renameAll() }
                 if step == "undoall" { model.undoAll() }
                 if step.hasPrefix("snapshot=") { snapshot(to: String(step.dropFirst(9))) }
@@ -115,9 +130,24 @@ struct TidyItem: Identifiable {
     var stem: String { url.deletingPathExtension().lastPathComponent }
 }
 
+/// Which files of a big folder to look at, by when they arrived there.
+enum TidySpan: Int, CaseIterable {
+    case week = 7, month = 30, year = 365, all = 0
+    var label: String { switch self { case .week: "Last 7 days"; case .month: "Last 30 days"; case .year: "Last year"; case .all: "All" } }
+    func includes(_ d: Date, now: Date = Date()) -> Bool { self == .all || d >= now.addingTimeInterval(-Double(rawValue) * 86_400) }
+}
+
 @MainActor
 final class TidyModel: ObservableObject {
     @Published var items: [TidyItem]
+    /// Every messy file in the folder, newest first; `items` are the ones in the chosen time span.
+    let all: [(url: URL, date: Date)]
+    /// Files you switched away from keep what neatly found for them (names, your edits) for when you switch back.
+    private var kept: [URL: TidyItem] = [:]
+    @Published var span: TidySpan = .all { didSet { if span != oldValue { applySpan() } } }
+    /// Only big folders get the time choice: a handful of files is quicker to just review.
+    var showsSpan: Bool { wholeFolder && all.count > 25 }
+    func count(_ s: TidySpan) -> Int { all.filter { s.includes($0.date) }.count }
     @Published var working = true
     @Published var done = 0
     @Published var finished: Int?            // renamed this many; nil = not yet
@@ -128,12 +158,30 @@ final class TidyModel: ObservableObject {
     var neatly: Neatly
     var forPicture = false
 
-    init(title: String, files: [URL], neatly: Neatly, wholeFolder: Bool) {
+    init(title: String, files: [(url: URL, date: Date)], neatly: Neatly, wholeFolder: Bool) {
         self.title = title
         self.wholeFolder = wholeFolder
         self.neatly = neatly
-        items = files.map { TidyItem(url: $0, name: $0.deletingPathExtension().lastPathComponent) }
-        for i in items.indices { loadThumbnail(i) }
+        all = files
+        items = []
+        // More than 100 messy files: start with the last 30 days (or the shortest span that has any).
+        if wholeFolder && files.count > 100 {
+            span = [TidySpan.month, .year].first { s in files.contains { s.includes($0.date) } } ?? .all
+        }
+        if let t = ProcessInfo.processInfo.environment["NEATLY_TIDY_SPAN"].flatMap(Int.init).flatMap(TidySpan.init) { span = t }   // tests
+        applySpan()
+    }
+
+    /// Show the files of the chosen span, keeping what was already found for each one.
+    func applySpan() {
+        for it in items { kept[it.url] = it }
+        items = all.filter { span.includes($0.date) }.map { kept[$0.url] ?? TidyItem(url: $0.url, name: $0.url.deletingPathExtension().lastPathComponent) }
+        for i in items.indices where items[i].thumbnail == nil { loadThumbnail(i) }
+        done = items.filter { !$0.isPending }.count
+        if items.isEmpty { message = all.isEmpty ? (wholeFolder ? "Everything here already has a clear name." : "Nothing to rename.")
+                                                 : "No messy names from this time. Pick a longer one." }
+        else { message = "" }
+        if !naming && items.contains(where: \.isPending) { Task { await nameAll() } }
     }
 
     var toRename: [Int] {
@@ -147,32 +195,46 @@ final class TidyModel: ObservableObject {
 
     /// One file at a time: the on-device model is one shared resource. Each file gets 15–20 s — this window
     /// shows progress, so waiting a little beats giving up.
+    private var naming = false
+
     func nameAll() async {
-        message = items.isEmpty ? (wholeFolder ? "Everything here already has a clear name." : "Nothing to rename.") : ""
+        guard !naming else { return }   // already reading (started by the window or by a new time span)
+        naming = true; working = true
+        defer { naming = false; working = false }
         // Wake the model first (slow only on a fresh install), so no file times out while it starts.
         let t0 = Date()
         if !items.isEmpty && neatly.useModel { warming = true; await Neatly.warmUp(); warming = false }
         print("tidy: model ready after \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
-        for i in items.indices {
-            items[i].state = .reading
+        // Top to bottom, newest first. The list can change while neatly reads (another time span): each file is
+        // looked up again by its place on disk afterwards, and a file no longer shown keeps its result for later.
+        while let next = items.first(where: \.isPending) {
+            let url = next.url
+            update(url) { $0.state = .reading }
             var n = neatly
             n.documentBudget = .seconds(15)
             n.imageBudget = .seconds(20)
             let t1 = Date()
-            let outcome = await n.suggest(for: items[i].url, explicit: true, within: .seconds(30))
-            print("tidy: \(items[i].url.lastPathComponent) → \(outcome) in \(Int(Date().timeIntervalSince(t1) * 1000)) ms")
-            switch outcome {
-            case .suggested(let s):
-                items[i].suggestion = s.name
-                items[i].name = s.name
-                items[i].state = .named
-            case .kept(let why), .unsure(let why):
-                items[i].checked = false
-                items[i].state = .noIdea(Self.plain(why, url: items[i].url))
+            let outcome = await n.suggest(for: url, explicit: true, within: .seconds(30))
+            print("tidy: \(url.lastPathComponent) → \(outcome) in \(Int(Date().timeIntervalSince(t1) * 1000)) ms")
+            update(url) { item in
+                switch outcome {
+                case .suggested(let s):
+                    item.suggestion = s.name
+                    item.name = s.name
+                    item.state = .named
+                case .kept(let why), .unsure(let why):
+                    item.checked = false
+                    item.state = .noIdea(Self.plain(why, url: url))
+                }
             }
-            done = i + 1
+            done = items.filter { !$0.isPending }.count
         }
-        working = false
+    }
+
+    /// Change a file's row, whether it's shown now or kept for another time span.
+    private func update(_ url: URL, _ change: (inout TidyItem) -> Void) {
+        if let i = items.firstIndex(where: { $0.url == url }) { change(&items[i]) }
+        else if var it = kept[url] { change(&it); kept[url] = it }
     }
 
     /// neatly's internal reasons, in words anyone understands.
@@ -238,6 +300,8 @@ final class TidyModel: ObservableObject {
 
 extension TidyItem {
     var stateIsUndone: Bool { if case .undone = state { true } else { false } }
+    /// Not looked at yet (or interrupted while being read): neatly still has to read it.
+    var isPending: Bool { switch state { case .waiting: true; case .reading: true; default: false } }
 }
 
 // MARK: - The look (same building blocks as the neatly window)
@@ -259,7 +323,11 @@ struct TidyView: View {
 
     var rows: some View {
         VStack(spacing: 8) {
-            ForEach($model.items) { $item in Row(item: $item, model: model) }
+            if model.forPicture {   // a picture has no scrolling: the first rows, so the header stays in view
+                ForEach(Array(model.items.indices.prefix(4)), id: \.self) { i in Row(item: $model.items[i], model: model) }
+            } else {
+                ForEach($model.items) { $item in Row(item: $item, model: model) }
+            }
         }.padding(.horizontal, 24).padding(.bottom, 12)
     }
 
@@ -280,6 +348,14 @@ struct TidyView: View {
                     Text("Renamed \(n) file\(n == 1 ? "" : "s").").foregroundStyle(.secondary)
                 } else {
                     Text(model.message.isEmpty ? "Check the names — change any you like." : model.message).foregroundStyle(.secondary)
+                }
+                if model.showsSpan && model.finished == nil {
+                    HStack(spacing: 6) {
+                        Text("Files from").foregroundStyle(.secondary)
+                        ForEach(TidySpan.allCases, id: \.self) { s in
+                            Chip(text: "\(s.label) (\(model.count(s)))", selected: model.span == s) { model.span = s }
+                        }
+                    }.padding(.top, 4)
                 }
             }
             Spacer()
@@ -421,7 +497,7 @@ struct Pill: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.body.weight(.medium))
+            Text(title).font(.body.weight(.medium)).lineLimit(1).fixedSize()   // a button label never wraps
                 .padding(.horizontal, 14).padding(.vertical, 6)
                 .foregroundStyle(primary ? AnyShapeStyle(look.onFill) : AnyShapeStyle(.primary))
                 .background(RoundedRectangle(cornerRadius: look.control, style: .continuous)

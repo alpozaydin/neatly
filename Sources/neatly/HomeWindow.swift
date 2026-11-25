@@ -5,7 +5,7 @@ import NeatlyCore
 
 /// The window you get when you open neatly (Spotlight, Applications, or "Open neatly…" in the menu).
 /// Written for people who never open Terminal: one promise, a big drop target, three big buttons,
-/// plain-language switches, and name styles you pick by their look. Everything else is under "More options".
+/// plain-language switches, and a name style shown by one live example. Everything else is under "More options".
 /// It lives in the running service, so changes apply to the very next file.
 @MainActor
 final class HomeWindow: NSObject, NSWindowDelegate {
@@ -87,9 +87,11 @@ final class HomeWindow: NSObject, NSWindowDelegate {
     }
 
     /// Draw the window into PNGs (light and dark) without putting it on screen: the tests check the layout this way.
+    /// Pictures for tests and reviews: light and dark with More options open, and "-first": light, as a new
+    /// person first sees it (More options closed).
     static func snapshot(_ model: HomeModel, to path: String) {
-        for (scheme, suffix) in [(ColorScheme.light, ""), (.dark, "-dark")] {
-            model.moreOpen = true
+        for (scheme, suffix, open) in [(ColorScheme.light, "", true), (.dark, "-dark", true), (.light, "-first", false)] {
+            model.moreOpen = open
             model.forPicture = true
             defer { model.forPicture = false }
             let r = ImageRenderer(content: HomeView(model: model)
@@ -107,9 +109,13 @@ final class HomeWindow: NSObject, NSWindowDelegate {
 // MARK: - Model: the window's switches ⇄ neatly's settings
 
 enum NameStyle: String, CaseIterable {
-    case dashes, title, underscores
+    case title, dashes, underscores
     var example: String {
         switch self { case .dashes: "beach-trip"; case .title: "Beach Trip"; case .underscores: "beach_trip" }
+    }
+    /// The choice as it reads in the window: what the words look like, shown by the label itself.
+    var label: String {
+        switch self { case .title: "Title Case"; case .dashes: "with-dashes"; case .underscores: "with_underscores" }
     }
 }
 
@@ -296,48 +302,62 @@ struct HomeView: View {
                 }
                 .padding(12).warnBox()
             }
-            dropZone
-            HStack(spacing: 12) {
-                Tile(icon: "menubar.dock.rectangle", color: .blue, title: "Tidy Desktop", subtitle: "Name what's on it") {
-                    MenuBar.shared.tidyDesktop()
+            // Rename files now: the three places people start from, and a drop target for anything else.
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    SectionTitle(text: "Rename messy files now")
+                    Text("Choose a folder below").font(.caption).foregroundStyle(.secondary)
                 }
-                Tile(icon: "arrow.down.circle.fill", color: .green, title: "Tidy Downloads", subtitle: "Name your downloads") {
-                    MenuBar.shared.tidy([Home.real.appending(path: "Downloads").path])
+                HStack(spacing: 12) {
+                    Tile(icon: "menubar.dock.rectangle", color: .blue, title: "Desktop", subtitle: nil) {
+                        MenuBar.shared.tidyDesktop()
+                    }
+                    Tile(icon: "arrow.down.circle.fill", color: .green, title: "Downloads", subtitle: nil) {
+                        MenuBar.shared.tidy([Home.real.appending(path: "Downloads").path])
+                    }
+                    Tile(icon: "folder.fill", color: .orange, title: "Folder…", subtitle: nil) {
+                        MenuBar.shared.tidyFolder()
+                    }
                 }
-                Tile(icon: "folder.fill", color: .orange, title: "Pick a Folder", subtitle: "Any folder you like") {
-                    MenuBar.shared.tidyFolder()
-                }
+                dropZone
             }
 
             Card(title: "Automatically") {
                 SwitchRow(icon: "arrow.down.circle.fill", color: .green, title: "New downloads",
-                          subtitle: "Suggest a clear name and a place to keep it", isOn: $model.downloads)
+                          subtitle: "A popup suggests a name and a folder", isOn: $model.downloads)
                 Divider().padding(.leading, 44)
                 SwitchRow(icon: "camera.viewfinder", color: .purple, title: "New screenshots",
-                          subtitle: "Give them a real name right away — you can always undo", isOn: $model.screenshots)
+                          subtitle: "Renamed right away, with an Undo button", isOn: $model.screenshots)
             }
 
-            Card(title: "How names look") {
+            Card(title: "Name style") {
+                // One example that follows every choice below, so each choice shows what it does.
                 HStack(spacing: 8) {
+                    Text("Example").foregroundStyle(.secondary).frame(width: 92, alignment: .leading)
+                    Image(systemName: "doc").foregroundStyle(look.glyph)
+                    Text(model.preview).font(.body.weight(.semibold)).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 9).padding(.horizontal, 10)
+                .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
+                ChoiceRow(label: "Words") {
                     ForEach(NameStyle.allCases, id: \.self) { s in
-                        Chip(text: s.example, selected: model.style == s) { model.style = s }
+                        Chip(text: s.label, selected: model.style == s) { model.style = s }
                     }
                 }
-                HStack(spacing: 8) {
-                    Text("Length").foregroundStyle(.secondary).frame(width: 60, alignment: .leading)
+                ChoiceRow(label: "Length") {
                     ForEach(StyleProfile.Length.allCases, id: \.self) { l in
                         Chip(text: l.label, selected: model.length == l) { model.length = l }
                     }
-                    Spacer()
                 }
-                SwitchRow(icon: "calendar", color: .red, title: "Start with the date", subtitle: nil, isOn: $model.dateFirst)
-                HStack(spacing: 8) {
-                    Image(systemName: "doc").foregroundStyle(look.glyph)
-                    Text(model.preview).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                ChoiceRow(label: "Date") {
+                    Chip(text: "No date", selected: !model.dateFirst) { model.dateFirst = false }
+                    Chip(text: "Date first", selected: model.dateFirst) { model.dateFirst = true }
                 }
-                .padding(.horizontal, 12).padding(.vertical, 9)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
+                ChoiceRow(label: "Screenshots") {
+                    Chip(text: "Just the name", selected: !model.appName) { model.appName = false }
+                    Chip(text: "Add app name", selected: model.appName) { model.appName = true }
+                }
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -349,15 +369,29 @@ struct HomeView: View {
                 }.buttonStyle(.plain)
                 if model.moreOpen {
                     Card(title: nil) {
-                        SwitchRow(icon: "app.badge", color: .indigo, title: "Add the app's name to screenshots",
-                                  subtitle: "e.g. “…-in-safari”", isOn: $model.appName)
+                        HStack(spacing: 12) {
+                            IconBadge(icon: "timer", color: .gray)
+                            Text("If you don't answer a download popup")
+                            Spacer()
+                        }
+                        ChoiceRow(label: "After", indent: 44) {
+                            ForEach([3, 5, 10, 30, 0], id: \.self) { s in
+                                Chip(text: s == 0 ? "Wait for me" : "\(s) s", selected: model.countdown == s) { model.countdown = s }
+                            }
+                        }
+                        if model.countdown != 0 {
+                            ChoiceRow(label: "Then", indent: 44) {
+                                Chip(text: "Rename Only", selected: !model.leaveIfAway) { model.leaveIfAway = false }
+                                Chip(text: "Keep Original", selected: model.leaveIfAway) { model.leaveIfAway = true }
+                            }
+                        }
                         Divider().padding(.leading, 44)
                         SwitchRow(icon: "doc.on.clipboard", color: .teal, title: "Copy new screenshots",
-                                  subtitle: "So you can paste them right away", isOn: $model.copyShots)
+                                  subtitle: "Ready to paste right away", isOn: $model.copyShots)
                         Divider().padding(.leading, 44)
                         if Home.sandboxed {
                             SwitchRow(icon: "power", color: .teal, title: "Open at login",
-                                      subtitle: "So new downloads and screenshots are always named",
+                                      subtitle: "So new files are always named",
                                       isOn: Binding(get: { LoginItem.isOn }, set: { LoginItem.set($0); model.objectWillChange.send() }))
                         } else {
                             SwitchRow(icon: "arrow.triangle.2.circlepath", color: .teal, title: "Update neatly automatically",
@@ -365,51 +399,15 @@ struct HomeView: View {
                                       isOn: Binding(get: { model.autoUpdate != false }, set: { model.autoUpdate = $0 }))
                         }
                         Divider().padding(.leading, 44)
-                        SwitchRow(icon: "globe", color: .blue, title: "Look up papers and photo places online",
-                                  subtitle: "Sends only a paper's number or a photo's location",
+                        SwitchRow(icon: "globe", color: .blue, title: "Look up paper titles and photo places online",
+                                  subtitle: "Sends only a research paper's ID or a photo's GPS location, never files",
                                   isOn: $model.online)
-                        Divider().padding(.leading, 44)
-                        HStack(spacing: 12) {
-                            IconBadge(icon: "sun.max", color: .gray)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Appearance")
-                                Text("Auto follows your Mac's light or dark mode").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                        HStack(spacing: 6) {
-                            ForEach([("Auto", nil), ("Light", "light"), ("Dark", "dark")] as [(String, String?)], id: \.0) { item in
-                                Chip(text: item.0, selected: model.appearance == item.1) { model.appearance = item.1 }
-                            }
-                        }.padding(.leading, 44)
-                        Divider().padding(.leading, 44)
-                        HStack(spacing: 12) {
-                            IconBadge(icon: "timer", color: .gray)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("If I don't answer a download suggestion")
-                                Text(model.countdown == 0 ? "The popup stays until you answer."
-                                     : model.leaveIfAway ? "Nothing changes after:" : "neatly keeps the new name, in Downloads, after:")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                        HStack(spacing: 6) {
-                            ForEach([3, 5, 10, 30, 0], id: \.self) { s in
-                                Chip(text: s == 0 ? "Wait for me" : "\(s) sec", selected: model.countdown == s) { model.countdown = s }
-                            }
-                        }.padding(.leading, 44)
-                        if model.countdown != 0 {
-                            HStack(spacing: 6) {
-                                Chip(text: "Keep the new name", selected: !model.leaveIfAway) { model.leaveIfAway = false }
-                                Chip(text: "Change nothing", selected: model.leaveIfAway) { model.leaveIfAway = true }
-                            }.padding(.leading, 44)
-                        }
                         Divider().padding(.leading, 44)
                         HStack(spacing: 12) {
                             IconBadge(icon: "trash", color: .gray)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Forget my history")
-                                Text("What neatly remembers about past files. Settings stay.").font(.caption).foregroundStyle(.secondary)
+                                Text("Past renames and the edits neatly learned from").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Pill(title: "Forget", primary: false) { model.forget() }
@@ -431,7 +429,7 @@ struct HomeView: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill").font(.caption)
-                Text("Your files stay on your Mac. neatly lives in your menu bar ✦").font(.caption)
+                Text("Files never leave your Mac. Runs from the menu bar.").font(.caption)
                 Spacer()
                 Button("History") { HistoryWindow.shared.show() }.buttonStyle(.plain).font(.caption.weight(.medium)).foregroundStyle(look.link)
                 Text("·").font(.caption)
@@ -449,26 +447,21 @@ struct HomeView: View {
                 .resizable().frame(width: 58, height: 58)
             VStack(alignment: .leading, spacing: 3) {
                 Text("neatly").font(.system(size: 26, weight: look.titleWeight, design: look.titleFont)).kerning(-0.3)
-                Text(model.named == 0 ? "Clear names for your files, automatically."
+                Text(model.named == 0 ? "Clear file names, automatically."
                                       : "\(model.named) files named so far.")
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            VStack(spacing: 4) {
-                Switch(isOn: $model.on, label: "neatly on")
-                Text(model.on ? "On" : "Paused").font(.caption.weight(.medium)).foregroundStyle(model.on ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-            }
+            AppearancePicker(selection: $model.appearance)   // Pause lives in the menu-bar menu
         }
     }
 
     var dropZone: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "tray.and.arrow.down").font(.system(size: 26, weight: .light)).foregroundStyle(look.glyph)
-                .padding(.bottom, 2)
-            Text("Drop files here to rename them").font(.system(size: 15, weight: .semibold))
-            Text("neatly suggests clear names. Nothing changes until you say so.").font(.callout).foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            Image(systemName: "tray.and.arrow.down").font(.system(size: 17, weight: .light)).foregroundStyle(look.glyph)
+            Text("…or drop files or folders here").foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 28)
+        .frame(maxWidth: .infinity).padding(.vertical, 16)
         .background(RoundedRectangle(cornerRadius: look.radius + 2, style: .continuous)
             .fill(model.dropping ? AnyShapeStyle(look.accent.opacity(0.06)) : AnyShapeStyle(look.surface.opacity(0.6))))
         .overlay(RoundedRectangle(cornerRadius: look.radius + 2, style: .continuous)
@@ -511,13 +504,62 @@ struct Card<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
-                if look.section { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.leading, 2) }
+                if look.section { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary.opacity(0.68)).padding(.leading, 2) }
                 else { Text(title).font(.system(size: 15, weight: .semibold, design: look.titleFont)) }
             }
             VStack(alignment: .leading, spacing: 12) { content }
                 .padding(14)
                 .surface()
         }
+    }
+}
+
+/// A section heading outside a card, styled like a card's title.
+struct SectionTitle: View {
+    let text: String
+    var body: some View {
+        if look.section { Text(text).font(.subheadline.weight(.semibold)).foregroundStyle(.primary.opacity(0.68)).padding(.leading, 2) }
+        else { Text(text).font(.system(size: 15, weight: look.titleWeight, design: look.titleFont)) }
+    }
+}
+
+/// "Length   [Short] [Medium] [Long]": a label, then the choices.
+struct ChoiceRow<Content: View>: View {
+    let label: String
+    var indent: CGFloat = 0
+    @ViewBuilder let content: Content
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label).foregroundStyle(.secondary).frame(width: indent > 0 ? 44 : 92, alignment: .leading)
+            content
+            Spacer(minLength: 0)
+        }.padding(.leading, indent)
+    }
+}
+
+/// Light or Dark, right at the top of the window: one click. Until you pick one, neatly follows the Mac
+/// and the one it's showing is the one lit.
+struct AppearancePicker: View {
+    @Binding var selection: String?
+    @Environment(\.colorScheme) var scheme
+    var body: some View {
+        let shown = selection ?? (scheme == .dark ? "dark" : "light")
+        HStack(spacing: 2) {
+            ForEach([("sun.max", "light", "Light"), ("moon", "dark", "Dark")], id: \.1) { item in
+                let on = shown == item.1
+                Button { selection = item.1 } label: {
+                    Image(systemName: item.0).font(.system(size: 12, weight: on ? .semibold : .regular))
+                        .frame(width: 26, height: 22)
+                        .foregroundStyle(on ? AnyShapeStyle(look.onFill) : AnyShapeStyle(.secondary))
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(on ? AnyShapeStyle(look.fill) : AnyShapeStyle(Color.clear)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).help(item.2)
+                .accessibilityLabel("Appearance: \(item.2)").accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(look.field))
     }
 }
 
@@ -531,7 +573,7 @@ struct IconBadge: View {
                 .frame(width: 32)
         case .glyph:
             Image(systemName: icon.replacingOccurrences(of: ".fill", with: "")).font(.system(size: 16, weight: .regular))
-                .foregroundStyle(look.glyph).frame(width: 32, height: 28)
+                .foregroundStyle(Look.tint(color)).frame(width: 32, height: 28)
         }
     }
 }
@@ -598,20 +640,31 @@ struct Chip: View {
 }
 
 struct Tile: View {
-    let icon: String, color: Color, title: String, subtitle: String, action: () -> Void
+    let icon: String, color: Color, title: String, subtitle: String?, action: () -> Void
     var body: some View {
         Button(action: action) {
+            if subtitle == nil {
+                HStack(spacing: 8) {
+                    IconBadge(icon: icon, color: color).frame(width: 28, alignment: .leading)
+                    Text(title).font(.body.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 12)
+                .surface()
+                .contentShape(Rectangle())
+            } else {
             VStack(alignment: .leading, spacing: 12) {
                 IconBadge(icon: icon, color: color).frame(width: 28, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .surface()
             .contentShape(Rectangle())
+            }
         }
         .buttonStyle(PressStyle())
     }

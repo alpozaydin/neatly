@@ -7,7 +7,8 @@ import QuickLookThumbnailing
 /// The download popup: a picture of the file, the suggested name (editable), where it goes, and Save.
 /// If nobody answers, the new name is kept but the file stays in Downloads (unless one of your rules says
 /// where it goes), so agents and scripts never wait on a click and nothing disappears into a folder unseen.
-/// With "Change nothing" chosen in the window (`leave`), no answer means no change at all, rules included.
+/// With "Keep Original" chosen in the window (`leave`), no answer means no change at all, rules included.
+/// A download whose name is already good (`moveOnly`) keeps it: the popup only offers the folder.
 /// It never takes the keyboard: whatever you're typing elsewhere stays there until you click the popup.
 /// Hovering or typing stops the countdown.
 ///
@@ -25,9 +26,12 @@ final class DialogModel: ObservableObject {
     let duplicate: URL?      // the same file you already have
     let pinned: Bool         // the folder comes from one of your rules: it's used even when nobody answers
     let leave: Bool          // nobody answers → change nothing (instead of keeping the new name)
-    init(file: String, name: String, folder: URL?, seconds: Int, duplicate: URL?, pinned: Bool, leave: Bool = false) {
+    let moveOnly: Bool       // the name is already good: only the folder is offered
+    init(file: String, name: String, folder: URL?, seconds: Int, duplicate: URL?, pinned: Bool, leave: Bool = false,
+         moveOnly: Bool = false) {
         self.file = file; self.name = name; self.folder = folder; self.remaining = seconds
         self.counting = seconds > 0; self.duplicate = duplicate; self.pinned = pinned; self.leave = leave
+        self.moveOnly = moveOnly
     }
 }
 
@@ -42,15 +46,16 @@ final class CountdownDialog: NSObject {
     var timer: Timer?
 
     init(file: String, name: String, folder: URL?, seconds: Int, path: URL? = nil, duplicate: URL? = nil, pinned: Bool = false,
-         leave: Bool = false) {
+         leave: Bool = false, moveOnly: Bool = false) {
         model = DialogModel(file: file, name: name, folder: folder, seconds: seconds, duplicate: duplicate, pinned: pinned,
-                            leave: leave)
+                            leave: leave, moveOnly: moveOnly)
         super.init()
         let view = DialogView(model: model, save: { [weak self] in self?.saveNow(auto: false) },
                               keep: { [weak self] in self?.finish("keep") },
                               trash: { [weak self] in self?.finish("trash") },
                               choose: { [weak self] in self?.chooseFolder() },
-                              pause: { [weak self] in self?.pause() })
+                              pause: { [weak self] in self?.pause() },
+                              renameOnly: { [weak self] in self?.renameOnlyNow() })
         let host = NSHostingView(rootView: view)
         panel.contentView = host
         panel.titlebarAppearsTransparent = true
@@ -111,6 +116,7 @@ final class CountdownDialog: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             if step == "save" { self.saveNow(auto: false) }
             if step == "keep" { self.finish("keep") }
+            if step == "renameonly" { self.renameOnlyNow() }
             if step == "trash" { self.finish(self.model.duplicate != nil ? "trash" : "keep") }
             if step.hasPrefix("edit:") { self.model.name = String(step.dropFirst(5)); self.pause(); self.saveNow(auto: false) }
             if step.hasPrefix("place:") { self.picked(URL(fileURLWithPath: String(step.dropFirst(6)))) }   // as if picked in the picker
@@ -150,6 +156,9 @@ final class CountdownDialog: NSObject {
 
     /// The countdown ran out: keep the new name, or change nothing if that's what you chose.
     func timeUp() { if model.leave { finish("none") } else { saveNow(auto: true) } }
+
+    /// "Rename Only": the new name, and the file stays in Downloads.
+    func renameOnlyNow() { model.folder = nil; model.picked = false; saveNow(auto: false) }
 
     /// auto = the countdown ran out: nobody looked, so this mustn't be read as "the person agreed".
     func saveNow(auto: Bool) {
@@ -191,6 +200,7 @@ final class CountdownDialog: NSObject {
 struct DialogView: View {
     @ObservedObject var model: DialogModel
     let save: () -> Void, keep: () -> Void, trash: () -> Void, choose: () -> Void, pause: () -> Void
+    var renameOnly: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -202,12 +212,13 @@ struct DialogView: View {
                 .frame(width: 44, height: 44)
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New download").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(model.moveOnly ? "New download · name looks good" : "New download")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     Text(model.file).font(.callout).foregroundStyle(.primary).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 6) {
+            if !model.moveOnly { VStack(alignment: .leading, spacing: 6) {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 Group {
                     if model.forPicture { Text(model.name).frame(maxWidth: .infinity, alignment: .leading) }
@@ -217,10 +228,12 @@ struct DialogView: View {
                     .background(RoundedRectangle(cornerRadius: look.control, style: .continuous).fill(look.field))
                     .onChange(of: model.name) { _, _ in pause() }
                     .accessibilityLabel("New name")
-            }
+            } }
             HStack(spacing: 8) {
                 Image(systemName: "folder").foregroundStyle(look.glyph).accessibilityHidden(true)
+                Text(model.folder == nil ? "Stays in" : "Move to").foregroundStyle(.secondary)
                 Text(model.folder.map { shortFolder($0) } ?? "Downloads").lineLimit(1).truncationMode(.head)
+                    .font(.body.weight(.semibold))
                     .accessibilityLabel("Goes to \(model.folder.map { shortFolder($0) } ?? "Downloads")")
                 if model.pinned { Text("your rule").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
@@ -231,19 +244,32 @@ struct DialogView: View {
                     Image(systemName: "doc.on.doc").foregroundStyle(look.warn).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("You already have this file").font(.callout.weight(.semibold))
-                        Text("\(shortFolder(twin.deletingLastPathComponent())) › \(twin.lastPathComponent)")
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        // The file's name in full, then where it is: that's what you need before trashing this one.
+                        Text("Same content: \(twin.lastPathComponent) · in \(twin.deletingLastPathComponent().lastPathComponent)")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
-                    Button("Move to Trash", action: trash).buttonStyle(.plain).foregroundStyle(look.warn).font(.callout.weight(.semibold))
+                    Button("Trash This Download", action: trash).buttonStyle(.plain).foregroundStyle(look.warn).font(.callout.weight(.semibold))
                 }
                 .padding(10).warnBox()
             }
-            HStack(spacing: 10) {
+            // What happens if you don't answer is always one of the buttons below, named by its label.
+            if !status.isEmpty {
                 Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Pill(title: "Leave as Is", primary: false, action: keep).keyboardShortcut(.cancelAction)
-                Pill(title: "Save", primary: true, action: save).keyboardShortcut(.defaultAction)
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                if model.moveOnly && model.folder == nil {   // good name, nowhere to move it: only the duplicate question
+                    Pill(title: "Keep Both", primary: true, action: keep).keyboardShortcut(.defaultAction)
+                } else if model.moveOnly {
+                    Pill(title: "Keep in Downloads", primary: false, action: keep).keyboardShortcut(.cancelAction)
+                    Pill(title: "Move", primary: true, action: save).keyboardShortcut(.defaultAction)
+                } else {
+                    Pill(title: "Keep Original", primary: false, action: keep).keyboardShortcut(.cancelAction)
+                    if model.folder != nil { Pill(title: "Rename Only", primary: false, action: renameOnly) }
+                    Pill(title: model.folder == nil ? "Rename" : "Rename & Move", primary: true, action: save)
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 18)
@@ -252,12 +278,17 @@ struct DialogView: View {
         .onHover { if $0 { pause() } }
     }
 
+    /// "If you don't answer in 5 s: Rename Only": names the button that the countdown presses.
     var status: String {
         guard model.counting else { return "" }
-        let s = "\(max(model.remaining, 0)) s"
-        if model.leave { return "Away? In \(s) nothing changes." }
-        if model.pinned { return "Saves in \(s), by your rule." }
-        return model.duplicate != nil ? "Away? In \(s) both are kept." : "Away? In \(s) it's renamed and stays in Downloads."
+        let s = "If you don't answer in \(max(model.remaining, 0)) s: "
+        if model.moveOnly {
+            if model.folder == nil { return s + "Keep Both" }
+            return s + (model.pinned && !model.leave ? "Move (your rule)" : "Keep in Downloads")
+        }
+        if model.leave { return s + "Keep Original" }
+        if model.pinned { return s + "Rename & Move (your rule)" }
+        return s + (model.folder == nil ? "Rename" : "Rename Only") + (model.duplicate != nil ? ", both copies kept" : "")
     }
 }
 
@@ -432,10 +463,10 @@ enum InApp {
     static func release(_ o: NSObject) { open.removeAll { $0 === o } }
 
     static func ask(file: String, suggestion: String, folder: URL?, seconds: Int, path: URL? = nil,
-                    duplicate: URL? = nil, pinned: Bool = false, leave: Bool = false) async -> String {
+                    duplicate: URL? = nil, pinned: Bool = false, leave: Bool = false, moveOnly: Bool = false) async -> String {
         await withCheckedContinuation { (c: CheckedContinuation<String, Never>) in
             let d = CountdownDialog(file: file, name: suggestion, folder: folder, seconds: seconds, path: path,
-                                    duplicate: duplicate, pinned: pinned, leave: leave)
+                                    duplicate: duplicate, pinned: pinned, leave: leave, moveOnly: moveOnly)
             open.append(d)
             d.onFinish = { line in open.removeAll { $0 === d }; c.resume(returning: line) }
             d.present()

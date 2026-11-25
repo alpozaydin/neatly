@@ -53,8 +53,8 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         menu.addItem(status)
         menu.addItem(entry("Open neatly…", #selector(openHome)))
         menu.addItem(.separator())
-        menu.addItem(entry("Tidy Desktop…", #selector(tidyDesktop)))
-        menu.addItem(entry("Tidy a Folder…", #selector(tidyFolder)))
+        menu.addItem(entry("Rename Desktop Files…", #selector(tidyDesktop)))
+        menu.addItem(entry("Rename Files in a Folder…", #selector(tidyFolder)))
         menu.addItem(entry("History…", #selector(openHistory)))
         // Greyed out (with nothing to say) when there's nothing to undo.
         let lastDownload = History.lastDownload()
@@ -63,7 +63,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         undoDownload.isEnabled = lastDownload != nil
         menu.addItem(undoDownload)
         let n = Tidy.lastCount
-        let undoTidy = entry(n > 0 ? "Undo Last Tidy (\(n) file\(n == 1 ? "" : "s"))" : "Undo Last Tidy", #selector(undoLastTidy))
+        let undoTidy = entry(n > 0 ? "Undo Last Rename (\(n) file\(n == 1 ? "" : "s"))" : "Undo Last Rename", #selector(undoLastTidy))
         undoTidy.isEnabled = n > 0
         menu.addItem(undoTidy)
         menu.addItem(.separator())
@@ -143,7 +143,7 @@ final class MenuBar: NSObject, NSMenuDelegate, NSWindowDelegate {
         let open = NSOpenPanel()
         open.canChooseDirectories = true
         open.canChooseFiles = false
-        open.prompt = "Tidy"
+        open.prompt = "Rename Files"
         open.message = "Choose a folder: neatly suggests names for its badly named files. Nothing changes until you click Rename."
         NSApp.activate()
         open.begin { [weak self] r in   // not modal: neatly keeps working while the picker is open

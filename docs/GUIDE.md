@@ -33,7 +33,7 @@ Your files are read and named on your Mac. Three things go online:
   that is, so the name can say it (`colosseum-in-rome`). Only the photo's coordinates are sent, never the photo.
   Screenshots are never looked up.
 
-Turn both lookups off in **More options → Look up papers and photo places online**, or run with `--offline`.
+Turn both lookups off in **More options → Look up paper titles and photo places online**, or run with `--offline`.
 
 neatly keeps, in `~/Library/Application Support/neatly/`: your settings, the names you chose (to learn your style;
 the last 2,000), and the History of what it renamed (the last 500, for Revert). **More options → Forget my history**
@@ -42,7 +42,7 @@ deletes them. Activity is logged to `~/Library/Logs/neatly.log` (kept under 4 MB
 ## What it does
 
 Open **neatly** from Spotlight or Applications: a window with a drop zone (drop files or folders to name them),
-one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No Terminal needed.
+one-click renaming for your Desktop, Downloads or any folder (**Rename messy files now**), and every setting. No Terminal needed.
 
 - **Downloads** get a small popup with a suggested name **and folder** (below).
 - **Screenshots** are named the moment you take them, in place, by what's on screen: `coldplay-concert-ticket`,
@@ -56,7 +56,7 @@ one-click Tidy Desktop / Tidy Downloads / Choose a Folder, and every setting. No
   or **Open With → neatly**. The review window opens for all of them (folders: the files inside).
 - **History** (menu bar or the window): everything neatly renamed or moved, each with **Revert**. For a download,
   **Always do this** makes a rule: files from that site always go to that folder.
-- **Menu-bar icon**: Tidy Desktop, Tidy a Folder, History, Undo Last Download, name length, date, Title Case,
+- **Menu-bar icon**: Rename Desktop Files, Rename Files in a Folder, History, Undo Last Download, name length, date, Title Case,
   app name, copy screenshots to the clipboard, Pause. **Drop files or a folder on the icon** to name them.
 - **Tidy a folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
   keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
@@ -70,24 +70,30 @@ neatly service uninstall           # stop it
 neatly --watch ~/Downloads --ask --screenshots --menubar   # the same, in this terminal
 ```
 
-Every new download gets a popup in the top-right corner with a suggested name and folder:
+A new download with a junk name gets a popup in the top-right corner with a suggested name and folder:
 
 ```
 New download  scan_20261104_8812.pdf
 Name    [Rent Agreement]
 📁 Documents › Home                       Choose Folder…
-Away? In 5 s it's renamed and stays in Downloads.   [Leave as Is]  [Save]
+If you don't answer in 5 s: Rename Only
+                     [Keep Original]  [Rename Only]  [Rename & Move]
 ```
 
-**Save** puts it in that folder with that name. Edit the name to choose your own.
-**Choose Folder…** saves it in a folder you pick (any folder you can write to, even on another drive). **Leave as Is** changes nothing and won't ask again.
+**Rename & Move** puts it in that folder with that name; **Rename Only** keeps it in Downloads. Edit the name to choose your own.
+**Choose Folder…** saves it in a folder you pick (any folder you can write to, even on another drive). **Keep Original** changes nothing and won't ask again.
 Installers (.dmg, .pkg) are skipped. The popup never takes the keyboard from the app you're typing in.
+
+A download that already has a good name keeps it. If neatly knows a folder for it, the popup only offers the folder
+("name looks good", **Move to** Companies › Fincart, **Keep in Downloads** / **Move**); if not, there's no popup.
 
 **No answer in 5 seconds = the new name is kept, in Downloads**, so downloads made by agents or scripts never wait
 for a click, and nothing moves to another folder while nobody's looking (unless you made a rule for that site with
 **Always do this**). A pill then shows the new name with **Undo**. Moving the mouse over the popup or typing stops
-the countdown. Change the time with `--timeout N` (`--timeout 0` waits for you).
-A second copy of a file you already have is flagged in the popup with **Move to Trash**; with no answer, both are kept.
+the countdown. In the neatly window (More options → **If I don't answer a download suggestion**) you can change
+the time, choose **Wait for me**, or choose **Keep Original**: then no answer means the file keeps its name and
+stays where it is. From Terminal: `--timeout N` (`--timeout 0` waits for you), `--leave-if-away`.
+A second copy of a file you already have is flagged in the popup with **Trash This Download**; with no answer, both are kept.
 
 Before renaming or moving, neatly checks the file is still the one it looked at: if it was still being written or
 was replaced meanwhile, it's looked at again. Files that don't come from a browser must sit unchanged for 3 seconds first.
@@ -138,7 +144,7 @@ neatly stats      # how often you saved the suggestion unchanged, and your recen
 ## Naming style
 
 By default names read like titles: **Turkish Airlines Boarding Pass**, **Netflix Invoice Nov 2026**,
-**Colosseum in Rome**. Prefer compact names? Pick `beach-trip` under **How names look** (or
+**Colosseum in Rome**. Prefer compact names? Pick **with-dashes** under **Name style** (or
 `neatly style --sep dash --case lower`): `turkish-airlines-boarding-pass`, `invoice-netflix-nov26`.
 
 ## How it decides (cheapest first, stops as soon as it's sure)

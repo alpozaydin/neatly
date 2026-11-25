@@ -6,7 +6,7 @@ faq:
   - q: "How do I rename screenshots automatically on a Mac?"
     a: "Install neatly. Every new screenshot is named by what's on screen the moment it's saved (for example 'Hubble Space Telescope.png' instead of 'Screenshot 2026-11-16 at 10.13.03.png'). A small pill shows the new name with Undo. Tip: turn off macOS's floating thumbnail (⌘⇧5 → Options) so the file is saved, and named, right away."
   - q: "How do I rename downloaded files automatically on a Mac?"
-    a: "neatly watches your Downloads folder. When a file with a meaningless name arrives (doc_8f3a2c.pdf, 2304.02643.pdf, IMG_4821.jpg), a small popup suggests a clear name and the folder it belongs in. Click Save, edit it, or ignore it: after a few seconds it keeps the new name in Downloads (or changes nothing, if you choose that in settings), so nothing waits on you."
+    a: "neatly watches your Downloads folder. When a file with a meaningless name arrives (doc_8f3a2c.pdf, 2304.02643.pdf, IMG_4821.jpg), a small popup suggests a clear name and the folder it belongs in. Click Rename & Move, edit it, or ignore it: after a few seconds it keeps the new name in Downloads (or keeps the original, if you choose that in settings), so nothing waits on you."
   - q: "Can it rename photos by what's in them and where they were taken?"
     a: "Yes. Photos without a useful name get one from what they show, plus the place from the photo's GPS, for example 'Colosseum in Rome.jpg' or 'Two Cats in Istanbul.jpg'. The place lookup sends only the two GPS numbers to Apple Maps, and you can turn it off."
   - q: "Can I rename a whole folder of messy files at once?"

@@ -7,9 +7,9 @@ import SwiftUI
 /// for all of them instead of one per file. The files are named in the background while it shows.
 ///   Put in Folder: a new folder (name suggested, editable) with the named files inside.
 ///   Rename Only:   each file gets its name and stays in Downloads.
-///   Leave as Is:   nothing changes.
+///   Keep Originals: nothing changes.
 /// No answer = Rename Only, like a single download: nothing moves unseen. A pill then says what was done, with Undo.
-/// With "Change nothing" chosen in the window, no answer = nothing changes.
+/// With "Keep Original" chosen in the window, no answer = nothing changes.
 ///
 /// Answers with one line: "folder\t<folder name>\t<where, empty = Downloads>\t<user|picked>", "rename\t<auto|user>",
 /// "keep" or "keep\tauto" (nobody answered).
@@ -218,7 +218,7 @@ struct BatchView: View {
             Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
                 Spacer(minLength: 0)
-                Pill(title: "Leave as Is", primary: false, action: keep).keyboardShortcut(.cancelAction)
+                Pill(title: "Keep Originals", primary: false, action: keep).keyboardShortcut(.cancelAction)
                 Pill(title: "Rename Only", primary: false, action: rename)
                 Pill(title: "Put in Folder", primary: true, action: folder).keyboardShortcut(.defaultAction)
             }
@@ -237,8 +237,8 @@ struct BatchView: View {
     var status: String {
         let each = "Each file gets a clear name."
         guard model.counting else { return each }
-        if model.leave { return "\(each) Away? In \(max(model.remaining, 0)) s nothing changes." }
-        return "\(each) Away? In \(max(model.remaining, 0)) s they're renamed and stay in Downloads."
+        if model.leave { return "\(each) If you don't answer in \(max(model.remaining, 0)) s: Keep Originals" }
+        return "\(each) If you don't answer in \(max(model.remaining, 0)) s: Rename Only"
     }
 }
 

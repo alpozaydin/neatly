@@ -101,7 +101,7 @@ Only three small things ever go online, never the files themselves:
 - **Paper titles**: a research paper's arXiv number, to get its real title.
 - **Photo places**: a phone photo's GPS coordinates (just the two numbers) go to Apple Maps, to name the place.
 
-You can turn any of them off at any time: **More options → Look up papers and photo places online**, or the
+You can turn any of them off at any time: **More options → Look up paper titles and photo places online**, or the
 update switch next to it. [Privacy details](docs/GUIDE.md#privacy)
 
 ## More

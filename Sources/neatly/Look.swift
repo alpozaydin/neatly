@@ -38,15 +38,15 @@ struct Look {
     var fill: Adaptive { ink ?? accent }
     var onFill: Adaptive { onInk ?? onAccent }
 
-    /// A "Graphite": ink-black buttons and choices; one quiet forest-green accent for "on" and links.
+    /// A "Graphite": quiet grey surfaces, softly colored line icons, and one forest-green accent for the main
+    /// button, the selected choice, switches and links. Cards stand a little apart from the window.
     static let graphite = Look(
         accent: Adaptive(0x22634A, 0x6CC197), onAccent: Adaptive(0xFFFFFF, 0x0E1A14),
         link: Adaptive(0x22634A, 0x7FCCA3),
-        window: Adaptive(0xFAFAFA, 0x161618), surface: Adaptive(0xFFFFFF, 0x1F1F22),
-        stroke: Adaptive(0xE6E6E8, 0x2C2C30), field: Adaptive(0xF1F1F2, 0x2A2A2E),
+        window: Adaptive(0xF3F3F5, 0x161618), surface: Adaptive(0xFFFFFF, 0x222225),
+        stroke: Adaptive(0xDEDEE2, 0x313136), field: Adaptive(0xECECEF, 0x2D2D32),
         glyph: Adaptive(0x6E6E73, 0x9A9AA0), warn: Adaptive(0xB25E09, 0xE8A04B),
-        icons: .glyph, radius: 12, control: 8, titleFont: .default, titleWeight: .semibold, section: true,
-        ink: Adaptive(0x1C1C1E, 0xF2F2F3), onInk: Adaptive(0xFFFFFF, 0x111113))
+        icons: .glyph, radius: 12, control: 8, titleFont: .default, titleWeight: .semibold, section: true)
 
     /// B "Paper": warm off-white, ink-navy accent, New York for titles.
     static let paper = Look(
@@ -67,6 +67,19 @@ struct Look {
         icons: .badge, radius: 10, control: 6, titleFont: .default, titleWeight: .bold, section: true)
 
     static let current: Look = .graphite
+
+    /// Soft colors for line icons (Graphite): enough to tell sections apart, never loud. Gray stays the glyph grey.
+    static func tint(_ c: Color) -> Adaptive {
+        switch c {
+        case .green: Adaptive(0x2E8B5E, 0x6CC197)
+        case .purple, .indigo: Adaptive(0x6B5BD2, 0xA79CF0)
+        case .orange: Adaptive(0xC8781F, 0xF0B060)
+        case .red: Adaptive(0xC9463D, 0xF08A80)
+        case .teal: Adaptive(0x2B86A3, 0x6FC3DB)
+        case .gray: look.glyph
+        default: Adaptive(0x2F6FD0, 0x7AAAF5)
+        }
+    }
 
     /// Flat, quiet versions of the colors badges use (C only).
     static func badge(_ c: Color) -> Color {
