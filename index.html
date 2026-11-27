@@ -2,6 +2,7 @@
 layout: default
 title: "neatly — free AI file renamer for Mac"
 description: "neatly gives your downloads, screenshots and photos clear names by itself. A free Mac app: download, drag to Applications, done. Private: everything stays on your Mac."
+preload: /docs/assets/demo-poster.webp
 ---
 <style>
   .hero { text-align:center; padding:28px 0 8px; }
@@ -49,14 +50,14 @@ description: "neatly gives your downloads, screenshots and photos clear names by
 </style>
 
 <div class="hero">
-  <img class="icon" src="{{ '/docs/assets/icon.png' | relative_url }}" alt="neatly icon">
+  <img class="icon" src="{{ '/docs/assets/icon.png' | relative_url }}" width="112" height="112" alt="neatly icon">
   <h1>neatly <span class="kind">Free AI file renamer for Mac</span></h1>
   <p class="lead">Clear names for your files, automatically.</p>
   <p class="sub">No more <code>IMG_4821.jpg</code> or <code>Screenshot 2026-11-14 at 23.12.04.png</code>.
      neatly gives your downloads, screenshots and photos real names, by itself. Free, and everything stays on your Mac.</p>
   <a class="btn" href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">⬇️&nbsp; Download for Mac</a>
   <div class="fine">Free · For Macs with Apple silicon (M1 or newer) and macOS 26 or newer · Checked and approved by Apple</div>
-  <div class="shot"><video autoplay muted loop playsinline width="1200" height="750" poster="{{ '/docs/assets/demo-poster.jpg' | relative_url }}" aria-label="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"><source src="{{ '/docs/assets/demo.mp4' | relative_url }}" type="video/mp4"><img src="{{ '/docs/assets/demo.gif' | relative_url }}" alt="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"></video></div>
+  <div class="shot"><video autoplay muted loop playsinline width="1200" height="750" poster="{{ '/docs/assets/demo-poster.webp' | relative_url }}" aria-label="A download called doc_8f3a2c_20261104.pdf; neatly suggests Water Bill Nov 2026 in Documents › Bills"><source src="{{ '/docs/assets/demo.mp4' | relative_url }}" type="video/mp4"></video></div>
 </div>
 
 <section id="install">
@@ -82,14 +83,14 @@ description: "neatly gives your downloads, screenshots and photos clear names by
 
 <section>
   <h2>Before and after</h2>
-  <div class="shot" style="margin-top:20px"><img src="{{ '/docs/assets/hero.png' | relative_url }}" loading="lazy" alt="Messy file names on the left, clear names from neatly on the right"></div>
+  <div class="shot" style="margin-top:20px"><img src="{{ '/docs/assets/hero.webp' | relative_url }}" width="1600" height="820" loading="lazy" alt="Messy file names on the left, clear names from neatly on the right"></div>
 </section>
 
 <section>
   <h2>On a real Mac</h2>
   <div class="pair" style="margin-top:20px">
-    <figure><video autoplay muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-screenshot-poster.jpg' | relative_url }}" aria-label="A screenshot of the Hubble Space Telescope page gets its name right away"><source src="{{ '/docs/assets/real-screenshot.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📸 A screenshot, named as it's taken</figcaption></figure>
-    <figure><video autoplay muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-download-poster.jpg' | relative_url }}" aria-label="A downloaded research paper gets its title as its name"><source src="{{ '/docs/assets/real-download.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📥 A downloaded paper, named by its title</figcaption></figure>
+    <figure><video data-lazy muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-screenshot-poster.webp' | relative_url }}" aria-label="A screenshot of the Hubble Space Telescope page gets its name right away"><source src="{{ '/docs/assets/real-screenshot.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📸 A screenshot, named as it's taken</figcaption></figure>
+    <figure><video data-lazy muted loop playsinline preload="none" width="800" height="516" poster="{{ '/docs/assets/real-download-poster.webp' | relative_url }}" aria-label="A downloaded research paper gets its title as its name"><source src="{{ '/docs/assets/real-download.mp4' | relative_url }}" type="video/mp4"></video><figcaption>📥 A downloaded paper, named by its title</figcaption></figure>
   </div>
 </section>
 
@@ -143,3 +144,15 @@ description: "neatly gives your downloads, screenshots and photos clear names by
     <code>brew install alpozaydin/tap/neatly && neatly service install</code>,
     or see the <a href="https://github.com/alpozaydin/neatly">code on GitHub</a>. Ideas, issues and pull requests are welcome.</p>
 </section>
+
+<script>
+// Play the "On a real Mac" videos only when they scroll into view, so they don't slow the first load.
+(function () {
+  var vids = document.querySelectorAll('video[data-lazy]');
+  if (!('IntersectionObserver' in window)) { vids.forEach(function (v) { v.play(); }); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { e.target.play(); io.unobserve(e.target); } });
+  }, { rootMargin: '200px' });
+  vids.forEach(function (v) { io.observe(v); });
+})();
+</script>

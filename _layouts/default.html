@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#22634A">
 {% seo %}
+{% if page.preload %}<link rel="preload" as="image" href="{{ page.preload | relative_url }}" fetchpriority="high">{% endif %}
 <meta name="keywords" content="AI file renamer, Mac, macOS, rename screenshots automatically, rename downloads, rename photos, file organizer, Apple Intelligence, on-device AI, private, open source, free">
 <link rel="icon" type="image/png" sizes="64x64" href="{{ '/docs/assets/favicon.png' | relative_url }}">
 <link rel="apple-touch-icon" sizes="180x180" href="{{ '/docs/assets/apple-touch-icon.png' | relative_url }}">
@@ -82,7 +83,7 @@
 </head>
 <body>
 <nav>
-  <a class="brand" href="{{ '/' | relative_url }}"><img src="{{ '/docs/assets/icon.png' | relative_url }}" alt="">neatly</a>
+  <a class="brand" href="{{ '/' | relative_url }}"><img src="{{ '/docs/assets/icon.png' | relative_url }}" width="30" height="30" alt="">neatly</a>
   <a href="{{ '/' | relative_url }}#install">Install</a>
   <a href="{{ '/faq/' | relative_url }}">FAQ</a>
   <a href="https://github.com/alpozaydin/neatly/blob/main/docs/GUIDE.md">Guide</a>
