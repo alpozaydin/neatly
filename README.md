@@ -48,7 +48,7 @@ It lives in your menu bar and keeps itself up to date.
 | 📥 **Downloads** | A small popup suggests a name **and a folder**. Away? It keeps the new name and never makes you wait. |
 | 📸 **Screenshots** | Named the moment you take them, by what's on screen. One click to undo. |
 | 🏞️ **Photos** | Named by what they show, and where they were taken. |
-| 🧹 **Tidy** | Clean up your Desktop, Downloads or any folder at once. You review every name first. |
+| 🧹 **Whole folders** | Rename messy files on your Desktop, in Downloads or any folder at once (or just the last 7 days). You review every name first. |
 | 🖱️ **Finder** | Select files → right-click → **Rename with neatly** (or Open With → neatly). |
 | ↩️ **History** | Everything neatly changed, each with **Revert**. "Always do this" turns a choice into a rule. |
 | 🎨 **Your style** | Natural names by default; short or long, dashes or spaces, dates, light or dark. |

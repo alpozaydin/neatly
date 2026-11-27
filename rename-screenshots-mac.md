@@ -49,7 +49,7 @@ screen:
 - **Screen recordings too:** they're named from what's on screen.
 - **Private:** it reads the screenshot on your Mac with Apple's on-device model. Nothing is uploaded.
 - **Your style:** natural names by default, or `turkish-airlines-boarding-pass` with dashes, dates first or last.
-- **Old screenshots:** open **Tidy** from the menu bar to name the ones already on your Desktop. You review every name first.
+- **Old screenshots:** open neatly → **Rename messy files now** → **Desktop** to name the ones already there. You review every name first.
 
 <p><a style="display:inline-block;background:var(--deep);color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:700" href="https://github.com/alpozaydin/neatly/releases/latest/download/neatly.dmg">⬇️ Download neatly for Mac</a></p>
 
@@ -64,6 +64,7 @@ Needs a Mac with Apple silicon and macOS 26 or later. Turn on Apple Intelligence
 ## Related
 
 - [Organize the Downloads folder on Mac](../organize-downloads-mac/)
+- [Rename photos automatically on Mac](../rename-photos-mac/)
 - [AI file renamer for Mac: how it works](../ai-file-renamer-mac/)
 - [neatly vs Finder, Shortcuts and Hazel](../alternatives/)
 - [FAQ](../faq/)

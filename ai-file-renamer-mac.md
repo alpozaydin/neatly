@@ -21,7 +21,7 @@ nothing uploaded.
 | Photo | `IMG_4108.HEIC` | `Colosseum in Rome.heic` |
 | Scan | `scan_20261104_8812.pdf` | `Rent Agreement.pdf` |
 
-It works three ways: **automatically** for new downloads and screenshots, **in bulk** with the Tidy window, and
+It works three ways: **automatically** for new downloads and screenshots, **in bulk** for a whole folder (**Rename messy files now**), and
 **on demand** from Finder (right-click → Rename with neatly).
 
 ## How it works
@@ -62,5 +62,7 @@ without it, neatly still names many files with its rules and the text it reads.
 
 - [Rename screenshots automatically on Mac](../rename-screenshots-mac/)
 - [Organize the Downloads folder on Mac](../organize-downloads-mac/)
+- [Rename PDF files by their content on Mac](../rename-pdf-files-mac/)
+- [Rename photos automatically on Mac](../rename-photos-mac/)
 - [neatly vs Finder, Shortcuts and Hazel](../alternatives/)
 - [FAQ](../faq/)

@@ -10,6 +10,9 @@ defaults:
   - scope: { path: "" }
     values:
       image: /docs/assets/social.png
+  - scope: { path: "google3e7ef78da95890f9.html" }
+    values:
+      sitemap: false
 plugins:
   - jekyll-seo-tag
   - jekyll-sitemap

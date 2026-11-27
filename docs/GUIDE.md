@@ -58,7 +58,7 @@ one-click renaming for your Desktop, Downloads or any folder (**Rename messy fil
   **Always do this** makes a rule: files from that site always go to that folder.
 - **Menu-bar icon**: Rename Desktop Files, Rename Files in a Folder, History, Undo Last Download, name length, date, Title Case,
   app name, copy screenshots to the clipboard, Pause. **Drop files or a folder on the icon** to name them.
-- **Tidy a folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
+- **Rename a whole folder** in a review window (`neatly tidy`, `neatly tidy ~/Downloads`): edit any name, untick what to
   keep, then Rename. **Undo All** puts every name back (`neatly undo --last` later).
 - Works on PDFs, Word, PowerPoint, notebooks, e-books (EPUB), zips, images, screenshots and screen recordings.
 
@@ -90,7 +90,7 @@ A download that already has a good name keeps it. If neatly knows a folder for i
 **No answer in 5 seconds = the new name is kept, in Downloads**, so downloads made by agents or scripts never wait
 for a click, and nothing moves to another folder while nobody's looking (unless you made a rule for that site with
 **Always do this**). A pill then shows the new name with **Undo**. Moving the mouse over the popup or typing stops
-the countdown. In the neatly window (More options → **If I don't answer a download suggestion**) you can change
+the countdown. In the neatly window (More options → **If you don't answer a download popup**) you can change
 the time, choose **Wait for me**, or choose **Keep Original**: then no answer means the file keeps its name and
 stays where it is. From Terminal: `--timeout N` (`--timeout 0` waits for you), `--leave-if-away`.
 A second copy of a file you already have is flagged in the popup with **Trash This Download**; with no answer, both are kept.

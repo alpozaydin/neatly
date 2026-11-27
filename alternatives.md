@@ -15,7 +15,7 @@ There are several ways to rename files on a Mac. They solve different problems, 
 | **Finder: suggested names** (Apple Intelligence) | Yes | No | No, one file at a time | Built in |
 | **Shortcuts + Apple Intelligence** | Yes | With a folder action | You build it | Built in |
 | **Hazel** | Partly, with rules you write | Yes | Yes | Paid |
-| **neatly** | Yes | Yes | Yes (Tidy) | Free, open source |
+| **neatly** | Yes | Yes | Yes | Free, open source |
 
 ## Finder: Rename items
 
@@ -63,4 +63,6 @@ change can be undone.
 - [Rename screenshots automatically on Mac](../rename-screenshots-mac/)
 - [Organize the Downloads folder on Mac](../organize-downloads-mac/)
 - [AI file renamer for Mac: how it works](../ai-file-renamer-mac/)
+- [Rename PDF files by their content on Mac](../rename-pdf-files-mac/)
+- [Rename photos automatically on Mac](../rename-photos-mac/)
 - [FAQ](../faq/)

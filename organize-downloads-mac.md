@@ -17,8 +17,9 @@ nothing, so you end up opening each file to find the one you need. Here's how to
 - **Group by kind.** View → Use Groups → **Kind** puts PDFs, images and installers together.
 - **Delete installers.** `.dmg` and `.pkg` files are safe to delete once the app is installed.
 - **Name the rest.** This is the slow part: open each file, read it, type a name.
-  [neatly](../)'s **Tidy** window does it for a whole folder at once. You see every suggested name and folder, then
-  click Rename. Every change can be reverted from History.
+  [neatly](../) does it for a whole folder at once: open it → **Rename messy files now** → **Downloads**. Newest
+  files come first, and for a big folder you can choose **Last 7 days**, **Last 30 days**, **Last year** or **All**.
+  You see every suggested name, then click Rename. Every change can be reverted from History.
 
 ## 2. Keep it clean: name new downloads as they arrive
 
@@ -50,6 +51,8 @@ tracking. [Privacy details](../privacy/)
 ## Related
 
 - [Rename screenshots automatically on Mac](../rename-screenshots-mac/)
+- [Rename PDF files by their content on Mac](../rename-pdf-files-mac/)
+- [Rename photos automatically on Mac](../rename-photos-mac/)
 - [AI file renamer for Mac: how it works](../ai-file-renamer-mac/)
 - [neatly vs Finder, Shortcuts and Hazel](../alternatives/)
 - [FAQ](../faq/)

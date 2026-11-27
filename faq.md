@@ -10,7 +10,7 @@ faq:
   - q: "Can it rename photos by what's in them and where they were taken?"
     a: "Yes. Photos without a useful name get one from what they show, plus the place from the photo's GPS, for example 'Colosseum in Rome.jpg' or 'Two Cats in Istanbul.jpg'. The place lookup sends only the two GPS numbers to Apple Maps, and you can turn it off."
   - q: "Can I rename a whole folder of messy files at once?"
-    a: "Yes. Open Tidy from the menu bar (or right-click files in Finder → Rename with neatly). You see every suggested name first and rename them all with one click. History lets you revert any rename later."
+    a: "Yes. Open neatly → Rename messy files now, and pick Desktop, Downloads or any folder (or right-click files in Finder → Rename with neatly). For big folders you can choose only the last 7 days, 30 days or year. You see every suggested name first and rename them all with one click. History lets you revert any rename later."
   - q: "Is it private? Does it upload my files?"
     a: "Your files never leave your Mac. neatly reads them with Apple's on-device model (Apple Intelligence), with no account, no tracking and no cloud AI. Only three small things can go online: the update check, an arXiv paper number (to get the paper's real title) and a photo's GPS coordinates (to name the place). All three can be turned off."
   - q: "Is neatly free?"
